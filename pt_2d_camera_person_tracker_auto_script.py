@@ -22,26 +22,40 @@ from sensor_msgs.msg import Image
 from nepi_ros_interfaces.msg import ClassifierSelection, PanTiltLimits, PanTiltPosition, PanTiltStatus, StringArray
 from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 
-######################## SETUP - Edit as Necessary ##################################
-# ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
 
-# Set Camera topics and parameters
+############################################################################
+# SETUP - User Settings
+############################################################################
+
+# Minimum detection box area as a ration of image size
+MIN_DETECT_BOX_AREA_RATIO = 0.15 # Filters background targets.
+OBJ_LABEL_OF_INTEREST = "person"
+
+
+# Set Camera topics
 CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
 #CAMERA_NAME = "sidus_ss400/"
 #CAMERA_NAME = "onwote_hd_poe/"
 #CAMERA_NAME = "see3cam_cu81/"
-CAMERA_NAMESPACE = BASE_NAMESPACE + CAMERA_NAME
+CAM_RES=1 # Number 0-3, 0 Low, 1 Med, 2 High, 3 Ultra
 
+# Pan and Tilt topics and parameters
+PT_NAME = "iqr_pan_tilt/"
+PT_REVERSE_PAN = False # Relative to image pixel location reporting
+PT_REVERSE_TILT = True # Relative to image pixel location reporting
+PT_SCAN_PAN_LIMITS = 40 # +- Pan Angle Limits
+PT_SCAN_TILT_RATIO = 0.55 # Tilt Angle During Scanning
+
+############################################################################
+# SETUP - Env Settings
+############################################################################
+# ROS namespace setup
+BASE_NAMESPACE = "/nepi/s2x/"
+CAMERA_NAMESPACE = BASE_NAMESPACE + CAMERA_NAME
 RESOLUTION_ADJ_TOPIC = CAMERA_NAMESPACE + "idx/set_resolution_mode"
 COLOR_2D_IMG_TOPIC = CAMERA_NAMESPACE + "idx/color_2d_image"
+#COLOR_2D_IMG_TOPIC = CAMERA_NAMESPACE + idx/enhanced_2d_image
 
-LOW_RES_VALUE = 0
-MED_RES_VALUE = 1
-HIGH_RES_VALUE = 2
-ULTRA_RES_VALUE = 3
-
-OBJ_CENTERED_BUFFER_RATIO = 0.3 # Hysteresis band about center of image for tracking purposes
 
 # Classifier topics and parameters
 BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
@@ -50,13 +64,11 @@ START_CLASSIFIER_TOPIC = BASE_NAMESPACE + "start_classifier"
 STOP_CLASSIFIER_TOPIC = BASE_NAMESPACE + "stop_classifier"
 DETECTION_MODEL = "common_object_detection"
 DETECTION_THRESHOLD = 0.5
-MIN_BOX_AREA = 50 # Minimum detection box area (px^2) to track
+MIN_BOX_AREA = 50000 # Minimum detection box area (px^2) to track
+OBJ_CENTERED_BUFFER_RATIO = 0.3 # Hysteresis band about center of image for tracking purposes
 
-# Parameters for actions upon detection of object of interest
-OBJ_LABEL_OF_INTEREST = "person"
 
-# Pan and Tilt topics and parameters
-PT_NAME = "iqr_pan_tilt/"
+
 PT_NAMESPACE = BASE_NAMESPACE + PT_NAME
 
 
@@ -69,20 +81,20 @@ PT_GOTO_TILT_RATIO_TOPIC = PT_NAMESPACE + "ptx/jog_to_pitch_ratio"
 PT_SET_SOFT_LIMITS_TOPIC = PT_NAMESPACE + "ptx/set_soft_limits"
 
 # Parameters for pan and tilt settings
-PT_REVERSE_PAN = False # Relative to image pixel location reporting
-PT_REVERSE_TILT = True # Relative to image pixel location reporting
 PT_SCAN_CHECK_INTERVAL = 0.5
 PT_SCAN_SPEED = 0.6
-PT_SCAN_TILT_RATIO = 0.55
 PT_MAX_TRACK_SPEED = 1.0
 PT_MIN_TRACK_SPEED = 0.05
 PT_OBJECT_TILT_OFFSET_RATIO = 0.7 # Adjust tilt tracking ratio location within box
-PT_SCAN_PAN_LIMITS = 55 # +-
+
+
+
 
 
 #####################################################################################
-
 # Globals
+#####################################################################################
+
 res_adj_pub = rospy.Publisher(RESOLUTION_ADJ_TOPIC, UInt8, queue_size=10)
 stop_classifier_pub = rospy.Publisher(STOP_CLASSIFIER_TOPIC, Empty, queue_size=10)
 send_pt_home_pub = rospy.Publisher(PT_GOHOME_TOPIC, Empty, queue_size=10)
@@ -91,6 +103,9 @@ set_pt_pan_ratio_pub = rospy.Publisher(PT_GOTO_PAN_RATIO_TOPIC, Float32, queue_s
 set_pt_tilt_ratio_pub = rospy.Publisher(PT_GOTO_TILT_RATIO_TOPIC, Float32, queue_size=10)
 set_pt_soft_limits_pub = rospy.Publisher(PT_SET_SOFT_LIMITS_TOPIC, PanTiltLimits, queue_size=10)
 
+img_width = 0 # Updated on receipt of first image
+img_height = 0 # Updated on receipt of first image
+img_area = 0 # Updated on receipt of first image
 
 pt_stop_motion_pub = rospy.Publisher(PT_STOP_TOPIC, Empty, queue_size=10)
 pan_scan_direction = 1 # Keep track of current scan direction (1: Positive Limit, -1: Negative Limit)
@@ -110,15 +125,59 @@ pt_pitch_now_ratio=0
 pt_speed_now_ratio=0
 
 
+
+#####################################################################################
+# Methods
+#####################################################################################
+
+
+### System Initialization processes
+def initialize_actions():
+  global pt_tilt_scan_ratio
+  # Detect and Initialize PanTilt
+  # Camera initialization
+  print("Initializing " + CAMERA_NAMESPACE + " to MEDIUM resolution")
+  time.sleep(1)
+  res_adj_pub.publish(CAM_RES)
+  # Classifier initialization
+  start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
+  classifier_selection = ClassifierSelection(img_topic=COLOR_2D_IMG_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
+  time.sleep(1) # Important to sleep between publisher constructor and publish()
+  print("Starting object detector: " + str(start_classifier_pub.name))
+  start_classifier_pub.publish(classifier_selection)
+  # Start PT Status Callback
+  print("Starting Pan Tilt Stutus callback")
+  rospy.Subscriber(PT_GET_STATUS_TOPIC, PanTiltStatus, pt_status_callback)  
+  # Pan/Tilt initialization: Center both axes
+  print("Setting pan/tilt to initial position and speed")
+  print("Scan tilt ratio set to: " + "%.2f" % (pt_tilt_scan_ratio))
+  set_pt_tilt_ratio_pub.publish(pt_tilt_scan_ratio)
+  set_pt_pan_ratio_pub.publish(0.5)
+  set_pt_speed_ratio_pub.publish(PT_SCAN_SPEED)
+  time.sleep(2) # Give time to center  
+  #Wait to get the image dimensions
+  img_sub = rospy.Subscriber(COLOR_2D_IMG_TOPIC, Image, image_callback)
+  while img_width is 0 and img_height is 0:
+    print("Waiting for initial image to determine dimensions")
+    time.sleep(1)
+  img_sub.unregister() # Don't need it anymore
+  # Set up the timer that start scanning when no objects are detected
+  print("Setting up pan/tilt scan check timer")
+  rospy.Timer(rospy.Duration(PT_SCAN_CHECK_INTERVAL), pt_scan_timer_callback)
+  print("Initialization Complete")
+
   ### Simple callback to get image height and width
 def image_callback(img_msg):
   # This is just to get the image size for ratio purposes
   global img_height
   global img_width
+  global img_area
   if (img_height == 0 and img_width == 0):
     print("Initial input image received. Size = " + str(img_msg.width) + "x" + str(img_msg.height))
     img_height = img_msg.height
     img_width = img_msg.width
+    img_area = img_height*img_width
+
 
 
 ### Simple callback to get pt status info
@@ -178,82 +237,48 @@ def pt_scan_timer_callback(timer):
     set_pt_tilt_ratio_pub.publish(pt_tilt_scan_ratio)
   #object_detected=False  # reset obj detection value
 
-### System Initialization processes
-def initialize_actions():
-  global pt_tilt_scan_ratio
-  # Detect and Initialize PanTilt
 
-  # Camera initialization
-  print("Initializing " + CAMERA_NAMESPACE + " to MEDIUM resolution")
-  time.sleep(1)
-  res_adj_pub.publish(MED_RES_VALUE)
-  
-  # Classifier initialization
-  start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
-  classifier_selection = ClassifierSelection(img_topic=COLOR_2D_IMG_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
-  time.sleep(1) # Important to sleep between publisher constructor and publish()
-  print("Starting object detector: " + str(start_classifier_pub.name))
-  start_classifier_pub.publish(classifier_selection)
-
-  # Start PT Status Callback
-  print("Starting Pan Tilt Stutus callback")
-  rospy.Subscriber(PT_GET_STATUS_TOPIC, PanTiltStatus, pt_status_callback)
-  
-  # Pan/Tilt initialization: Center both axes
-  print("Setting pan/tilt to initial position and speed")
-  print("Scan tilt ratio set to: " + "%.2f" % (pt_tilt_scan_ratio))
-  set_pt_tilt_ratio_pub.publish(pt_tilt_scan_ratio)
-  set_pt_pan_ratio_pub.publish(0.5)
-  set_pt_speed_ratio_pub.publish(PT_SCAN_SPEED)
-  time.sleep(2) # Give time to center
-  
-  #Wait to get the image dimensions
-  img_sub = rospy.Subscriber(COLOR_2D_IMG_TOPIC, Image, image_callback)
-  while img_width is 0 and img_height is 0:
-    print("Waiting for initial image to determine dimensions")
-    time.sleep(1)
-  img_sub.unregister() # Don't need it anymore
-
-  # Set up the timer that start scanning when no objects are detected
-  print("Setting up pan/tilt scan check timer")
-  rospy.Timer(rospy.Duration(PT_SCAN_CHECK_INTERVAL), pt_scan_timer_callback)
-
-  print("Initialization Complete")
   
 ### Detection and localization of object of interest relative to FOV center in degrees
 def objects_detected_callback(bounding_box_msg):
   global pan_scan_direction
   global last_object_pan_ratio
   global object_detected
+  global img_area
   box_of_interest = None
+  print("Entering Detection Callback")
   # Iterate over all of the objects reported by the detector and return center of largest box in degrees relative to img center
-  largest_box_area=0 # Initialize largest box area
+  largest_box_area_ratio=0 # Initialize largest box area
   for box in bounding_box_msg.bounding_boxes:
     # Check for the object of interest and take appropriate actions
     if box.Class == OBJ_LABEL_OF_INTEREST:
       # Check if largest box
       box_area=(box.xmax-box.xmin)*(box.ymax-box.ymin)
-      if box_area > largest_box_area:
-        largest_box_area=box_area
-        box_of_interest = box
-      if largest_box_area > MIN_BOX_AREA:
-        object_detected=True
-        # Calculate the box center in image ratio terms
-        object_tilt_ratio=PT_OBJECT_TILT_OFFSET_RATIO
-        if PT_REVERSE_TILT:
-          object_tilt_ratio=1-object_tilt_ratio
-        object_loc_y_pix = box_of_interest.ymin + ((box_of_interest.ymax - box_of_interest.ymin)  * object_tilt_ratio) 
-        object_loc_x_pix = box_of_interest.xmin + ((box_of_interest.xmax - box_of_interest.xmin)  / 2)
-        object_loc_y_ratio = float(object_loc_y_pix) / img_height
-        object_loc_x_ratio = float(object_loc_x_pix) / img_width
-        #print("Object Detected " + OBJ_LABEL_OF_INTEREST + " with box center (" + str(object_loc_x_ratio) + ", " + str(object_loc_y_ratio) + ")")
-        # Call the tracking algorithm
-        pt_track_box(object_loc_y_ratio, object_loc_x_ratio)
-        # Set next scan direction in direction of target
-        pan_scan_direction = np.sign(last_object_pan_ratio-object_loc_x_ratio) # direction used if object lost an scan mode start up
-        last_object_pan_ratio=object_loc_x_ratio
-
-  if box_of_interest is None:
+      box_area_ratio = float(box_area) / img_area
+      print("")
+      print("box_area_ratio: " + "%.6f" % (box_area_ratio) )
+      print("")
+      if box_area_ratio > largest_box_area_ratio:
+        largest_box_area_ratio=box_area_ratio
+        largest_box=box
+  if largest_box_area_ratio > MIN_DETECT_BOX_AREA_RATIO:
+    box_of_interest = largest_box
+    object_detected=True
+    # Calculate the box center in image ratio terms
+    object_tilt_ratio=PT_OBJECT_TILT_OFFSET_RATIO
+    if PT_REVERSE_TILT:
+      object_tilt_ratio=1-object_tilt_ratio
+    object_loc_y_pix = box_of_interest.ymin + ((box_of_interest.ymax - box_of_interest.ymin)  * object_tilt_ratio) 
+    object_loc_x_pix = box_of_interest.xmin + ((box_of_interest.xmax - box_of_interest.xmin)  / 2)
+    object_loc_y_ratio = float(object_loc_y_pix) / img_height
+    object_loc_x_ratio = float(object_loc_x_pix) / img_width
+    #print("Object Detected " + OBJ_LABEL_OF_INTEREST + " with box center (" + str(object_loc_x_ratio) + ", " + str(object_loc_y_ratio) + ")")
+    # Call the tracking algorithm
+    pt_track_box(object_loc_y_ratio, object_loc_x_ratio)
+    # Set next scan direction in direction of target
+    pan_scan_direction = np.sign(last_object_pan_ratio-object_loc_x_ratio) # direction used if object lost an scan mode start up
+    last_object_pan_ratio=object_loc_x_ratio
+  else:
     # Object of interest not detected, so reset object_detected
     object_detected=False  # will start scan mode on next timer event
   
@@ -263,6 +288,7 @@ def found_object_callback(found_obj_msg):
   if found_obj_msg.count == 0:
     print("No objects found")
     object_detected=False
+
 
 ### Track box process based on current box center relative ratio of image
 def pt_track_box(object_loc_y_ratio, object_loc_x_ratio):
@@ -298,7 +324,7 @@ def pt_track_box(object_loc_y_ratio, object_loc_x_ratio):
       pan_axis_ratio_target = pt_forward_pan_limit_ratio if object_loc_x_ratio < 0.5 else pt_backward_pan_limit_ratio
       set_pt_pan_ratio_pub.publish(pan_axis_ratio_target)
       print("Current pan_track_to_ratio: " + "%.2f" % (pan_axis_ratio_target))
-    time.sleep(0.1)
+ 
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
@@ -333,6 +359,10 @@ def startNode():
   # Spin forever (until object is detected)
   rospy.spin()
 
+
+#####################################################################################
+# Main
+#####################################################################################
 if __name__ == '__main__':
   startNode()   #initialize system
 

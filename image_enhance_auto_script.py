@@ -33,10 +33,10 @@ RESOLUTION_ADJ_TOPIC = CAMERA_NAMESPACE + "idx/set_resolution_mode"
 IMAGE_INPUT_TOPIC = CAMERA_NAMESPACE + "idx/color_2d_image"
 
 
-LOW_RES_VALUE = 0
-MED_RES_VALUE = 1
-HIGH_RES_VALUE = 2
-ULTRA_RES_VALUE = 3
+#LOW_RES_VALUE = 0
+#MED_RES_VALUE = 1
+#HIGH_RES_VALUE = 2
+#ULTRA_RES_VALUE = 3
 
 ###!!!!!!!! Set Enhancment topics and parameters !!!!!!!!
 ENHANCED_IMAGE_TOPIC = CAMERA_NAMESPACE + "idx/enhanced_2d_image"
