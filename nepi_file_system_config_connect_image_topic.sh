@@ -5,7 +5,7 @@
 
 filename=nepi_link_ros_bridge.yaml.user
 cd /opt/nepi/ros/etc/nepi_link_ros_bridge/
-rm $filename
+echo -ne '\n' | rm $filename
 cat > $filename <<EOF
 #####################################
 # Edit the user CONNECT config content below
