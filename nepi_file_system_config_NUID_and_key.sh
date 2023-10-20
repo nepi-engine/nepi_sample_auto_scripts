@@ -12,7 +12,7 @@
 ### https://numbergenerator.org/random-10-digit-number-generator 
 #NUID=4999999999
 ### or randomize it -- this does a random 10-digit number
-NUID=`echo $((RANDOM%(9999)))$((RANDOM%(9999)))$((RANDOM%(999)))`
+NUID=`echo $((RANDOM%(9999)))$((RANDOM%(9999)))$((RANDOM%(99)))`
 #####################################################
 
 ### Change the NUID number below to your desired NUID
