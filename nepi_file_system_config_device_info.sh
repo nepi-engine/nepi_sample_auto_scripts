@@ -11,7 +11,7 @@ rm /opt/nepi/.sys_env.bash.swp
 Serial_Number=100100
 sed -i "s/DEVICE_SN=.*/DEVICE_SN=$Serial_Number/" /opt/nepi/sys_env.bash
 ###--Device ID Updating ------------------------------------------------------
-ID=S2X
+ID=s2x
 sed -i "s/DEVICE_ID=.*/DEVICE_ID=$ID/" /opt/nepi/sys_env.bash
 #####################################################
 
