@@ -16,18 +16,18 @@ hb: {auto_data_offload: false, data_source_folder: /mnt/nepi-storage/data, enabl
 lb:
   available_data_sources:
 #####################################
-# Edit Your Camera Image Topic List Here
+# Edit Your Camera Image Topic List Here, Comment or Delete Devices Not Present, Add New Devices If Needed
 #####################################
   - {conversion_call: lb_convert_image, enabled: true, msg_mod: sensor_msgs.msg, msg_type: Image,
     snippet_id: 0, snippet_type: img, topic: nexigo_n60_fhd_webcam_audio/idx/color_2d_image}
-  - {conversion_call: lb_convert_image, enabled: false, msg_mod: sensor_msgs.msg, msg_type: Image,
-    snippet_id: 0, snippet_type: img, topic: see3cam_cu81/idx/color_2d_image}
-  - {conversion_call: lb_convert_image, enabled: false, msg_mod: sensor_msgs.msg, msg_type: Image,
-    snippet_id: 0, snippet_type: img, topic: econ_routecam/idx/color_2d_image}
-  - {conversion_call: lb_convert_image, enabled: false, msg_mod: sensor_msgs.msg, msg_type: Image,
-    snippet_id: 0, snippet_type: img, topic: onwote_hd_poe/idx/color_2d_image}
-  - {conversion_call: lb_convert_image, enabled: false, msg_mod: sensor_msgs.msg, msg_type: Image,
-    snippet_id: 0, snippet_type: img, topic: sidus_ss400/idx/color_2d_image}
+#  - {conversion_call: lb_convert_image, enabled: false, msg_mod: sensor_msgs.msg, msg_type: Image,
+#    snippet_id: 0, snippet_type: img, topic: see3cam_cu81/idx/color_2d_image}
+#  - {conversion_call: lb_convert_image, enabled: false, msg_mod: sensor_msgs.msg, msg_type: Image,
+#    snippet_id: 0, snippet_type: img, topic: econ_routecam/idx/color_2d_image}
+#  - {conversion_call: lb_convert_image, enabled: false, msg_mod: sensor_msgs.msg, msg_type: Image,
+#    snippet_id: 0, snippet_type: img, topic: onwote_hd_poe/idx/color_2d_image}
+#  - {conversion_call: lb_convert_image, enabled: false, msg_mod: sensor_msgs.msg, msg_type: Image,
+#    snippet_id: 0, snippet_type: img, topic: sidus_ss400/idx/color_2d_image}
 #####################################
 # Edit Other System Topic List Here
 #####################################
