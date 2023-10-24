@@ -53,9 +53,7 @@ PT_SCAN_TILT_RATIO = 0.55 # Tilt Angle During Scanning
 BASE_NAMESPACE = "/nepi/s2x/"
 CAMERA_NAMESPACE = BASE_NAMESPACE + CAMERA_NAME
 RESOLUTION_ADJ_TOPIC = CAMERA_NAMESPACE + "idx/set_resolution_mode"
-COLOR_2D_IMG_TOPIC = CAMERA_NAMESPACE + "idx/color_2d_image"
-#COLOR_2D_IMG_TOPIC = CAMERA_NAMESPACE + idx/enhanced_2d_image
-
+IMAGE_INPUT_TOPIC = CAMERA_NAMESPACE + "idx/color_2d_image"
 
 # Classifier topics and parameters
 BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
@@ -70,8 +68,6 @@ OBJ_CENTERED_BUFFER_RATIO = 0.3 # Hysteresis band about center of image for trac
 
 
 PT_NAMESPACE = BASE_NAMESPACE + PT_NAME
-
-
 PT_GET_STATUS_TOPIC = PT_NAMESPACE + "ptx/status"
 PT_SET_SPEED_RATIO_TOPIC = PT_NAMESPACE + "ptx/set_speed_ratio"
 PT_GOHOME_TOPIC = PT_NAMESPACE + "ptx/go_home"
@@ -81,7 +77,7 @@ PT_GOTO_TILT_RATIO_TOPIC = PT_NAMESPACE + "ptx/jog_to_pitch_ratio"
 PT_SET_SOFT_LIMITS_TOPIC = PT_NAMESPACE + "ptx/set_soft_limits"
 
 # Parameters for pan and tilt settings
-PT_SCAN_CHECK_INTERVAL = 0.5
+PT_SCAN_CHECK_INTERVAL = 0.25
 PT_SCAN_SPEED = 0.6
 PT_MAX_TRACK_SPEED = 1.0
 PT_MIN_TRACK_SPEED = 0.05
@@ -133,40 +129,55 @@ pt_speed_now_ratio=0
 
 ### System Initialization processes
 def initialize_actions():
+  global res_adj_pub
+  global set_pt_speed_ratio_pub
+  global set_pt_pan_ratio_pub
+  global set_pt_tilt_ratio_pub
+  global set_pt_soft_limits_pub
   global pt_tilt_scan_ratio
-  # Detect and Initialize PanTilt
-  # Camera initialization
-  print("Initializing " + CAMERA_NAMESPACE + " to MEDIUM resolution")
-  time.sleep(1)
-  res_adj_pub.publish(CAM_RES)
-  # Classifier initialization
-  start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
-  classifier_selection = ClassifierSelection(img_topic=COLOR_2D_IMG_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
-  time.sleep(1) # Important to sleep between publisher constructor and publish()
-  print("Starting object detector: " + str(start_classifier_pub.name))
-  start_classifier_pub.publish(classifier_selection)
-  # Start PT Status Callback
-  print("Starting Pan Tilt Stutus callback")
-  rospy.Subscriber(PT_GET_STATUS_TOPIC, PanTiltStatus, pt_status_callback)  
-  # Pan/Tilt initialization: Center both axes
-  print("Setting pan/tilt to initial position and speed")
-  print("Scan tilt ratio set to: " + "%.2f" % (pt_tilt_scan_ratio))
-  set_pt_tilt_ratio_pub.publish(pt_tilt_scan_ratio)
-  set_pt_pan_ratio_pub.publish(0.5)
-  set_pt_speed_ratio_pub.publish(PT_SCAN_SPEED)
-  time.sleep(2) # Give time to center  
-  #Wait to get the image dimensions
-  img_sub = rospy.Subscriber(COLOR_2D_IMG_TOPIC, Image, image_callback)
-  while img_width is 0 and img_height is 0:
-    print("Waiting for initial image to determine dimensions")
+  print("")
+  rospy.loginfo("Initializing " + CAMERA_NAMESPACE )
+  rospy.loginfo("Connecting to ROS Topic " + IMAGE_INPUT_TOPIC )
+  # Check if camera topic is publishing
+  topic_list=rospy.get_published_topics(namespace='/')
+  topic_to_connect=[IMAGE_INPUT_TOPIC, 'sensor_msgs/Image']
+  if topic_to_connect in topic_list: 
+    # Camera initialization
+    print("Initializing Camera resolution")
+    res_adj_pub.publish(CAM_RES)
     time.sleep(1)
-  img_sub.unregister() # Don't need it anymore
-  # Set up the timer that start scanning when no objects are detected
-  print("Setting up pan/tilt scan check timer")
-  rospy.Timer(rospy.Duration(PT_SCAN_CHECK_INTERVAL), pt_scan_timer_callback)
-  print("Initialization Complete")
+    #Wait to get the image dimensions
+    img_sub = rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, image_callback)
+    while img_width is 0 and img_height is 0:
+      print("Waiting for initial image to determine dimensions")
+      time.sleep(1)
+    img_sub.unregister() # Don't need it anymore
+    # Classifier initialization
+    start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
+    classifier_selection = ClassifierSelection(img_topic=IMAGE_INPUT_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
+    time.sleep(1) # Important to sleep between publisher constructor and publish()
+    print("Starting object detector: " + str(start_classifier_pub.name))
+    start_classifier_pub.publish(classifier_selection)
+    # Start PT Status Callback
+    print("Starting Pan Tilt Stutus callback")
+    rospy.Subscriber(PT_GET_STATUS_TOPIC, PanTiltStatus, pt_status_callback)  
+    # Pan/Tilt initialization: Center both axes
+    print("Setting pan/tilt to initial position and speed")
+    print("Scan tilt ratio set to: " + "%.2f" % (pt_tilt_scan_ratio))
+    set_pt_tilt_ratio_pub.publish(pt_tilt_scan_ratio)
+    set_pt_pan_ratio_pub.publish(0.5)
+    set_pt_speed_ratio_pub.publish(PT_SCAN_SPEED)
+    time.sleep(2) # Give time to center  
+    # Set up the timer that start scanning when no objects are detected
+    print("Setting up pan/tilt scan check timer")
+    rospy.Timer(rospy.Duration(PT_SCAN_CHECK_INTERVAL), pt_scan_timer_callback)
+    print("Initialization Complete")
+  else: 
+    print("!!!!! Camera topic not found, shutting down")
+    time.sleep(1)
+    rospy.signal_shutdown("Camera topic not found")
 
-  ### Simple callback to get image height and width
+### Simple callback to get image height and width
 def image_callback(img_msg):
   # This is just to get the image size for ratio purposes
   global img_height
@@ -207,12 +218,14 @@ def pt_status_callback(PanTiltStatus):
 ### Setup a regular background scan process based on timer callback
 def pt_scan_timer_callback(timer):
   # Called periodically no matter what as a Timer object callback
+  global set_pt_speed_ratio_pub
+  global set_pt_pan_ratio_pub
+  global set_pt_tilt_ratio_pub
   global pan_scan_direction
   global pt_tilt_scan_ratio
   global pt_yaw_now_deg
   global pt_pitch_now_deg
   global pt_pitch_now_ratio
-  global pt_speed_now_ratio
   global pt_speed_now_ratio
   global object_detected
   print("Entering Scan Callback, Object Detection Value: " + str(object_detected))
@@ -235,7 +248,7 @@ def pt_scan_timer_callback(timer):
     print("Current tilt_scan_to_ratio: " + "%.2f" % (pt_tilt_scan_ratio))
     set_pt_pan_ratio_pub.publish(pt_scan_pan_ratio)
     set_pt_tilt_ratio_pub.publish(pt_tilt_scan_ratio)
-  #object_detected=False  # reset obj detection value
+
 
 
   
@@ -293,11 +306,13 @@ def found_object_callback(found_obj_msg):
 ### Track box process based on current box center relative ratio of image
 def pt_track_box(object_loc_y_ratio, object_loc_x_ratio):
   global object_detected
+  global set_pt_speed_ratio_pub
+  global set_pt_pan_ratio_pub
+  global set_pt_tilt_ratio_pub
   print("Entering Track Callback, Object Detection Value: " + str(object_detected)) 
   if object_detected:
     print("Target Found, Entering Track Mode")
     # Simple bang/bang positional control with hysteresis band and error-proportional speed control
-
     # First check if we are close enough to center in either dimension to stop motion: Hysteresis band
     box_abs_error_x_ratio = 2.0 * abs(object_loc_x_ratio - 0.5)
     box_abs_error_y_ratio = 2.0 * abs(object_loc_y_ratio - 0.5)
@@ -306,19 +321,16 @@ def pt_track_box(object_loc_y_ratio, object_loc_x_ratio):
        (box_abs_error_x_ratio <= OBJ_CENTERED_BUFFER_RATIO ):
       #print_throttle(1.0, "Object is centered in frame in at least one axis: Stopping any p/t motion") 
       pt_stop_motion_pub.publish()
-
     # Now set the speed proportional to average error
     speed_control_value = PT_MIN_TRACK_SPEED + (PT_MAX_TRACK_SPEED-PT_MIN_TRACK_SPEED) * box_abs_error_x_ratio
     #print("Current track speed ratio: " + "%.2f" % (speed_control_value))
     set_pt_speed_ratio_pub.publish(speed_control_value)
-
     # Per-axis bang/bang based on direction
     if box_abs_error_y_ratio > OBJ_CENTERED_BUFFER_RATIO:
       print("Tilt Object Error To High, Adjusitng TilT") 
       tilt_axis_ratio_target = pt_forward_tilt_limit_ratio if object_loc_y_ratio < 0.5 else pt_backward_tilt_limit_ratio
       set_pt_tilt_ratio_pub.publish(tilt_axis_ratio_target)
       print("Current tilt_track_to_ratio: " + "%.2f" % (tilt_axis_ratio_target))
-
     if box_abs_error_x_ratio > OBJ_CENTERED_BUFFER_RATIO:
       print("Pan Object Error To High, Adjusitng Pan")     
       pan_axis_ratio_target = pt_forward_pan_limit_ratio if object_loc_x_ratio < 0.5 else pt_backward_pan_limit_ratio
@@ -328,7 +340,9 @@ def pt_track_box(object_loc_y_ratio, object_loc_x_ratio):
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  print("Starting cleanup") 
+  global stop_classifier_pub
+  global send_pt_home_pub
+  print("Shutting down: Executing script cleanup actions")
   print("Stopping object detector")
   stop_classifier_pub.publish()
   print("Send pan and tilt to home position")
@@ -340,22 +354,16 @@ def cleanup_actions():
 def startNode():
   rospy.loginfo("Starting PT_2D_CAMERA_PERSON_TRACKER automation script", disable_signals=True) # Disable signals so we can force a shutdown
   rospy.init_node(name="pt_2d_camera_person_tracker_auto_script")
-  
   #initialize system including pan scan process
   initialize_actions()
-
-
-
-  #Set up object detector subscriber
+  #Set up object detector subscriber which only updates on AI detection
   print("Starting object detection subscriber")
-  rospy.Subscriber(BOUNDING_BOXES_TOPIC, BoundingBoxes, objects_detected_callback)
-
+  rospy.Subscriber(BOUNDING_BOXES_TOPIC, BoundingBoxes, objects_detected_callback, queue_size = 1)
+  #Set up found object subscriber which monitors all AI outputs
   print("Starting found object subscriber")
-  rospy.Subscriber(FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback)
-
+  rospy.Subscriber(FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback, queue_size = 1)
   #Set up cleanup on node shutdown
   rospy.on_shutdown(cleanup_actions)
-
   # Spin forever (until object is detected)
   rospy.spin()
 

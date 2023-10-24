@@ -6,7 +6,7 @@
 # NavPose values on your system.
 # Uses onboard ROS python library to
 # 1. Set a fixed NavPose Solution (Lat,Long,Alt,Heading)
-# 2. Exit after set
+# 2. Exit after setting
 
 import rospy
 from std_msgs.msg import Float64, Empty
