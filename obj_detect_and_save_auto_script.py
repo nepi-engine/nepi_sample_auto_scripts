@@ -57,6 +57,7 @@ OBJ_CENTERED_BUFFER_RATIO = 0.5 # acceptable band about center of image for savi
 SAVE_DATA_RATE_TOPIC = CAMERA_NAMESPACE + "save_data_rate"
 SAVE_DATA_PREFIX_TOPIC = CAMERA_NAMESPACE + "save_data_prefix"
 SAVE_DATA_TOPIC = CAMERA_NAMESPACE + "save_data"
+SAVE_DATA_PRODUCT = "color_2d_image"
 
 
 #####################################################################################
@@ -99,17 +100,19 @@ def initialize_actions():
       print("Waiting for initial image to determine dimensions")
       time.sleep(1)
     img_sub.unregister() # Don't need it anymore
-    # Set up data saving rate
+    
+    ### Set up data saving rate and prefix
     # First, disable all data products
     save_data_rate_pub.publish(data_product=SaveDataRate.ALL_DATA_PRODUCTS, save_rate_hz=0.0)
-    # Then turn on just the one data product we care about
     time.sleep(1) # Just for good measure
-    rospy.loginfo("Setting save data rate to " + str(SAVE_DATA_RATE_HZ) + "hz")
-    save_data_rate_pub.publish(data_product='image', save_rate_hz=SAVE_DATA_RATE_HZ)
+    # Then turn on just the one data product we care about
+    rospy.loginfo("Setting save data rate to " + str(SAVE_DATA_RATE_HZ) + " hz")
+    save_data_rate_pub.publish(data_product=SAVE_DATA_PRODUCT, save_rate_hz=SAVE_DATA_RATE_HZ)
     # Set up data saving prefix
-    time.sleep(1)
     rospy.loginfo("Setting save data prefix to " + SAVE_DATA_PREFIX)
-    save_data_prefix_pub.publish(SAVE_DATA_PREFIX)   
+    save_data_prefix_pub.publish(SAVE_DATA_PREFIX)
+    time.sleep(1) # Just for good measure
+  
     ### Classifier initialization, and wait for it to publish
     start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
     classifier_selection = ClassifierSelection(img_topic=IMAGE_INPUT_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
