@@ -2,8 +2,9 @@
 
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
-# 1. Add contrours and text overlay to image and republish to a new topic
-# 2. Run until Stopped
+# 1. Converts ROS image to OpenCV image
+# 2. Blank area for custom code
+# 2. Converts OpenCV image back to ROS image
 
 
 import time
@@ -34,7 +35,7 @@ CAMERA_NAMESPACE = BASE_NAMESPACE + CAMERA_NAME
 
 RESOLUTION_ADJ_TOPIC = CAMERA_NAMESPACE + "idx/set_resolution_mode"
 IMAGE_INPUT_TOPIC = CAMERA_NAMESPACE + "idx/color_2d_image"
-IMAGE_OUTPUT_TOPIC = CAMERA_NAMESPACE + "idx/contours_2d_image"
+IMAGE_OUTPUT_TOPIC = CAMERA_NAMESPACE + "idx/custom_image"
 
 #####################################################################################
 # Globals
@@ -75,28 +76,15 @@ def image_contour_callback(img_msg):
   bridge = CvBridge()
   cv_image = bridge.imgmsg_to_cv2(img_msg, "bgr8")
   # Get contours
-  cv_image.setflags(write=1)
-  cv_image_gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-  ret, thresh2 = cv2.threshold(cv_image_gray, 150, 255, cv2.THRESH_BINARY)
-  contours3, hierarchy3 = cv2.findContours(thresh2, cv2.RETR_LIST, 
-                                       cv2.CHAIN_APPROX_NONE)
-  # Add contours as overlay
-  cv2.drawContours(cv_image, contours3, -1, (0, 255, 0), 2, 
-                 cv2.LINE_AA)
-  # Add text overlay
-  font                   = cv2.FONT_HERSHEY_SIMPLEX
-  bottomLeftCornerOfText = (10,10)
-  fontScale              = 0.5
-  fontColor              = (0, 255, 0)
-  thickness              = 1
-  lineType               = 1
-  cv2.putText(cv_image,'Image with Contours', 
-    bottomLeftCornerOfText, 
-    font, 
-    fontScale,
-    fontColor,
-    thickness,
-    lineType)
+  ###########################################################
+  ### ADD YOUR CODE HERE
+  ###########################################################
+
+
+
+  ###########################################################
+  ### END OF YOUR CODE
+  ###########################################################
   #Convert image from cv2 to ros
   img_out_msg = bridge.cv2_to_imgmsg(cv_image,"bgr8")#desired_encoding='passthrough')
   # Publish new image to ros
