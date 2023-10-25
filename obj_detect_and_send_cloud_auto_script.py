@@ -80,6 +80,8 @@ img_height = 0 # Updated on receipt of first image
 def initialize_actions():
   global img_height
   global img_width
+  global res_adj_pub
+  global start_classifier_pub
   print("")
   rospy.loginfo("Initializing " + CAMERA_NAMESPACE )
   rospy.loginfo("Connecting to ROS Topic" + IMAGE_INPUT_TOPIC )
@@ -99,7 +101,7 @@ def initialize_actions():
     # Classifier initialization
     start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
     classifier_selection = ClassifierSelection(img_topic=IMAGE_INPUT_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
-    time.sleep(1) # Important to sleep between publisher constructor and publish()
+    time.sleep(2) # Important to sleep between publisher constructor and publish()
     rospy.loginfo("Starting object detector: " + str(start_classifier_pub.name))
     start_classifier_pub.publish(classifier_selection)
     print("Initialization Complete")
@@ -124,6 +126,10 @@ def image_callback(img_msg):
 def object_detected_callback(bounding_box_msg):
   global img_height
   global img_width
+  global nepi_link_enable_pub
+  global nepi_link_set_data_sources
+  global nepi_link_collect_data_pub
+  global nepi_link_connect_now_pub
   # Iterate over all of the objects reported by the detector
   for box in bounding_box_msg.bounding_boxes:
     # Check for the object of interest and take appropriate actions
@@ -162,10 +168,11 @@ def object_detected_callback(bounding_box_msg):
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
+    global stop_classifier_pub
     print("Shutting down: Executing script cleanup actions")
     # Stop Classifier
     stop_classifier_pub.publish()
-    time.sleep(1)
+    time.sleep(2)
 
 
 

@@ -110,12 +110,13 @@ def found_object_callback(found_obj_msg):
   # Must reset target lists if no targets are detected
   global detect_boxes
   if found_obj_msg.count == 0:
-    print("No objects found")
+    print("No objects detected")
     detect_boxes=None
 
 ### If object(s) detected, save bounding box info to global
 def object_detected_callback(bounding_box_msg):
   global detect_boxes
+  print("Objects detected, passsing to targeting process")
   detect_boxes=bounding_box_msg
     
 
@@ -173,18 +174,18 @@ def object_targeting_callback(img_msg):
           target_range_m=-999
       else:
         target_range_m=-999
-      print("target range: " + "%.2f" % target_range_m)
+      #print("target range: " + "%.2f" % target_range_m)
       # Calculate target bearings
       object_loc_y_pix = float(box.ymin + ((box.ymax - box.ymin))  / 2) 
       object_loc_x_pix = float(box.xmin + ((box.xmax - box.xmin))  / 2)
       object_loc_y_ratio_from_center = float(object_loc_y_pix - img_height/2) / float(img_height/2)
       object_loc_x_ratio_from_center = float(object_loc_x_pix - img_width/2) / float(img_width/2)
-      print("x_ratio: " + "%.2f" % object_loc_x_ratio_from_center)
-      print("y_ratio: " + "%.2f" % object_loc_y_ratio_from_center)
+      #print("x_ratio: " + "%.2f" % object_loc_x_ratio_from_center)
+      #print("y_ratio: " + "%.2f" % object_loc_y_ratio_from_center)
       target_vert_angle_deg = -(object_loc_y_ratio_from_center * float(FOV_VERT_DEG/2))
       target_horz_angle_deg = (object_loc_x_ratio_from_center * float(FOV_HORZ_DEG/2))
-      print("horz angle: " + "%.2f" % target_horz_angle_deg)
-      print("vert angle: " + "%.2f" % target_vert_angle_deg)
+      #print("horz angle: " + "%.2f" % target_horz_angle_deg)
+      #print("vert angle: " + "%.2f" % target_vert_angle_deg)
       
       ###### Publish Targeting_Data ROS Message
       target_data_msg=TargetLocalization()
