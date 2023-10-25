@@ -340,6 +340,7 @@ def pt_track_box(object_loc_y_ratio, object_loc_x_ratio):
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
+  time.sleep(1)
   global stop_classifier_pub
   global send_pt_home_pub
   print("Shutting down: Executing script cleanup actions")

@@ -11,7 +11,7 @@ import time
 import sys
 import rospy
 import numpy as np
-import cv2 as cv
+import cv2
 
 from sensor_msgs.msg import Image
 from rospy.numpy_msg import numpy_msg
@@ -25,11 +25,10 @@ from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 ##########################################
 
 #Set Runtime User Settings
-DEPTH_IMAGE_MIN_RANGE_METERS=0.25 #Set to meter value to adjust depth image active range
-DEPTH_IMAGE_MAX_RANGE_METERS=10.0 #Set to meter value to adjust depth image active range
 
-TARGET_BOX_PERCENT=50 # Sets the percent of target box around center to use for range calc
-TARGET_BOX_METERS=0.3 # Sets the depth filter around mean depth to use for range calc
+TARGET_BOX_REDUCTION_PERCENT=50 # Sets the percent of target box around center to use for range calc
+TARGET_DEPTH_METERS=0.3 # Sets the depth filter around mean depth to use for range calc
+TARGET_MIN_VALUES=10 # Sets the minimum number of valid points to consider for a valid range
 
 
 # ROS namespace setup
@@ -58,71 +57,53 @@ DETECTION_THRESHOLD = 0.5
 #####################################################################################
 # Globals
 #####################################################################################
-
-depth_image_pub = rospy.Publisher(DEPTH_IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
+publish_enable=True
 #target_data_pub = rospy.Publisher(TARGET_DATA_OUTPUT_TOPIC, , queue_size=10)
 target_overlay_pub = rospy.Publisher(TARGET_IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 stop_classifier_pub = rospy.Publisher(STOP_CLASSIFIER_TOPIC, Empty, queue_size=10)
 
 np_depth_array_m=None # will be replaced when depthmap is recieved and converted
-img_height=0 # Updated on receipt of first image
-img_width=0 # Updated on receipt of first image
 detect_boxes=None
 
 #####################################################################################
 # Methods
 #####################################################################################
 
+
+
+
+
 ### System Initialization processes
 def initialize_actions():
-  print("")
-  rospy.loginfo("Initializing " + CAMERA_NAMESPACE )
-  rospy.loginfo("Connecting to ROS Topic" + IMAGE_INPUT_TOPIC )
-  # Check if camera topic is publishing
   topic_list=rospy.get_published_topics(namespace='/')
+  print("")
+  # Check if camera topic is publishing
   topic_to_connect=[IMAGE_INPUT_TOPIC, 'sensor_msgs/Image']
+  rospy.loginfo("Connecting to ROS Topic " + IMAGE_INPUT_TOPIC )
   if topic_to_connect in topic_list: 
-    print("Camera topic found, starting initializing process")
-    # Classifier initialization
-    start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
-    classifier_selection = ClassifierSelection(img_topic=CAMERA_IMAGE_INPUT_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
-    time.sleep(1) # Important to sleep between publisher constructor and publish()
-    print("Starting target detector: " + str(start_classifier_pub.name))
-    start_classifier_pub.publish(classifier_selection)
-    print("Detector initialization complete")
+    print("Camera Topic found, starting initializing process")
+    print("Camera Initialization Complete")
   else: 
     print("!!!!! Camera topic not found, shutting down")
     time.sleep(1)
+  # Check if depth topic is publishing
+  rospy.loginfo("Connecting to ROS Topic " + DEPTH_DATA_INPUT_TOPIC )
+  topic_to_connect=[DEPTH_DATA_INPUT_TOPIC, 'sensor_msgs/Image']
+  if topic_to_connect in topic_list: 
+    print("Depth Topic found, starting initializing process")
+    print("Depth Initialization Complete")
+  else: 
+    print("!!!!! Depth topic not found, shutting down")
+    time.sleep(1)
     rospy.signal_shutdown("Camera topic not found")
-    
+  # Classifier initialization
+  start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
+  classifier_selection = ClassifierSelection(img_topic=IMAGE_INPUT_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
+  time.sleep(1) # Important to sleep between publisher constructor and publish()
+  print("Starting target detector: " + str(start_classifier_pub.name))
+  start_classifier_pub.publish(classifier_selection)
+  print("Detector initialization complete")
 
-
-### callback to get depthmap, convert to global float array and rgb image, then publish depth_image
-def convert_depthmap_callback(depth_data):
-  global np_depth_array_m
-  # Zed depth data is floats in m, but passed as 4 bytes each that must be converted to floats
-  # Use cv_bridge() to convert the ROS image to OpenCV format
-  #Convert the depth 4xbyte data to global float meter array
-  bridge = CvBridge()
-  cv_depth_image = bridge.imgmsg_to_cv2(depth_data, desired_encoding="passthrough")
-  np_depth_array_m = (np.array(cv_depth_image, dtype=np.float32)) # replace nan values
-  np_depth_array_m[np.isnan(np_depth_array_m)] = 0
-  #img_height, img_width = np_depth_array_m.shape[:2]
-  # Create thresholded and 255 scaled version
-  min_range_m=DEPTH_IMAGE_MIN_RANGE_METERS
-  max_range_m=DEPTH_IMAGE_MAX_RANGE_METERS
-  np_depth_array_scaled = np_depth_array_m
-  np_depth_array_scaled[np_depth_array_scaled < min_range_m] = max_range_m # put to max
-  np_depth_array_scaled[np_depth_array_scaled > max_range_m] = max_range_m # put to max
-  np_depth_array_scaled=np_depth_array_scaled-min_range_m
-  depth_scaler=np.amax(np_depth_array_m) # use max range as scalar
-  np_depth_array_scaled = np.array(255*np_depth_array_m/depth_scaler,np.uint8)
-  max_value=np.max(np_depth_array_scaled)
-  np_depth_array_scaled=np.array(np.abs(np_depth_array_scaled-float(max_value)),np.uint8) # Reverse for colormaping
-  # Convert to CV color image using colormap
-  cv_depth_image_color = cv.applyColorMap(np_depth_array_scaled, cv.COLORMAP_JET)
-  ros_depth_image = bridge.cv2_to_imgmsg(cv_depth_image_color,"bgr8")
-  depth_image_pub.publish(ros_depth_image)
 
 ### Monitor Output of AI model to clear detection status
 def found_object_callback(found_obj_msg):
@@ -136,14 +117,26 @@ def found_object_callback(found_obj_msg):
 def object_detected_callback(bounding_box_msg):
   global detect_boxes
   detect_boxes=bounding_box_msg
+    
+
+### callback to get depthmap, convert to global float array and rgb image, then publish depth_image
+def get_depth_data_callback(depth_data):
+  global np_depth_array_m
+  # Zed depth data is floats in m, but passed as 4 bytes each that must be converted to floats
+  # Use cv2_bridge() to convert the ROS image to OpenCV format
+  #Convert the depth 4xbyte data to global float meter array
+  cv2_bridge = CvBridge()
+  cv2_depth_image = cv2_bridge.imgmsg_to_cv2(depth_data, desired_encoding="passthrough")
+  np_depth_array_m = (np.array(cv2_depth_image, dtype=np.float32)) # replace nan values
+  np_depth_array_m[np.isnan(np_depth_array_m)] = 0
 
 
 ### calculate range and bearing of AI detected targets
 def object_targeting_callback(img_msg):
+  global publish_enable
+  global target_overlay_pub
   global detect_boxes
   global np_depth_array_m
-  global img_height
-  global img_width
   img_height = img_msg.height
   img_width = img_msg.width
   target_labels=[]
@@ -151,39 +144,40 @@ def object_targeting_callback(img_msg):
   target_bearing_horz_deg=[]
   target_bearing_vert_deg=[]
   # Convert ROS image to OpenCV for editing
-  bridge = CvBridge()
-  cv_image = bridge.imgmsg_to_cv2(img_msg, "bgr8")
+  cv2_bridge = CvBridge()
+  cv2_image = cv2_bridge.imgmsg_to_cv2(img_msg, "bgr8")
   # Iterate over all of the objects and calculate range and bearing data
   if detect_boxes is not None:
     for box in detect_boxes.bounding_boxes:
       # Get target label
       target_labels.append(box.Class)
+      # reduce target box based on user settings
+      box_reduction_y_pix=int(float((box.ymax - box.ymin))*float(TARGET_BOX_REDUCTION_PERCENT)/100/2)
+      box_reduction_x_pix=int(float((box.xmax - box.xmin))*float(TARGET_BOX_REDUCTION_PERCENT)/100/2)
+      ymin_adj=int(box.ymin + box_reduction_y_pix)
+      ymax_adj=int(box.ymax - box_reduction_y_pix)
+      xmin_adj=box.xmin + box_reduction_x_pix
+      xmax_adj=box.xmax - box_reduction_x_pix
       # Calculate target range
       if np_depth_array_m is not None:
-        print(np_depth_array_m.shape)
-        # Caclulate target reduced target window based on user settings
-        print([box.ymin,box.ymax])
-        box_reduction_y_pix=float(box.ymax - box.ymin)*(1-TARGET_BOX_PERCENT/100)/2
-        print("y_reduction_pixs: " + "%.2f" % box_reduction_y_pix)
-        ymin_adj=int(box.ymin + box_reduction_y_pix)
-        ymax_adj=int(box.ymax - box_reduction_y_pix)
-        print([box.xmin,box.xmax])
-        box_reduction_x_pix=float(box.xmax - box.xmin)*(1-TARGET_BOX_PERCENT/100)/2
-        print("x_reduction_pixs: " + "%.2f" % box_reduction_x_pix)
-        xmin_adj=int(box.xmin + box_reduction_x_pix)
-        xmax_adj=int(box.xmax - box_reduction_x_pix)
-        print([ymin_adj,ymax_adj,xmin_adj,xmax_adj])
         # Get target range from cropped and filtered depth data
         depth_box_adj= np_depth_array_m[ymin_adj:ymax_adj,xmin_adj:xmax_adj]
         print(depth_box_adj.shape)
         depth_mean_val=np.mean(depth_box_adj)
-        depth_box_adj[depth_box_adj > (depth_mean_val+TARGET_BOX_METERS/2)]=np.nan
-        depth_box_adj[depth_box_adj < (depth_mean_val-TARGET_BOX_METERS/2)]=np.nan
-        target_range_m=np.mean(depth_box_adj)
-        print("target range: " + "%.2f" % target_range_m)
-        target_ranges_m.append(target_range_m)
+        print("depth mean val: " + "%.2f" % depth_mean_val)
+        depth_array=depth_box_adj.flatten()
+        min_filter=depth_mean_val-TARGET_DEPTH_METERS/2
+        max_filter=depth_mean_val+TARGET_DEPTH_METERS/2
+        depth_array=depth_array[depth_array > min_filter]
+        depth_array=depth_array[depth_array < max_filter]
+        if len(depth_array) > TARGET_MIN_VALUES:
+          target_range_m=np.mean(depth_box_adj)
+        else:
+          target_range_m=0
       else:
-        target_ranges_m.append(np.nan)        
+        target_range_m=0
+      print("target range: " + "%.2f" % target_range_m)
+      target_ranges_m.append(target_range_m)
       # Calculate target bearings
       object_loc_y_pix = float(box.ymin + ((box.ymax - box.ymin))  / 2) 
       object_loc_x_pix = float(box.xmin + ((box.xmax - box.xmin))  / 2)
@@ -191,27 +185,37 @@ def object_targeting_callback(img_msg):
       object_loc_x_ratio_from_center = float(object_loc_x_pix - img_width/2) / float(img_width/2)
       print("x_ratio: " + "%.2f" % object_loc_x_ratio_from_center)
       print("y_ratio: " + "%.2f" % object_loc_y_ratio_from_center)
-
-
       target_vert_angle = (object_loc_y_ratio_from_center * float(FOV_VERT_DEG/2))
       target_horz_angle = (object_loc_x_ratio_from_center * float(FOV_HORZ_DEG/2))
       target_bearing_vert_deg.append(target_vert_angle)
       target_bearing_horz_deg.append(target_horz_angle)
       print("horz angle: " + "%.2f" % target_horz_angle)
       print("vert angle: " + "%.2f" % target_vert_angle)
-      # Overlay data on OpenCV image
-      font                   = cv.FONT_HERSHEY_SIMPLEX
+      # Overlay adjusted detection boxes on image
+      start_point = (xmin_adj, ymin_adj)
+      end_point = (xmax_adj, ymax_adj)
+      cv2.rectangle(cv2_image, start_point, end_point, color=(255,0,0), thickness=2)
+      # Overlay text data on OpenCV image
+      font                   = cv2.FONT_HERSHEY_SIMPLEX
       fontScale              = 0.5
       fontColor              = (0, 255, 0)
       thickness              = 1
       lineType               = 1
 
-      text2overlay="%.1f" % target_range_m + "m," + "%.f" % target_horz_angle + "d," + "%.f" % target_vert_angle + "d"
-      print(text2overlay)
+     # Overlay Label
+      text2overlay=box.Class
       bottomLeftCornerOfText = (int(object_loc_x_pix),int(object_loc_y_pix))
-      print(bottomLeftCornerOfText)
-      print("")
-      cv.putText(cv_image,text2overlay, 
+      cv2.putText(cv2_image,text2overlay, 
+        bottomLeftCornerOfText, 
+        font, 
+        fontScale,
+        fontColor,
+        thickness,
+        lineType)
+      # Overlay Label
+      text2overlay="%.1f" % target_range_m + "m," + "%.f" % target_horz_angle + "d," + "%.f" % target_vert_angle + "d"
+      bottomLeftCornerOfText = (int(object_loc_x_pix),int(object_loc_y_pix)+15)
+      cv2.putText(cv2_image,text2overlay, 
         bottomLeftCornerOfText, 
         font, 
         fontScale,
@@ -219,16 +223,23 @@ def object_targeting_callback(img_msg):
         thickness,
         lineType)
   #Convert OpenCV image to ROS image
-  img_out_msg = bridge.cv2_to_imgmsg(cv_image,"bgr8")#desired_encoding='passthrough')
-  # Publish new image
-  target_overlay_pub.publish(img_out_msg)
+  img_out_msg = cv2_bridge.cv2_to_imgmsg(cv2_image,"bgr8")#desired_encoding='passthrough')
+  # Publish new image to ros
+  if publish_enable:
+    target_overlay_pub.publish(img_out_msg)
   
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  print("Starting cleanup") 
-  print("Stopping object detector")
+  global publish_enable
+  global target_overlay_pub
+  publish_enable=False
+  time.sleep(2)
+  print("Shutting down: Executing script cleanup actions")
+  # Stop classifer process
   stop_classifier_pub.publish()
+  # Unregister publishing topics
+  target_overlay_pub.unregister()
   time.sleep(2)
 
 
@@ -237,18 +248,17 @@ def startNode():
   rospy.loginfo("Starting Image Depthmap to Image script", disable_signals=True) # Disable signals so we can force a shutdown
   rospy.init_node
   rospy.init_node(name="zed_targeting_auto_script")
-
-
-  #initialize system and start processes
+  #initialize system including pan scan process
   initialize_actions()
-  rospy.Subscriber(FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback)
+  print("Starting found object subscriber")
+  rospy.Subscriber(FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback, queue_size = 1)
   print("Starting object detection subscriber")
-  rospy.Subscriber(BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback)
+  rospy.Subscriber(BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
   print("Starting targeteting subscriber")
-  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, object_targeting_callback)
+  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, object_targeting_callback, queue_size = 1)
   print("Starting convert depthmap subscriber")
-  rospy.Subscriber(DEPTH_DATA_INPUT_TOPIC, numpy_msg(Image), convert_depthmap_callback)
-  start_target_detector()
+  rospy.Subscriber(DEPTH_DATA_INPUT_TOPIC, numpy_msg(Image), get_depth_data_callback, queue_size = 1)
+
   
 
   # run cleanup actions on shutdown
