@@ -17,7 +17,7 @@ from sensor_msgs.msg import Image
 from rospy.numpy_msg import numpy_msg
 from cv_bridge import CvBridge
 from std_msgs.msg import UInt8, Empty, String, Bool
-from nepi_ros_interfaces.msg import ClassifierSelection, StringArray
+from nepi_ros_interfaces.msg import ClassifierSelection, StringArray, TargetLocalization
 from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 
 #####################################################################################
@@ -43,7 +43,7 @@ DEPTH_DATA_INPUT_TOPIC = BASE_NAMESPACE + "zed2/zed_node/depth/depth_registered"
 DEPTH_IMAGE_OUTPUT_TOPIC = BASE_NAMESPACE + "zed2/zed_node/depth/depth_image"
 
 ###!!!!!!!! Set data output stream topics and parameters !!!!!!!!
-TARGET_DATA_OUTPUT_TOPIC = BASE_NAMESPACE + "targeting/target_range_bearing_data"
+TARGET_DATA_OUTPUT_TOPIC = BASE_NAMESPACE + "targeting/targeting_data"
 TARGET_IMAGE_OUTPUT_TOPIC = BASE_NAMESPACE + "targeting/targeting_image"
 
 ### Classifier topics and parameters
@@ -58,7 +58,7 @@ DETECTION_THRESHOLD = 0.5
 # Globals
 #####################################################################################
 publish_enable=True
-#target_data_pub = rospy.Publisher(TARGET_DATA_OUTPUT_TOPIC, , queue_size=10)
+target_data_pub = rospy.Publisher(TARGET_DATA_OUTPUT_TOPIC, TargetLocalization, queue_size=10)
 target_overlay_pub = rospy.Publisher(TARGET_IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 stop_classifier_pub = rospy.Publisher(STOP_CLASSIFIER_TOPIC, Empty, queue_size=10)
 
@@ -134,15 +134,12 @@ def get_depth_data_callback(depth_data):
 ### calculate range and bearing of AI detected targets
 def object_targeting_callback(img_msg):
   global publish_enable
+  global target_data_pub
   global target_overlay_pub
   global detect_boxes
   global np_depth_array_m
   img_height = img_msg.height
   img_width = img_msg.width
-  target_labels=[]
-  target_ranges_m=[]
-  target_bearing_horz_deg=[]
-  target_bearing_vert_deg=[]
   # Convert ROS image to OpenCV for editing
   cv2_bridge = CvBridge()
   cv2_image = cv2_bridge.imgmsg_to_cv2(img_msg, "bgr8")
@@ -150,7 +147,7 @@ def object_targeting_callback(img_msg):
   if detect_boxes is not None:
     for box in detect_boxes.bounding_boxes:
       # Get target label
-      target_labels.append(box.Class)
+      target_label=box.Class
       # reduce target box based on user settings
       box_reduction_y_pix=int(float((box.ymax - box.ymin))*float(TARGET_BOX_REDUCTION_PERCENT)/100/2)
       box_reduction_x_pix=int(float((box.xmax - box.xmin))*float(TARGET_BOX_REDUCTION_PERCENT)/100/2)
@@ -173,11 +170,10 @@ def object_targeting_callback(img_msg):
         if len(depth_array) > TARGET_MIN_VALUES:
           target_range_m=np.mean(depth_box_adj)
         else:
-          target_range_m=0
+          target_range_m=-999
       else:
-        target_range_m=0
+        target_range_m=-999
       print("target range: " + "%.2f" % target_range_m)
-      target_ranges_m.append(target_range_m)
       # Calculate target bearings
       object_loc_y_pix = float(box.ymin + ((box.ymax - box.ymin))  / 2) 
       object_loc_x_pix = float(box.xmin + ((box.xmax - box.xmin))  / 2)
@@ -185,13 +181,22 @@ def object_targeting_callback(img_msg):
       object_loc_x_ratio_from_center = float(object_loc_x_pix - img_width/2) / float(img_width/2)
       print("x_ratio: " + "%.2f" % object_loc_x_ratio_from_center)
       print("y_ratio: " + "%.2f" % object_loc_y_ratio_from_center)
-      target_vert_angle = (object_loc_y_ratio_from_center * float(FOV_VERT_DEG/2))
-      target_horz_angle = (object_loc_x_ratio_from_center * float(FOV_HORZ_DEG/2))
-      target_bearing_vert_deg.append(target_vert_angle)
-      target_bearing_horz_deg.append(target_horz_angle)
-      print("horz angle: " + "%.2f" % target_horz_angle)
-      print("vert angle: " + "%.2f" % target_vert_angle)
-      # Overlay adjusted detection boxes on image
+      target_vert_angle_deg = -(object_loc_y_ratio_from_center * float(FOV_VERT_DEG/2))
+      target_horz_angle_deg = (object_loc_x_ratio_from_center * float(FOV_HORZ_DEG/2))
+      print("horz angle: " + "%.2f" % target_horz_angle_deg)
+      print("vert angle: " + "%.2f" % target_vert_angle_deg)
+      
+      ###### Publish Targeting_Data ROS Message
+      target_data_msg=TargetLocalization()
+      target_data_msg.name=target_label
+      target_data_msg.range_m=target_range_m
+      target_data_msg.azimuth_deg=target_horz_angle_deg
+      target_data_msg.elevation_deg=target_vert_angle_deg
+      if publish_enable:
+        target_data_pub.publish(target_data_msg)
+      
+      ###### Apply Image Overlays and Publish Targeting_Image ROS Message
+      # Overlay adjusted detection boxes on image 
       start_point = (xmin_adj, ymin_adj)
       end_point = (xmax_adj, ymax_adj)
       cv2.rectangle(cv2_image, start_point, end_point, color=(255,0,0), thickness=2)
@@ -201,7 +206,6 @@ def object_targeting_callback(img_msg):
       fontColor              = (0, 255, 0)
       thickness              = 1
       lineType               = 1
-
      # Overlay Label
       text2overlay=box.Class
       bottomLeftCornerOfText = (int(object_loc_x_pix),int(object_loc_y_pix))
@@ -212,8 +216,12 @@ def object_targeting_callback(img_msg):
         fontColor,
         thickness,
         lineType)
-      # Overlay Label
-      text2overlay="%.1f" % target_range_m + "m," + "%.f" % target_horz_angle + "d," + "%.f" % target_vert_angle + "d"
+      # Overlay Data
+      if target_range_m == -999:
+        t_range_m = 0
+      else:
+        t_range_m = target_range_m
+      text2overlay="%.1f" % t_range_m + "m," + "%.f" % target_horz_angle_deg + "d," + "%.f" % target_vert_angle_deg + "d"
       bottomLeftCornerOfText = (int(object_loc_x_pix),int(object_loc_y_pix)+15)
       cv2.putText(cv2_image,text2overlay, 
         bottomLeftCornerOfText, 
@@ -232,6 +240,7 @@ def object_targeting_callback(img_msg):
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   global publish_enable
+  global target_data_pub
   global target_overlay_pub
   publish_enable=False
   time.sleep(2)
@@ -239,6 +248,7 @@ def cleanup_actions():
   # Stop classifer process
   stop_classifier_pub.publish()
   # Unregister publishing topics
+  target_data_pub.unregister()
   target_overlay_pub.unregister()
   time.sleep(2)
 
