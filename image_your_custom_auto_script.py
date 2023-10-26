@@ -27,10 +27,11 @@ CAM_RES=1 # Number 0-3, 0 Low, 1 Med, 2 High, 3 Ultra
 BASE_NAMESPACE = "/nepi/s2x/"
 
 ###!!!!!!!! Set Camera topics and parameters !!!!!!!!
-#CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
+CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
+#CAMERA_NAME = "see3cam_cu81/"
 #CAMERA_NAME = "sidus_ss400/"
 #CAMERA_NAME = "onwote_hd_poe/"
-CAMERA_NAME = "see3cam_cu81/"
+
 CAMERA_NAMESPACE = BASE_NAMESPACE + CAMERA_NAME
 
 RESOLUTION_ADJ_TOPIC = CAMERA_NAMESPACE + "idx/set_resolution_mode"
@@ -41,7 +42,7 @@ IMAGE_OUTPUT_TOPIC = CAMERA_NAMESPACE + "idx/custom_image"
 # Globals
 #####################################################################################
 publsih_enable=True #  This is turned to False during cleanup
-contour_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
+custom_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 res_adj_pub = rospy.Publisher(RESOLUTION_ADJ_TOPIC, UInt8, queue_size=10)
 
 #####################################################################################
@@ -67,8 +68,8 @@ def initialize_actions():
     rospy.signal_shutdown("Camera topic not found")
 
 
-### callback to get image, apply contour, and publish new image on new topic
-def image_contour_callback(img_msg):
+### Add your CV2 image customization code here
+def image_customization_callback(img_msg):
   global publsih_enable
   global contour_image_pub
 
@@ -89,7 +90,7 @@ def image_contour_callback(img_msg):
   img_out_msg = bridge.cv2_to_imgmsg(cv_image,"bgr8")#desired_encoding='passthrough')
   # Publish new image to ros
   if publsih_enable:
-    contour_image_pub.publish(img_out_msg) # You can view the enhanced_2D_image topic at //192.168.179.103:9091/ in a connected web browser
+    custom_image_pub.publish(img_out_msg) # You can view the enhanced_2D_image topic at //192.168.179.103:9091/ in a connected web browser
   
 
 ### Cleanup processes on node shutdown
@@ -101,7 +102,7 @@ def cleanup_actions():
   publish_enable=False
   time.sleep(2)
   # Unregister publishing topics
-  contour_image_pub.unregister()
+  custom_image_pub.unregister()
 
 
 ### Script Entrypoint
@@ -112,7 +113,7 @@ def startNode():
   # Run Initialization processes
   initialize_actions()
   # Start image contours overlay process and pubslisher
-  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, image_contour_callback, queue_size = 1)
+  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, image_customization_callback, queue_size = 1)
   #Set up cleanup on node shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever (until object is detected)
