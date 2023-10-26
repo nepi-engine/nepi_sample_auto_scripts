@@ -28,8 +28,8 @@ IMAGE_SEND_RES=0 # Number 0-3, 0 Low, 1 Med, 2 High, 3 Ultra
 SEND_RESET_DELAY_S = 10.0 # Seconds. Delay before starting over search/save process
 
 ###!!!!!!!! Set Camera ROS Topic Name !!!!!!!!
-#CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
-CAMERA_NAME = "see3cam_cu81/"
+CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
+#CAMERA_NAME = "see3cam_cu81/"
 #CAMERA_NAME = "sidus_ss400/"
 #CAMERA_NAME = "onwote_hd_poe/"
 

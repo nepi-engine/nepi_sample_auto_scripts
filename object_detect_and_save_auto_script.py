@@ -33,8 +33,8 @@ SAVE_DATA_PREFIX = "obj_detect_save_automation/" # Trailing slash makes this a s
 CAM_RES=1 # Number 0-3, 0 Low, 1 Med, 2 High, 3 Ultra
 
 ###!!!!!!!! Set Camera ROS Topic Name !!!!!!!!
-#CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
-CAMERA_NAME = "see3cam_cu81/"
+CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
+#CAMERA_NAME = "see3cam_cu81/"
 #CAMERA_NAME = "sidus_ss400/"
 #CAMERA_NAME = "onwote_hd_poe/"
 

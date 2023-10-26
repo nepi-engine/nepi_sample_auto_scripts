@@ -26,10 +26,10 @@ ENHANCE_SENSITIVITY_RATIO=0.5
 BASE_NAMESPACE = "/nepi/s2x/"
 
 ###!!!!!!!! Set Camera topics and parameters !!!!!!!!
-#CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
+CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
 #CAMERA_NAME = "sidus_ss400/"
 #CAMERA_NAME = "onwote_hd_poe/"
-CAMERA_NAME = "see3cam_cu81/"
+#CAMERA_NAME = "see3cam_cu81/"
 CAMERA_NAMESPACE = BASE_NAMESPACE + CAMERA_NAME
 
 RESOLUTION_ADJ_TOPIC = CAMERA_NAMESPACE + "idx/set_resolution_mode"
