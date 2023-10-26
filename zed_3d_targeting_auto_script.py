@@ -110,13 +110,13 @@ def found_object_callback(found_obj_msg):
   # Must reset target lists if no targets are detected
   global detect_boxes
   if found_obj_msg.count == 0:
-    print("No objects detected")
+    #print("No objects detected")
     detect_boxes=None
 
 ### If object(s) detected, save bounding box info to global
 def object_detected_callback(bounding_box_msg):
   global detect_boxes
-  print("Objects detected, passsing to targeting process")
+  #print("Objects detected, passsing to targeting process")
   detect_boxes=bounding_box_msg
     
 
@@ -129,7 +129,8 @@ def get_depth_data_callback(depth_data):
   cv2_bridge = CvBridge()
   cv2_depth_image = cv2_bridge.imgmsg_to_cv2(depth_data, desired_encoding="passthrough")
   np_depth_array_m = (np.array(cv2_depth_image, dtype=np.float32)) # replace nan values
-  np_depth_array_m[np.isnan(np_depth_array_m)] = 0
+  np_depth_array_m[np.isnan(np_depth_array_m)] = 0 # zero pixels with no value
+  np_depth_array_m[np.isinf(np_depth_array_m)] = 0 # zero pixels with inf value
 
 
 ### calculate range and bearing of AI detected targets
@@ -160,33 +161,32 @@ def object_targeting_callback(img_msg):
       if np_depth_array_m is not None:
         # Get target range from cropped and filtered depth data
         depth_box_adj= np_depth_array_m[ymin_adj:ymax_adj,xmin_adj:xmax_adj]
-        print(depth_box_adj.shape)
         depth_mean_val=np.mean(depth_box_adj)
-        print("depth mean val: " + "%.2f" % depth_mean_val)
         depth_array=depth_box_adj.flatten()
         min_filter=depth_mean_val-TARGET_DEPTH_METERS/2
         max_filter=depth_mean_val+TARGET_DEPTH_METERS/2
         depth_array=depth_array[depth_array > min_filter]
         depth_array=depth_array[depth_array < max_filter]
-        if len(depth_array) > TARGET_MIN_VALUES:
+        depth_len=len(depth_array)
+        if depth_len > TARGET_MIN_VALUES:
           target_range_m=np.mean(depth_box_adj)
         else:
-          target_range_m=-999
+          target_range_m=float(-999)
       else:
-        target_range_m=-999
-      #print("target range: " + "%.2f" % target_range_m)
+        target_range_m=float(-999)
       # Calculate target bearings
       object_loc_y_pix = float(box.ymin + ((box.ymax - box.ymin))  / 2) 
       object_loc_x_pix = float(box.xmin + ((box.xmax - box.xmin))  / 2)
       object_loc_y_ratio_from_center = float(object_loc_y_pix - img_height/2) / float(img_height/2)
       object_loc_x_ratio_from_center = float(object_loc_x_pix - img_width/2) / float(img_width/2)
-      #print("x_ratio: " + "%.2f" % object_loc_x_ratio_from_center)
-      #print("y_ratio: " + "%.2f" % object_loc_y_ratio_from_center)
       target_vert_angle_deg = -(object_loc_y_ratio_from_center * float(FOV_VERT_DEG/2))
       target_horz_angle_deg = (object_loc_x_ratio_from_center * float(FOV_HORZ_DEG/2))
-      #print("horz angle: " + "%.2f" % target_horz_angle_deg)
-      #print("vert angle: " + "%.2f" % target_vert_angle_deg)
-      
+      ### Print the range and bearings for each detected object
+##      print(target_label)
+##      print(str(depth_box_adj.shape) + " detection box size")
+##      print(str(depth_len) + " valid depth readings")
+##      print("%.2f" % target_range_m + "m : " + "%.2f" % target_horz_angle_deg + "d : " + "%.2f" % target_vert_angle_deg + "d : ")
+##      print("")
       ###### Publish Targeting_Data ROS Message
       target_data_msg=TargetLocalization()
       target_data_msg.name=target_label
@@ -219,7 +219,7 @@ def object_targeting_callback(img_msg):
         lineType)
       # Overlay Data
       if target_range_m == -999:
-        t_range_m = 0
+        t_range_m = np.nan
       else:
         t_range_m = target_range_m
       text2overlay="%.1f" % t_range_m + "m," + "%.f" % target_horz_angle_deg + "d," + "%.f" % target_vert_angle_deg + "d"
