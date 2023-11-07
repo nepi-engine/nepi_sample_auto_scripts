@@ -15,15 +15,20 @@ from sensor_msgs.msg import NavSatFix
 # ROS namespace setup
 BASE_NAMESPACE = "/nepi/s2x/"
 
+### Uncomment This Section for Ardupilot Firmware
 MAVLINK_GPS_TOPIC = BASE_NAMESPACE + "pixhawk_mavlink/global_position/global"
 MAVLINK_HEADING_TOPIC = BASE_NAMESPACE + "pixhawk_mavlink/global_position/compass_hdg"
-MAVLINK_ORIENTATION_TOPIC = BASE_NAMESPACE + "pixhawk_mavlink/local_position/odom"
+MAVLINK_ORIENTATION_TOPIC = BASE_NAMESPACE + "pixhawk_mavlink/global_position/local"
 
+### Uncomment This Section for Pixhawk Firmware
+##MAVLINK_GPS_TOPIC = BASE_NAMESPACE + "pixhawk_mavlink/global_position/global"
+##MAVLINK_HEADING_TOPIC = BASE_NAMESPACE + "pixhawk_mavlink/global_position/compass_hdg"
+##MAVLINK_ORIENTATION_TOPIC = BASE_NAMESPACE + "pixhawk_mavlink/local_position/odom"
 
+### Setup NEPI NavPose Topic Namespaces
 SET_NAVPOSE_GPS_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/set_gps_fix_topic"
 SET_NAVPOSE_HEADING_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/set_heading_topic"
 SET_NAVPOSE_ORIENTATION_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
-
 
 #####################################################################################
 # Methods
