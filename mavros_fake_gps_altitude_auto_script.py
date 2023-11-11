@@ -4,13 +4,19 @@
 # Uses onboard ROS python and mavros libraries to
 # 1. Publishes a fake GPS and Altitude MAVLink Message
 
+###################################################
+### These Parameters Must Be Configured in Ardupilot
+#GPS_TYPE = 14
+#EK3_SRC1_POSZ = 3
+#####################################################
+
 import rospy
 from std_msgs.msg import Float64, Header 
 from mavros_msgs.msg import HilGPS
 from geographic_msgs.msg import GeoPoint
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
+###################################################
+# SETUP - Edit as Necessary 
 ##########################################
 
 #Numurus Office
