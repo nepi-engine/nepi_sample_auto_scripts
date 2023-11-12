@@ -23,7 +23,7 @@ from std_msgs.msg import UInt8, Empty, String, Bool
 
 #Set Runtime User Settings
 DEPTH_IMAGE_MIN_RANGE_METERS=0.25 #Set to meter value to adjust depth image active range
-DEPTH_IMAGE_MAX_RANGE_METERS=1.0 #Set to meter value to adjust depth image active range
+DEPTH_IMAGE_MAX_RANGE_METERS=2.0 #Set to meter value to adjust depth image active range
 
 
 # ROS namespace setup
@@ -36,7 +36,6 @@ DEPTH_IMAGE_OUTPUT_TOPIC = BASE_NAMESPACE + "zed2/zed_node/depth/depth_image"
 #####################################################################################
 # Globals
 #####################################################################################
-publish_enable=True #  This is turned to False during cleanup
 depth_image_pub = rospy.Publisher(DEPTH_IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 
 #####################################################################################
@@ -63,7 +62,6 @@ def initialize_actions():
 
 ### callback to get depthmap, convert to global float array of meter depths corrisponding to image pixel location
 def convert_depthmap_callback(ros_depth_data):
-  global publsih_enable
   global depth_image_pub
   # Zed depth data is floats in m, but passed as 4 bytes each that must be converted to floats
   # Use cv2_bridge() to convert the ROS image to OpenCV format
@@ -101,20 +99,17 @@ def convert_depthmap_callback(ros_depth_data):
   # Convert to cv2 image to Ros Image message
   ros_depth_image = cv2_bridge.cv2_to_imgmsg(cv2_depth_image_color,"bgr8")
   # Publish new image to ros
-  if publish_enable:
+  if not rospy.is_shutdown():
     depth_image_pub.publish(ros_depth_image)
 
   
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global publish_enable
   global depth_image_pub
-  publish_enable=False
-  time.sleep(2)
   print("Shutting down: Executing script cleanup actions")
   # Unregister publishing topics
   depth_image_pub.unregister()
-
+  time.sleep(2)
 
 ### Script Entrypoint
 def startNode():

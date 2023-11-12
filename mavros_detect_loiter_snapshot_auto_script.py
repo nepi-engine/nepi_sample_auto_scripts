@@ -54,7 +54,6 @@ org_mode = None
 org_arm = None
 set_mode = None # global control 
 set_arm = False # global control
-pub_enable = True
 
 
 #####################################################################################
@@ -97,8 +96,7 @@ def set_state_callback(timer):
   global set_mode_client
   global set_mode
   global set_arm
-  global pub_enable
-  if pub_enable:
+  if not rospy.is_shutdown():
     if set_mode is not None:
       new_mode = SetModeRequest()
       new_mode.custom_mode = set_mode
@@ -141,13 +139,11 @@ def cleanup_actions():
   global org_arm
   global set_mode
   global set_arm
-  global pub_enable
   ("Setting System End_Mode and End_Arm states")
   set_mode=org_mode
   set_arm=org_arm
   while(current_state.mode != org_mode  or current_state.armed != org_arm):
     time.sleep(0.1)
-  pub_enable = False
   time.sleep(2)
   
 ### Script Entrypoint

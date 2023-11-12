@@ -31,10 +31,6 @@ OUTPUT_INTERVAL_SEC = 0.25
 #####################################################################################
 geopoint_data_pub = rospy.Publisher(OUTPUT_GEOPOINT_TOPIC, GeoPoint, queue_size=1)
 
-navpose_timestamp = 0 # Latest Data
-navpose_transform = 0 # No Tranformation
-publish_enable = True
-
 #####################################################################################
 # Methods
 #####################################################################################
@@ -43,8 +39,6 @@ publish_enable = True
 def navpose_get_publish_callback(timer):
   # Called periodically
   global geopoint_data_pub
-  global navpose_timestamp
-  global navpose_transform
   global publish_enable
   # Get current NEPI NavPose data from NEPI ROS nav_pose_query service call
   rospy.wait_for_service(NAVPOSE_SERVICE_NAME)
@@ -56,7 +50,7 @@ def navpose_get_publish_callback(timer):
     geopoint_data_msg.latitude=nav_pose_response.nav_pose.fix.latitude
     geopoint_data_msg.longitude=nav_pose_response.nav_pose.fix.longitude
     geopoint_data_msg.altitude=nav_pose_response.nav_pose.fix.altitude
-    if publish_enable:
+  if not rospy.is_shutdown():
       #print(geopoint_data_msg)
       geopoint_data_pub.publish(geopoint_data_msg)
   except rospy.ServiceException as e:
@@ -69,8 +63,6 @@ def navpose_get_publish_callback(timer):
   ### Cleanup processes on node shutdown
 def cleanup_actions():
   global geopoint_data_pub
-  global publish_enable
-  publish_enable=False
   time.sleep(2)
   print("Shutting down: Executing script cleanup actions")
   # Stop geopoint publisher
@@ -83,7 +75,6 @@ def startNode():
   rospy.loginfo("Starting Get Publish NavPose automation script")
   rospy.init_node(name="navpose_get_publish_auto_script")
   rospy.Timer(rospy.Duration(OUTPUT_INTERVAL_SEC), navpose_get_publish_callback)
-
   # run cleanup actions on shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever

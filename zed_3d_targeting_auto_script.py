@@ -57,7 +57,6 @@ DETECTION_THRESHOLD = 0.5
 #####################################################################################
 # Globals
 #####################################################################################
-publish_enable=True
 target_data_pub = rospy.Publisher(TARGET_DATA_OUTPUT_TOPIC, TargetLocalization, queue_size=10)
 target_overlay_pub = rospy.Publisher(TARGET_IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 stop_classifier_pub = rospy.Publisher(STOP_CLASSIFIER_TOPIC, Empty, queue_size=10)
@@ -135,7 +134,6 @@ def get_depth_data_callback(depth_data):
 
 ### calculate range and bearing of AI detected targets
 def object_targeting_callback(img_msg):
-  global publish_enable
   global target_data_pub
   global target_overlay_pub
   global detect_boxes
@@ -193,9 +191,8 @@ def object_targeting_callback(img_msg):
       target_data_msg.range_m=target_range_m
       target_data_msg.azimuth_deg=target_horz_angle_deg
       target_data_msg.elevation_deg=target_vert_angle_deg
-      if publish_enable:
+      if not rospy.is_shutdown():
         target_data_pub.publish(target_data_msg)
-      
       ###### Apply Image Overlays and Publish Targeting_Image ROS Message
       # Overlay adjusted detection boxes on image 
       start_point = (xmin_adj, ymin_adj)
@@ -234,17 +231,14 @@ def object_targeting_callback(img_msg):
   #Convert OpenCV image to ROS image
   img_out_msg = cv2_bridge.cv2_to_imgmsg(cv2_image,"bgr8")#desired_encoding='passthrough')
   # Publish new image to ros
-  if publish_enable:
+  if not rospy.is_shutdown():
     target_overlay_pub.publish(img_out_msg)
   
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global publish_enable
   global target_data_pub
   global target_overlay_pub
-  publish_enable=False
-  time.sleep(2)
   print("Shutting down: Executing script cleanup actions")
   # Stop classifer process
   stop_classifier_pub.publish()

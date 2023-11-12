@@ -40,7 +40,6 @@ IMAGE_OUTPUT_TOPIC = CAMERA_NAMESPACE + "idx/contours_2d_image"
 #####################################################################################
 # Globals
 #####################################################################################
-publsih_enable=True #  This is turned to False during cleanup
 contour_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 res_adj_pub = rospy.Publisher(RESOLUTION_ADJ_TOPIC, UInt8, queue_size=10)
 
@@ -69,9 +68,7 @@ def initialize_actions():
 
 ### callback to get image, apply contour, and publish new image on new topic
 def image_contour_callback(img_msg):
-  global publsih_enable
   global contour_image_pub
-
   #Convert image from ros to cv2
   bridge = CvBridge()
   cv_image = bridge.imgmsg_to_cv2(img_msg, "bgr8")
@@ -101,17 +98,14 @@ def image_contour_callback(img_msg):
   #Convert image from cv2 to ros
   img_out_msg = bridge.cv2_to_imgmsg(cv_image,"bgr8")#desired_encoding='passthrough')
   # Publish new image to ros
-  if publsih_enable:
+  if not rospy.is_shutdown():
     contour_image_pub.publish(img_out_msg) # You can view the enhanced_2D_image topic at //192.168.179.103:9091/ in a connected web browser
   
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global publish_enable
   global contour_image_pub
   print("Shutting down: Executing script cleanup actions")
-  # Disable all publishers
-  publish_enable=False
   time.sleep(2)
   # Unregister publishing topics
   contour_image_pub.unregister()
