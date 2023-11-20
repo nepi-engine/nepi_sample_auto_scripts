@@ -7,6 +7,13 @@
 # 2. Publishes a snapshot event trigger out
 # 3. Delays trigger event for some set delay time
 
+# Requires the following additional scripts are running
+# a)ai_detector_setup_start_auto_script.py
+# b)snapshot_event_save_data_auto_script.py
+# c) (Optional) snapshot_event_send_to_cloud_auto_script.py for cloud portal support
+# These scripts are available for download at:
+# [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
+
 import time
 import sys
 import rospy   
@@ -94,7 +101,7 @@ def object_detected_callback(bounding_box_msg):
          (box_abs_error_x_ratio <= OBJ_CENTERED_BUFFER_RATIO ):
         print("Detected a " + OBJ_LABEL_OF_INTEREST + " close to image center")
         print("Sending snapshot event trigger")
-        snapshot_trigger_pub.publish()
+        snapshot_trigger_pub.publish(Empty())
         print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
         time.sleep(RESET_DELAY_S)
 

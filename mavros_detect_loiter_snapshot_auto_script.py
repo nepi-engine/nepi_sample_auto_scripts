@@ -6,10 +6,16 @@
 # 1) Monitors detection for specfic target class 
 # 2) Sets system to Loiter mode
 # 3) Calls a Snapshot Event Auto Script
-# 4) Delays some set time
+# 4) Delays some set time for snapshot action
 # 5) Sets system back to original mode
 # 6) Delays, then starts monitoring again
 
+# Requires the following additional scripts are running
+# (Optional) Some Snapshot Action Automation Script like the following
+# a)snapshot_event_save_data_auto_script.py
+# b)snapshot_event_send_to_cloud_auto_script.py
+# These scripts are available for download at:
+# [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
 import rospy
 import time
@@ -26,20 +32,22 @@ from darknet_ros_msgs.msg import BoundingBoxes
 ##########################################
 
 OBJ_LABEL_OF_INTEREST = 'person'
-LOITER_DELAY_S = 10 # Time to Loiter at this spot
-RESET_DELAY_S = 5 # Min delay between triggers
-STATE_UPDATE_INTERVAL_SEC = 0.2
-
 SET_MODE = 'Loiter' # Requires GPS, use mavros_fake_gps_altitude_auto_script.py to fake
+ACTION_DELAY_S = 10 # Time to Loiter at this spot
+RESET_DELAY_S = 5 # Min delay between triggers
+
 
 # ROS namespace setup
 BASE_NAMESPACE = "/nepi/s2x/"
 MAVROS_NAMESPACE = BASE_NAMESPACE + "pixhawk_mavlink/"
-
+# MAVROS Subscriber Topics
 MAVROS_STATE_TOPIC = MAVROS_NAMESPACE + "state"
+# MAVROS Required Services
 MAVROS_ARMING_SERVICE = MAVROS_NAMESPACE + "cmd/arming"
 MAVROS_SET_MODE_SERVICE = MAVROS_NAMESPACE + "set_mode"
-CL_BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
+# AI Classifier Subscription Topic
+AI_BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
+# Snapshot Event Publish Topic
 SNAPSHOT_TOPIC = BASE_NAMESPACE + "snapshot_event"
 
 
@@ -49,21 +57,17 @@ SNAPSHOT_TOPIC = BASE_NAMESPACE + "snapshot_event"
 arming_client = rospy.ServiceProxy(MAVROS_ARMING_SERVICE, CommandBool)
 set_mode_client = rospy.ServiceProxy(MAVROS_SET_MODE_SERVICE, SetMode)
 snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TOPIC, Empty, queue_size = 1)
-current_state = None
+state_current = None
 org_mode = None
 org_arm = None
-set_mode = None # global control 
-set_arm = False # global control
-
 
 #####################################################################################
 # Methods
 #####################################################################################
 
-
 ### System Initialization processes
 def initialize_actions():
-  global current_state
+  global state_current
   global org_mode
   global org_arm
   global set_mode
@@ -71,46 +75,50 @@ def initialize_actions():
   print("Starting get_state_callback")
   rospy.Subscriber(MAVROS_STATE_TOPIC, State, callback = get_state_callback)
   print("Waiting for first state update")
-  while current_state is not None:
+  while state_current is not None:
     time.sleep(0.1)
   time.sleep(1)
   print("Getting Original State")
-  print(current_state)
-  org_mode = current_state.mode
-  org_arm = current_state.armed
-  print("Starting set_state_callback")
-  set_mode = org_mode
-  set_arm = org_arm
-  rospy.Timer(rospy.Duration(STATE_UPDATE_INTERVAL_SEC), set_state_callback)
-  time.sleep(0.25)
+  print(state_current)
+  org_mode = state_current.mode
+  org_arm = state_current.armed
   print("Completed Initialization")
 
 ### Callback to get current state
 def get_state_callback(state_msg):
-  global current_state
-  current_state = state_msg
+  global state_current
+  state_current = state_msg
 
-### Setup a regular set state publisher
-def set_state_callback(timer):
-  global arming_client
+### Function to set mode
+def update_mode(mode_new):
+  global state_current
   global set_mode_client
-  global set_mode
-  global set_arm
-  if not rospy.is_shutdown():
-    if set_mode is not None:
-      new_mode = SetModeRequest()
-      new_mode.custom_mode = set_mode
-      set_mode_client.call(new_mode)
-    arm_cmd = CommandBoolRequest()
-    arm_cmd.value = set_arm
+  print('gothere')
+  new_mode = SetModeRequest()
+  new_mode.custom_mode = mode_new
+  print("Updating mode")
+  print(mode_new)
+  while state_current.mode != mode_new:
+    set_mode_client.call(new_mode)
+    print("Waiting for mode to set")
+    time.sleep(.1)
+
+### Function to set armed state
+def update_armed(armed_new):
+  global state_current
+  global arming_client
+  arm_cmd = CommandBoolRequest()
+  arm_cmd.value = armed_new
+  print("Updating armed")
+  print(armed_new)
+  while state_current.armed != armed_new:
     arming_client.call(arm_cmd)
+    print("Waiting for armed value to set")
+    time.sleep(.1)
 
 # Action upon detection of object of interest
 def object_detected_callback(bounding_box_msg):
   global org_mode
-  global org_arm
-  global set_mode
-  global set_arm
   global snapshot_trigger_pub
   # Iterate over all of the objects reported by the detector
   for box in bounding_box_msg.bounding_boxes:
@@ -118,33 +126,20 @@ def object_detected_callback(bounding_box_msg):
     if box.Class == OBJ_LABEL_OF_INTEREST:
       print("Detected a " + OBJ_LABEL_OF_INTEREST)
       print("Switching to " + str(SET_MODE) + " mode")
-      set_mode = SET_MODE
-      set_arm = True
-      time.sleep(1)
+      update_mode(SET_MODE)
       print("Sending snapshot event trigger")
-      snapshot_trigger_pub.publish()
-      print("Staying in " + str(SET_MODE) + " for " + str(LOITER_DELAY_S) + " secs")
+      snapshot_trigger_pub.publish(Empty())
+      print("Staying in " + str(SET_MODE) + " for " + str(ACTION_DELAY_S) + " secs")
       time.sleep(RESET_DELAY_S)
-      print("Switching to original mode")
-      set_mode = org_mode
-      set_arm = org_arm
-      time.sleep(1)
+      print("Switching back to original mode")
+      update_mode(org_mode)
       print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
       time.sleep(RESET_DELAY_S)
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global current_state
   global org_mode
-  global org_arm
-  global set_mode
-  global set_arm
-  ("Setting System End_Mode and End_Arm states")
-  set_mode=org_mode
-  set_arm=org_arm
-  while(current_state.mode != org_mode  or current_state.armed != org_arm):
-    time.sleep(0.1)
-  time.sleep(2)
+  time.sleep(.1)
   
 ### Script Entrypoint
 def startNode():
@@ -153,8 +148,8 @@ def startNode():
   #initialize system including pan scan process
   initialize_actions()
   # Set up object detector subscriber
-  rospy.loginfo("Starting object detection subscriber: Object of interest = " + OBJ_LABEL_OF_INTEREST + "...")
-  rospy.Subscriber(CL_BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
+  print("Waiting for Classifier Topic to detect and publish")
+  rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
   # run cleanup actions on shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever

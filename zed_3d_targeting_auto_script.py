@@ -7,6 +7,13 @@
 # 3. Runs a process to calculate range and bearing of detected targets
 # 2. Runs until Stopped
 
+# Requires the following additional scripts are running
+# a)ai_detector_setup_start_auto_script.py
+# b)snapshot_event_save_data_auto_script.py
+# c) (Optional) snapshot_event_send_to_cloud_auto_script.py for cloud portal support
+# These scripts are available for download at:
+# [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
+
 import time
 import sys
 import rospy

@@ -5,6 +5,11 @@
 # 1. convert/publish zed stereo camera depthmap image to human viewable color image
 # 2. Run until Stopped
 
+# Requires the following additional scripts are running
+# a)ai_detector_setup_start_auto_script.py
+# These scripts are available for download at:
+# [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
+
 import time
 import sys
 import rospy
