@@ -78,7 +78,7 @@ NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/enable
 # MAVROS Subscriber Topics
 MAVROS_STATE_TOPIC = MAVROS_NAMESPACE + "state"
 MAVROS_HEADING_TOPIC = MAVROS_NAMESPACE + "global_position/compass_hdg"
-MAVROS_ORIENTATION_TOPIC = MAVROS_NAMESPACE + "local_position/pose"
+MAVROS_ORIENTATION_TOPIC = MAVROS_NAMESPACE + "global_position/local"
 MAVROS_POSITION_LOCAL_TOPIC = MAVROS_NAMESPACE + "global_position/local"
 MAVROS_POSITION_GLOBAL_TOPIC = MAVROS_NAMESPACE + "global_position/global"
 
@@ -147,7 +147,7 @@ def initialize_actions():
   ## Start Check Orientation Callback
   print("Starting orientation check subscriber callback")
   print(MAVROS_ORIENTATION_TOPIC)
-  rospy.Subscriber(MAVROS_ORIENTATION_TOPIC, PoseStamped, check_orientation_callback)
+  rospy.Subscriber(MAVROS_ORIENTATION_TOPIC, Odometry, check_orientation_callback)
   while mavros_orientation_check is None:
     print("Waiting for mavros orientation data to publish")
     time.sleep(0.5)  
