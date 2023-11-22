@@ -63,17 +63,17 @@ from sensor_msgs.msg import NavSatFix
 CURRENT_GEOID_HEIGHT_M = 22.0 
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
-MAVROS_NAMESPACE = BASE_NAMESPACE + "pixhawk_mavlink/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "pixhawk_mavlink/"
 
 # NEPI Get NAVPOSE Solution Service Name
-NAVPOSE_SERVICE_NAME = BASE_NAMESPACE + "nav_pose_query"
+NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 
 ### Setup NEPI NavPose Topic Namespaces
-NEPI_SET_NAVPOSE_GPS_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/set_gps_fix_topic"
-NEPI_SET_NAVPOSE_HEADING_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/set_heading_topic"
-NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
-NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/enable_gps_clock_sync"
+NEPI_SET_NAVPOSE_GPS_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_gps_fix_topic"
+NEPI_SET_NAVPOSE_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_heading_topic"
+NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
+NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/enable_gps_clock_sync"
 
 # MAVROS Subscriber Topics
 MAVROS_STATE_TOPIC = MAVROS_NAMESPACE + "state"
@@ -83,14 +83,14 @@ MAVROS_POSITION_LOCAL_TOPIC = MAVROS_NAMESPACE + "global_position/local"
 MAVROS_POSITION_GLOBAL_TOPIC = MAVROS_NAMESPACE + "global_position/global"
 
 ### NavPose Heading, Oreanation, Location, and Position Publish Topics
-NAVPOSE_CURRENT_HEADING_TOPIC = BASE_NAMESPACE + "nav_pose_current/heading_deg"
-NAVPOSE_CURRENT_ORIENTATION_NED_TOPIC = BASE_NAMESPACE + "nav_pose_current/orientation_ned_degs"
-NAVPOSE_CURRENT_ORIENTATION_ENU_TOPIC = BASE_NAMESPACE + "nav_pose_current/orientation_enu_degs"
-NAVPOSE_CURRENT_POSITION_NED_TOPIC = BASE_NAMESPACE + "nav_pose_current/position_ned_m"
-NAVPOSE_CURRENT_POSITION_ENU_TOPIC = BASE_NAMESPACE + "nav_pose_current/position_enu_m"
-NAVPOSE_CURRENT_LOCATION_AMSL_TOPIC = BASE_NAMESPACE + "nav_pose_current/location_amsl_geo"
-NAVPOSE_CURRENT_LOCATION_WGS84_TOPIC = BASE_NAMESPACE + "nav_pose_current/location_wgs84_geo"
-NAVPOSE_CURRENT_GEOID_HEIGHT_TOPIC = BASE_NAMESPACE + "nav_pose_current/geoid_height_m"
+NAVPOSE_CURRENT_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/heading_deg"
+NAVPOSE_CURRENT_ORIENTATION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/orientation_ned_degs"
+NAVPOSE_CURRENT_ORIENTATION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/orientation_enu_degs"
+NAVPOSE_CURRENT_POSITION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/position_ned_m"
+NAVPOSE_CURRENT_POSITION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/position_enu_m"
+NAVPOSE_CURRENT_LOCATION_AMSL_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/location_amsl_geo"
+NAVPOSE_CURRENT_LOCATION_WGS84_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/location_wgs84_geo"
+NAVPOSE_CURRENT_GEOID_HEIGHT_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/geoid_height_m"
 NAVPOSE_PUB_RATE_HZ = 10
 
 #####################################################################################
@@ -119,7 +119,8 @@ def initialize_actions():
   global mavros_global_check
   global mavros_heading_check
   global mavros_orientation_check
-
+  print("")
+  print("Starting Initialization")  
   ## Start Check Heading Callback
   print("Starting heading check subscriber callback")
   print(MAVROS_HEADING_TOPIC)
@@ -131,7 +132,6 @@ def initialize_actions():
   heading_pub = rospy.Publisher(NEPI_SET_NAVPOSE_HEADING_TOPIC, String, queue_size=10)
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
   heading_pub.publish(MAVROS_HEADING_TOPIC)
-  
   ## Start Check Global Callback
   print("Starting global check subscriber callback")
   print(MAVROS_POSITION_GLOBAL_TOPIC)
@@ -143,7 +143,6 @@ def initialize_actions():
   gps_pub = rospy.Publisher(NEPI_SET_NAVPOSE_GPS_TOPIC, String, queue_size=10)
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
   gps_pub.publish(MAVROS_POSITION_GLOBAL_TOPIC)
-
   ## Start Check Orientation Callback
   print("Starting orientation check subscriber callback")
   print(MAVROS_ORIENTATION_TOPIC)
@@ -155,12 +154,10 @@ def initialize_actions():
   orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=10)
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher
   orientation_pub.publish(MAVROS_ORIENTATION_TOPIC)
-
   # Sync NEPI clock to GPS timestamp
   gps_timesync_pub = rospy.Publisher(NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC, Bool, queue_size=10)
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher
   gps_timesync_pub.publish(data=True)
-  
   print("Initialization Complete")
 
 
@@ -228,7 +225,7 @@ def navpose_get_publish_callback(timer):
       # Set current position vector (x, y, z) in meters ned frame
       pose_ned_p = nav_pose_response.nav_pose.odom.pose.pose.position
       current_position_ned_m = Float64MultiArray()
-      current_position_ned_m.data = [pose_ned_p.x, pose_ned_p.y, -pose_ned_p.z]
+      current_position_ned_m.data = [pose_ned_p.x, -pose_ned_p.y, -pose_ned_p.z]
 
       # Set current location vector (lat, long, alt) in geopoint data with AMSL height
       pos_l = nav_pose_response.nav_pose.fix
@@ -275,7 +272,25 @@ def convert_rpy2quat(rpy_attitude_deg):
   xyzw_attitude = tf.transformations.quaternion_from_euler(math.radians(roll_deg), math.radians(pitch_deg), math.radians(yaw_deg))
   return xyzw_attitude
 
-  ### Cleanup processes on node shutdown
+### Function to Convert Yaw NED to Yaw ENU
+def convert_yaw_ned2enu(yaw_ned_deg):
+  yaw_enu_deg = -yaw_ned_deg-90
+  if yaw_enu_deg < -180:
+    yaw_enu_deg = 360 + yaw_enu_deg
+  elif yaw_enu_deg > 180:
+    yaw_enu_deg = yaw_enu_deg - 360
+  return yaw_enu_deg
+
+### Function to Convert Yaw ENU to Yaw NED
+def convert_yaw_enu2ned(yaw_enu_deg):
+  yaw_ned_deg = -rpy_ned_d[2] + 90
+  if yaw_ned_deg < 0:
+    yaw_ned_deg = 360 + yaw_ned_deg
+  elif yaw_ned_deg > 360:
+    yaw_ned_deg = yaw_ned_deg - 360
+  return yaw_ned_deg
+
+### Cleanup processes on node shutdown
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   time.sleep(2)

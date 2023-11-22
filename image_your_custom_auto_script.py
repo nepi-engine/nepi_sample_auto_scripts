@@ -21,28 +21,22 @@ from std_msgs.msg import UInt8, Empty, String, Bool
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
-CAM_RES=1 # Number 0-3, 0 Low, 1 Med, 2 High, 3 Ultra
+###!!!!!!!! Set Image ROS Topic Name to Use  !!!!!!!!
+IMAGE_INPUT_TOPIC = "/nepi/s2x/nexigo_n60_fhd_webcam_audio/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/see3cam_cu81/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/sidus_ss400/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/onwote_hd_poe/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/zed2/zed_node/left/image_rect_color"
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
-###!!!!!!!! Set Camera topics and parameters !!!!!!!!
-CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
-#CAMERA_NAME = "see3cam_cu81/"
-#CAMERA_NAME = "sidus_ss400/"
-#CAMERA_NAME = "onwote_hd_poe/"
-
-CAMERA_NAMESPACE = BASE_NAMESPACE + CAMERA_NAME
-
-RESOLUTION_ADJ_TOPIC = CAMERA_NAMESPACE + "idx/set_resolution_mode"
-IMAGE_INPUT_TOPIC = CAMERA_NAMESPACE + "idx/color_2d_image"
-IMAGE_OUTPUT_TOPIC = CAMERA_NAMESPACE + "idx/custom_image"
+IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "image_custom"
 
 #####################################################################################
 # Globals
 #####################################################################################
 custom_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
-res_adj_pub = rospy.Publisher(RESOLUTION_ADJ_TOPIC, UInt8, queue_size=10)
 
 #####################################################################################
 # Methods
@@ -51,20 +45,15 @@ res_adj_pub = rospy.Publisher(RESOLUTION_ADJ_TOPIC, UInt8, queue_size=10)
 ### System Initialization processes
 def initialize_actions():
   print("")
-  rospy.loginfo("Initializing " + CAMERA_NAMESPACE )
-  rospy.loginfo("Connecting to ROS Topic " + IMAGE_INPUT_TOPIC )
+  print("Starting Initialization")  
   # Check if camera topic is publishing
   topic_list=rospy.get_published_topics(namespace='/')
   topic_to_connect=[IMAGE_INPUT_TOPIC, 'sensor_msgs/Image']
-  if topic_to_connect in topic_list: 
-    print("Camera topic found, starting initializing process")
-    res_adj_pub.publish(CAM_RES)
+  while topic_to_connect not in topic_list:
+    print("!!!!! Image topic not found, waiting 1 second")
     time.sleep(1)
-    print("Initialization Complete")
-  else: 
-    print("!!!!! Camera topic not found, shutting down")
-    time.sleep(1)
-    rospy.signal_shutdown("Camera topic not found")
+  print("Image topic found")
+  print("Initialization Complete")
 
 
 ### Add your CV2 image customization code here
@@ -78,8 +67,6 @@ def image_customization_callback(img_msg):
   ### ADD YOUR CODE HERE
   ###########################################################
 
-
-
   ###########################################################
   ### END OF YOUR CODE
   ###########################################################
@@ -87,7 +74,9 @@ def image_customization_callback(img_msg):
   img_out_msg = bridge.cv2_to_imgmsg(cv_image,"bgr8")#desired_encoding='passthrough')
   # Publish new image to ros
   if not rospy.is_shutdown():
-    custom_image_pub.publish(img_out_msg) # You can view the enhanced_2D_image topic at //192.168.179.103:9091/ in a connected web browser
+    custom_image_pub.publish(img_out_msg)
+    # You can view the enhanced_2D_image topic at 
+    # //192.168.179.103:9091/ in a connected web browser
   
 
 ### Cleanup processes on node shutdown
@@ -96,7 +85,6 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   # Unregister publishing topics
   custom_image_pub.unregister()
-  time.sleep(2)
 
 
 ### Script Entrypoint

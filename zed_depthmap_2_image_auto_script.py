@@ -32,11 +32,11 @@ DEPTH_IMAGE_MAX_RANGE_METERS=2.0 #Set to meter value to adjust depth image activ
 
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
 ###!!!!!!!! Set data stream topics and parameters !!!!!!!!
-DEPTH_DATA_INPUT_TOPIC = BASE_NAMESPACE + "zed2/zed_node/depth/depth_registered"
-DEPTH_IMAGE_OUTPUT_TOPIC = BASE_NAMESPACE + "zed2/zed_node/depth/depth_image"
+DEPTH_DATA_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2/zed_node/depth/depth_registered"
+DEPTH_IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2/zed_node/depth/depth_image"
 
 #####################################################################################
 # Globals
@@ -114,7 +114,6 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   # Unregister publishing topics
   depth_image_pub.unregister()
-  time.sleep(2)
 
 ### Script Entrypoint
 def startNode():

@@ -39,25 +39,25 @@ TARGET_MIN_VALUES=10 # Sets the minimum number of valid points to consider for a
 
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
 ###!!!!!!!! Set data input stream topics and parameters !!!!!!!!
-IMAGE_INPUT_TOPIC = BASE_NAMESPACE + "zed2/zed_node/left/image_rect_color"
+IMAGE_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2/zed_node/left/image_rect_color"
 FOV_VERT_DEG=70 # Camera Vertical Field of View (FOV)
 FOV_HORZ_DEG=110 # Camera Horizontal Field of View (FOV)
 
-DEPTH_DATA_INPUT_TOPIC = BASE_NAMESPACE + "zed2/zed_node/depth/depth_registered"
-DEPTH_IMAGE_OUTPUT_TOPIC = BASE_NAMESPACE + "zed2/zed_node/depth/depth_image"
+DEPTH_DATA_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2/zed_node/depth/depth_registered"
+DEPTH_IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2/zed_node/depth/depth_image"
 
 ###!!!!!!!! Set data output stream topics and parameters !!!!!!!!
-TARGET_DATA_OUTPUT_TOPIC = BASE_NAMESPACE + "targeting/targeting_data"
-TARGET_IMAGE_OUTPUT_TOPIC = BASE_NAMESPACE + "targeting/targeting_image"
+TARGET_DATA_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "targeting/targeting_data"
+TARGET_IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "targeting/targeting_image"
 
 ### Classifier topics and parameters
-BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
-FOUND_OBJECT_TOPIC = BASE_NAMESPACE + "classifier/found_object"
-START_CLASSIFIER_TOPIC = BASE_NAMESPACE + "start_classifier"
-STOP_CLASSIFIER_TOPIC = BASE_NAMESPACE + "stop_classifier"
+BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
+FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "classifier/found_object"
+START_CLASSIFIER_TOPIC = NEPI_BASE_NAMESPACE + "start_classifier"
+STOP_CLASSIFIER_TOPIC = NEPI_BASE_NAMESPACE + "stop_classifier"
 DETECTION_MODEL = "common_object_detection"
 DETECTION_THRESHOLD = 0.5
 
@@ -74,10 +74,6 @@ detect_boxes=None
 #####################################################################################
 # Methods
 #####################################################################################
-
-
-
-
 
 ### System Initialization processes
 def initialize_actions():
@@ -252,7 +248,6 @@ def cleanup_actions():
   # Unregister publishing topics
   target_data_pub.unregister()
   target_overlay_pub.unregister()
-  time.sleep(2)
 
 
 ### Script Entrypoint

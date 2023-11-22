@@ -32,31 +32,25 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
-# Home Settings
-###################################################
-## Specified as [Lat, Long, Altitude_Meters] or -999 values to use current
-## Altitude is specified as meters in WGS-84 Ellipsoid height
-######################################################
-HOME_POSITION = [47.6541207,-122.3187998,0.0] # [Lat, Long, Altitude_Meters]. Replace any value with -999 to use current global val
-#HOME_POSITION = [-999,-999,-999] # us to update home to current position
 MODE_UPDATE_MAX_POSITION_ERROR_M = 2.0 # Goal used to check normal mode position changes like land and home
 
-# Setpoint Attitude Settings
+# Setpoint Attitude NED Settings
 ###################################################
 SETPOINT_ATTITUDE_NED_DEGS = [-999,30,90] # Roll, Pitch, Yaw Degrees: Enter -999 to use current value
 SETPOINT_ATTITUDE_MAX_ERROR_DEG = 2.0 # Goal reached when all values within this error value
 SETPOINT_ATTITUDE_THRUST = 0.2
 
-# Setpoint Position Local Settings
+# Setpoint Position Local Body Settings
 ###################################################
-# Local Position Updates X,Y,Z use these vehicle relative conventions
+# Local Body Position Setpoint Function use these body relative x,y,z,yaw conventions
 # x+ axis is forward
 # y+ axis is right
-# z+ axis is down ***
+# z+ axis is down
 # Only yaw orientation updated
+# yaw+ clockwise, yaw- counter clockwise from x axis (0 degrees faces x+ and rotates positive using right hand rule around z+ axis down)
 #####################################################
-SETPOINT_POSITION_LOCAL_POINT_M = [10,5,0] # X, Y, Z Offset in Meters (+Z is Down)
-SETPOINT_POSITION_LOCAL_YAW_DEG = 80 # Yaw Angle in Degrees, Enter -999 to use current value
+SETPOINT_POSITION_LOCAL_POINT_BODY_M = [10,5,0] # X, Y, Z Offset in Meters (+Z is Down). Use 0 value for no change
+SETPOINT_POSITION_LOCAL_YAW_BODY_DEG = 80 # Yaw Angle in Degrees, Enter -999 to use current value
 SETPOINT_POSITION_LOCAL_MAX_ERROR_M = 2.0 # Goal reached when all values within this error value
 SETPOINT_POSITION_LOCAL_MAX_ERROR_DEG = 2.0 # Goal reached when all values within this error value
 
@@ -85,20 +79,20 @@ MAVROS_FAKE_GPS_SIM_SUPPORT = True # Set True if running "MAVROS_fake_gps_sim_au
 MAVROS_FAKE_GPS_UPDATE_TIME_SEC=10 # Match setting in fake gps sim automation script
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
-MAVROS_NAMESPACE = BASE_NAMESPACE + "pixhawk_mavlink/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "pixhawk_mavlink/"
 MAVROS_CONTROLS_NAMESPACE = MAVROS_NAMESPACE + "backseat_controls/"
 MAVROS_FAKE_GPS_NAMESPACE = MAVROS_NAMESPACE + "fake_gps/"
 
 # NavPose Heading, Oreanation, Location, and Position Subscriber Topics
-NAVPOSE_CURRENT_HEADING_TOPIC = BASE_NAMESPACE + "nav_pose_current/heading_deg"
-NAVPOSE_CURRENT_ORIENTATION_NED_TOPIC = BASE_NAMESPACE + "nav_pose_current/orientation_ned_degs"
-NAVPOSE_CURRENT_ORIENTATION_ENU_TOPIC = BASE_NAMESPACE + "nav_pose_current/orientation_enu_degs"
-NAVPOSE_CURRENT_POSITION_NED_TOPIC = BASE_NAMESPACE + "nav_pose_current/position_ned_m"
-NAVPOSE_CURRENT_POSITION_ENU_TOPIC = BASE_NAMESPACE + "nav_pose_current/position_enu_m"
-NAVPOSE_CURRENT_LOCATION_AMSL_TOPIC = BASE_NAMESPACE + "nav_pose_current/location_amsl_geo"
-NAVPOSE_CURRENT_LOCATION_WGS84_TOPIC = BASE_NAMESPACE + "nav_pose_current/location_wgs84_geo"
-NAVPOSE_CURRENT_GEOID_HEIGHT_TOPIC = BASE_NAMESPACE + "nav_pose_current/geoid_height_m"
+NAVPOSE_CURRENT_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/heading_deg"
+NAVPOSE_CURRENT_ORIENTATION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/orientation_ned_degs"
+NAVPOSE_CURRENT_ORIENTATION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/orientation_enu_degs"
+NAVPOSE_CURRENT_POSITION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/position_ned_m"
+NAVPOSE_CURRENT_POSITION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/position_enu_m"
+NAVPOSE_CURRENT_LOCATION_AMSL_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/location_amsl_geo"
+NAVPOSE_CURRENT_LOCATION_WGS84_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/location_wgs84_geo"
+NAVPOSE_CURRENT_GEOID_HEIGHT_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/geoid_height_m"
 
 # MAVROS Subscriber Topics
 MAVROS_STATE_TOPIC = MAVROS_NAMESPACE + "state"
@@ -115,14 +109,13 @@ MAVROS_SETPOINT_POSITION_LOCAL_TOPIC = MAVROS_NAMESPACE + "setpoint_position/loc
 MAVROS_SETPOINT_POSITION_GLOBAL_TOPIC = MAVROS_NAMESPACE + "setpoint_position/global"
 
 # Setpoint Action Topics
-SNAPSHOT_TOPIC = BASE_NAMESPACE + "snapshot_event"
+SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
 # MAVROS Fake GPS Publish Topics
 MAVROS_FAKE_GPS_SETHOME_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "sethome"
 MAVROS_FAKE_GPS_TAKEOFF_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "takeoff"
 MAVROS_FAKE_GPS_UPDATE_GLOBAL_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "update_global"
-MAVROS_FAKE_GPS_GOTO_LOCAL_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "goto_local"
-MAVROS_FAKE_GPS_GOTO_GLOBAL_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "goto_global"
+MAVROS_FAKE_GPS_GOTO_GLOBAL_WGS84_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "goto_global_wgs84"
 MAVROS_FAKE_GPS_GOHOME_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "gohome"
 MAVROS_FAKE_GPS_LAND_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "land"
 
@@ -131,8 +124,7 @@ MAVROS_FAKE_GPS_LAND_TOPIC = MAVROS_FAKE_GPS_NAMESPACE + "land"
 #####################################################################################
 mavros_fake_gps_sethome_pub = rospy.Publisher(MAVROS_FAKE_GPS_SETHOME_TOPIC, GeoPoint, queue_size=1)
 mavros_fake_gps_takeoff_pub = rospy.Publisher(MAVROS_FAKE_GPS_TAKEOFF_TOPIC, Float64, queue_size=1)
-mavros_fake_gps_goto_local_pub = rospy.Publisher(MAVROS_FAKE_GPS_GOTO_LOCAL_TOPIC, Point, queue_size=1)
-mavros_fake_gps_goto_global_pub = rospy.Publisher(MAVROS_FAKE_GPS_GOTO_GLOBAL_TOPIC, GeoPoint, queue_size=1)
+mavros_fake_gps_goto_global_pub = rospy.Publisher(MAVROS_FAKE_GPS_GOTO_GLOBAL_WGS84_TOPIC, GeoPoint, queue_size=1)
 mavros_fake_gps_gohome_pub = rospy.Publisher(MAVROS_FAKE_GPS_GOHOME_TOPIC, Empty, queue_size=1)
 mavros_fake_gps_land_pub = rospy.Publisher(MAVROS_FAKE_GPS_LAND_TOPIC, Empty, queue_size=1)
 snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TOPIC, Empty, queue_size = 1)
@@ -232,9 +224,55 @@ def initialize_actions():
     time.sleep(0.5)
   print("Completed Initialization")
 
+## Function for custom post setpoint operations
+def pre_mission_custom_actions():
+  ###########################
+  # Start Your Custom Actions
+  ###########################
+  # Set Mode to Guided
+  update_mode('GUIDED')
+  # Arm System
+  update_armed(True)
+  # Send Takeoff Command
+  takeoff(10)
+  ###########################
+  # Stop Your Custom Actions
+  ###########################
+  print("Pre-Mission Actions Complete")
 
+## Function for custom setpoint operations
+def setpoint_custom_actions():
+  ###########################
+  # Start Your Custom Actions
+  ###########################
+  ## Change Vehicle Mode to Guided
+  print("Sending snapshot event trigger")
+  snapshot(5)
+  ###########################
+  # Stop Your Custom Actions
+  ###########################
+  print("Setpoing Actions Complete")
 
-### Function to set and check attitude setpoint command
+  
+## Function for custom post setpoint operations
+def post_mission_custom_actions():
+  ###########################
+  # Start Your Custom Actions
+  ###########################
+  land() # Uncomment to change to Land mode
+  #loiter() # Uncomment to change to Loiter mode
+  #home() # Uncomment to change to Home mode
+  #continue_mission() # Uncomment to return to pre setpoint state
+  time.sleep(1)
+  ###########################
+  # Stop Your Custom Actions
+  ###########################
+  print("Post-Mission Actions Complete")
+  # Shutdown
+  rospy.signal_shutdown("Setpoint Reached")
+  
+
+### Function to set and check setpoint attitude NED command
 def setpoint_attitude_ned_command(attitude_ned_degs, thrust, max_error_deg):
   global current_orientation_enu_degs
   global current_orientation_ned_degs
@@ -252,9 +290,9 @@ def setpoint_attitude_ned_command(attitude_ned_degs, thrust, max_error_deg):
   print("Attitude Current NED Degrees")
   print(" Roll, Pitch, Yaw")
   print(["%.2f" % current_orientation_ned_degs[0],"%.2f" % current_orientation_ned_degs[1],"%.2f" % current_orientation_ned_degs[2]])
-  # Capture current attitude and heading
-  cur_attitude_ned_degs=list(current_orientation_ned_degs)
-  # Set new attitude in degrees
+  # Capture current attitude in degs NED
+  start_orienation_ned_degs=list(current_orientation_ned_degs)
+  # Set new attitude in degs NED
   new_attitude_ned_degs=list(current_orientation_ned_degs) # Initialize with current
   for ind in range(3): # Overwrite current with new if set and valid
     if attitude_ned_degs[ind] != -999:
@@ -263,23 +301,19 @@ def setpoint_attitude_ned_command(attitude_ned_degs, thrust, max_error_deg):
   print("Attitude Goal NED Degrees")
   print(" Roll, Pitch, Yaw")
   print(["%.2f" % new_attitude_ned_degs[0],"%.2f" % new_attitude_ned_degs[1],"%.2f" % new_attitude_ned_degs[2]])
-  # Convert to ENU and create setpoint attitude goal in quaternion
-  yaw_enu_deg = -attitude_ned_degs[2]-90
-  if yaw_enu_deg < -180:
-    yaw_enu_deg = 360 + yaw_enu_deg
-  elif yaw_enu_deg > 180:
-    yaw_enu_deg = yaw_enu_deg - 360
-  attitude_sp_enu_degs = [attitude_ned_degs[0],attitude_ned_degs[1],yaw_enu_deg]
+  # Convert to ROS ENU attitude degs and create ENU quaternion setpoint attitude goal
+  yaw_enu_deg = convert_yaw_ned2enu(attitude_ned_degs[2])
+   attitude_sp_enu_degs = [attitude_ned_degs[0],attitude_ned_degs[1],yaw_enu_deg]
   print('')
   print("Attitude Goal ENU Degrees")
   print(" Roll, Pitch, Yaw")
   print(["%.2f" % attitude_sp_enu_degs[0],"%.2f" % attitude_sp_enu_degs[1],"%.2f" % attitude_sp_enu_degs[2]])
   attitude_sp_enu_quat = convert_rpy2quat(attitude_sp_enu_degs)
-  new_orientation = Quaternion()
-  new_orientation.x = attitude_sp_enu_quat[0]
-  new_orientation.y = attitude_sp_enu_quat[1]
-  new_orientation.z = attitude_sp_enu_quat[2]
-  new_orientation.w = attitude_sp_enu_quat[3]
+  new_orientation_enu_quat = Quaternion()
+  new_orientation_enu_quat.x = attitude_sp_enu_quat[0]
+  new_orientation_enu_quat.y = attitude_sp_enu_quat[1]
+  new_orientation_enu_quat.z = attitude_sp_enu_quat[2]
+  new_orientation_enu_quat.w = attitude_sp_enu_quat[3]
   # Set other setpoint attitude message values
   body_rate = Vector3()
   body_rate.x = 0
@@ -288,12 +322,12 @@ def setpoint_attitude_ned_command(attitude_ned_degs, thrust, max_error_deg):
   type_mask = 1|2|4
   # Create Setpoint Attitude Message
   attitude_target_msg = AttitudeTarget()
-  attitude_target_msg.orientation = new_orientation
+  attitude_target_msg.orientation = new_orientation_enu_quat
   attitude_target_msg.body_rate = body_rate
   attitude_target_msg.type_mask = type_mask
   attitude_target_msg.thrust = thrust
   print('')
-  print("Setpoint Attitude Message")
+  print("Setpoint Attitude ENU Message")
   print(attitude_target_msg)
   ##############################################
   ## Send Setpoint Message
@@ -308,23 +342,23 @@ def setpoint_attitude_ned_command(attitude_ned_degs, thrust, max_error_deg):
   setpoint_attitude_reached = False
   while setpoint_attitude_reached is False:  # Wait for attitude goal to be set
     # Calculate setpoint attitude errors
-    errors_deg = np.array(new_attitude_ned_degs) - np.array(current_orientation_ned_degs)
+    attitude_errors_degs = np.array(new_attitude_ned_degs) - np.array(current_orientation_ned_degs)
     for ind, val in enumerate(attitude_ned_degs):
       if val == -999.0: #Ignore
-        errors_deg[ind]=0.0
+        attitude_errors_degs[ind]=0.0
     # Print some information
     print('')
-    print("Current Attitude Degrees")
+    print("Current Attitude NED Degrees")
     print(" Roll, Pitch, Yaw")
     print(["%.2f" % current_orientation_ned_degs[0],"%.2f" % current_orientation_ned_degs[1],"%.2f" % current_orientation_ned_degs[2]])
     print('')
-    print("Current Goal Degrees")
+    print("Current Goal NED Degrees")
     print(["%.2f" % new_attitude_ned_degs[0],"%.2f" % new_attitude_ned_degs[1],"%.2f" % new_attitude_ned_degs[2]])
     print('')
     print("Current Attitude Errors")
-    print(["%.3f" % errors_deg[0],"%.3f" % errors_deg[1],"%.3f" % errors_deg[2]])
+    print(["%.3f" % attitude_errors_degs[0],"%.3f" % attitude_errors_degs[1],"%.3f" % attitude_errors_degs[2]])
     # Check for setpoint attitude goal
-    max_error = max(abs(errors_deg))
+    max_error = max(abs(attitude_errors_degs))
     if  max_error > max_error_deg:
       print("Waiting for Attitude Setpoint to complete")
       time.sleep(1)
@@ -335,154 +369,171 @@ def setpoint_attitude_ned_command(attitude_ned_degs, thrust, max_error_deg):
 
 
 
-##### Function to set and check position local setpoint command
-##def setpoint_position_local(point_m =[0,0,0], yaw_deg =-999, max_error_m =1.0, max_error_deg =2.0, yaw_is_heading =True):
-##  global poisiton_current_geopoint
-##  global current_orientation_ned_degs
-##  global current_heading_deg
-##  global mavros_fake_gps_land_pub
-##  global setpoint_position_local_pub
-##  print('')
-##  print("Starting Setpoint Position Local Create-Send-Check Process")
-##  ##############################################
-##  # Create Setpoint Message
-##  ##############################################
-##  print("Creating Message")
-##  # Capture current oreantation and heading
-##  cur_attitude_ned_deg=current_orientation_ned_degs 
-##  cur_heading_deg=current_heading_deg
-##  # Set new position in meters
-##  new_position=Position()
-##  new_position.x = point_m[0]
-##  new_position.y = point_m[1]
-##  new_position.z = point_m[2]
-##  point_sp_m = point_m # Initialize Value for Check
-##  print('')
-##  print("Postion Goal Degrees")
-##  print(" X, Y, Z")
-##  print(["%.2f" % new_position.x,"%.2f" % new_position.y,"%.2f" % new_position.z])
-##  # Set new yaw orienation in degrees
-##  new_attitude_ned_deg=cur_attitude_ned_deg # Initialize with current
-##  if yaw_deg != -999: # Keep current if -999
-##    if yaw_is_heading: # Convert global heading goal to yaw is set
-##      new_attitude_ned_deg[2] = cur_heading_deg+cur_attitude_ned_deg[2]-yaw_deg
-##  heading_sp_deg = new_attitude_ned_deg[2] # Initialize Value for Check
-##  print('')
-##  print("Orientation Goal Degrees")
-##  print(" Roll, Pitch, Yaw")
-##  print(["%.2f" % new_attitude_ned_deg[0],"%.2f" % new_attitude_ned_deg[1],"%.2f" % new_attitude_ned_deg[2]])
-##  ## Set new yaw orienation in quaternion
-##  new_attitude_quat = convert_rpy2quat(new_attitude_ned_deg)
-##  new_orientation = Quaternion()
-##  new_orientation.x = new_attitude_quat[0]
-##  new_orientation.y = new_attitude_quat[1]
-##  new_orientation.z = new_attitude_quat[2]
-##  new_orientation.w = new_attitude_quat[3]
-##  ## Create Setpoint Attitude Message
-##  position_local_target_msg = Pose()
-##  position_local_target_msg.position = new_position
-##  position_local_target_msg.orientation = new_orientation
-##  print('')
-##  print("Setpoint Position Local Message")
-##  print(position_local_target_msg)
-##  ##############################################
-##  ## Send Setpoint Message
-##  ##############################################
-##  print("Sending Message")
-##  setpoint_position_local_pub = rospy.Publisher(MAVROS_SETPOINT_POSITION_LOCAL_TOPIC, PoseStamped, queue_size=1)
-##  setpoint_positon_local_pub.publish(position_local_target_msg)
-##  if MAVROS_FAKE_GPS_SIM_SUPPORT:
-##  ##############################################
-##  ## Check for Setpoint Success
-##  ##############################################
-##  print("Checking for Setpoint Reached")
-##  setpoint_attitude_reached = False
-##  while setpoint_attitude_reached is False:  # Wait for attitude goal to be set
-##    # Calculate setpoint attitude errors
-##    pose = odometry_msg.pose.pose.orientation
-##    xyzw_pose=(pose.x,pose.y,pose.z,pose.w)
-##    attitude_ned_deg = convert_quat2rpy(xyzw_pose)
-##    errors_deg = np.array(attitude_sp_deg) - np.array(attitude_ned_deg)
-##    # Print some information
-##    print('')
-##    print("Current Attitude Degrees")
-##    print(" Roll, Pitch, Yaw")
-##    print(["%.2f" % attitude_ned_deg[0],"%.2f" % attitude_ned_deg[1],"%.2f" % attitude_ned_deg[2]])
-##    print('')
-##    print("Current Goal Degrees")
-##    print(["%.2f" % attitude_sp_deg[0],"%.2f" % attitude_sp_deg[1],"%.2f" % attitude_sp_deg[2]])
-##    print("Current Attitude Errors")
-##    print(["%.3f" % errors_deg[0],"%.3f" % errors_deg[1],"%.3f" % errors_deg[2]])
-##    # Check for setpoint attitude goal
-##    max_error_deg = np.amax(np.abs(errors_deg))
-##    if  max_error_deg > SETPOINT_ATTITUDE_MAX_ERROR_DEG:
-##      print("Waiting for Attitude Setpoint to complete")
-##      time.sleep(1)
-##    else:
-##      print("Attitude Setpoint Reached")
-##      setpoint_attitude_reached = True
+### Function to set and check setpoint position local body command
+def setpoint_position_local_body(point_body_m =[0,0,0], yaw_body_deg =-999, max_error_m =1.0, max_error_deg =2.0):
+  global current_orientation_ned_degs
+  global current_position_ned_meters
+  global current_location_wgs84_geo
+  global current_heading_deg
+  global setpoint_position_local_pub
+  global mavros_fake_gps_goto_global_pub
+  print('')
+  print("Starting Setpoint Position Local Create-Send-Check Process")
+  ##############################################
+  # Capture current navpose data
+  ##############################################
+  start_orienation_ned_degs=list(current_orientation_ned_degs)
+  start_position_ned_m = list(current_position_ned_meters)
+  start_location_wgs84_geo = list(current_location_wgs84_geo)
+  start_heading_deg=current_heading_deg
+  ##############################################
+  # Create Local ENU Position Setpoint Values
+  ##############################################
+  print('')
+  print("Position Goal Body Meters")
+  print(" X, Y, Z")
+  print(["%.2f" % point_body_m[0],"%.2f" % point_body_m[1],"%.2f" % point_body_m[2]])
+  # New position ENU in meters
+  
+  new_position_enu_m=Point()
+  new_position_enu_m.x = point_body_m[0]
+  new_position_enu_m.y = point_body_m[1]
+  new_position_enu_m.z = - point_body_m[2]
+  print('')
+  print("Postion Goal NED Degrees")
+  print(" X, Y, Z")
+  print(["%.2f" % new_position_enu_m.x,"%.2f" % new_position_enu_m.y,"%.2f" % new_position_enu_m.z])
+  ##############################################
+  # Create Local ENU Yaw Setpoint Value
+  ##############################################
+  # Set new yaw orienation in degrees
+  new_attitude_ned_deg=list(start_orienation_ned_degs) # Initialize with current
+  if yaw_ned_deg != -999: # Keep current if -999
+    new_attitude_ned_deg[2] = yaw_ned_deg
+  heading_sp_deg = new_attitude_ned_deg[2] # Initialize Value for Check
+  print('')
+  print("Orientation Goal NED Degrees")
+  print(" Roll, Pitch, Yaw")
+  print(["%.2f" % new_attitude_ned_deg[0],"%.2f" % new_attitude_ned_deg[1],"%.2f" % new_attitude_ned_deg[2]])
+  # Convert NED Yaw to ROS ENU and create setpoint attitude goal in quaternion
+  yaw_enu_deg = -yaw_ned_deg-90
+  if yaw_enu_deg < -180:
+    yaw_enu_deg = 360 + yaw_enu_deg
+  elif yaw_enu_deg > 180:
+    yaw_enu_deg = yaw_enu_deg - 360
+  attitude_sp_enu_degs = [new_attitude_ned_deg[0],new_attitude_ned_deg[1],yaw_enu_deg]
+  print('')
+  print("Orientation Goal ENU Degrees")
+  print(" Roll, Pitch, Yaw")
+  print(["%.2f" % attitude_sp_enu_degs[0],"%.2f" % attitude_sp_enu_degs[1],"%.2f" % attitude_sp_enu_degs[2]])
+  attitude_sp_enu_quat = convert_rpy2quat(attitude_sp_enu_degs)
+  new_orientation_enu_quat = Quaternion()
+  new_orientation_enu_quat.x = attitude_sp_enu_quat[0]
+  new_orientation_enu_quat.y = attitude_sp_enu_quat[1]
+  new_orientation_enu_quat.z = attitude_sp_enu_quat[2]
+  new_orientation_enu_quat.w = attitude_sp_enu_quat[3]
+  ##############################################
+  # Create PoseStamped Setpoint Local ENU Message
+  ##############################################
+  position_local_target_msg = PoseStamped()
+  position_local_target_msg.pose.position = new_position_enu_m
+  position_local_target_msg.pose.orientation = new_orientation_enu_quat
+  print('')
+  print("Setpoint Position Local Message")
+  print(position_local_target_msg)
+  ##############################################
+  ## Send Fake location update if enabled
+  ##############################################
+  print("Sending Message and Checking for Setpoint Success")
+  if MAVROS_FAKE_GPS_SIM_SUPPORT:
+    new_location_wgs84_geo=get_location_geo_at_body_point(start_location_wgs84_geo, start_heading_deg, point_body_m, R=6371)
+    mavros_fake_gps_goto_global_pub.publish(new_location_wgs84_geo)
+  ##############################################
+  ## Send Message and Check for Setpoint Success
+  ##############################################
+  print("Checking for Setpoint Reached")
+  setpoint_position_local_pub = rospy.Publisher(MAVROS_SETPOINT_POSITION_LOCAL_TOPIC, PoseStamped, queue_size=1)
+  setpoint_position_local_reached = False
+  time_sec=0
+  while setpoint_attitude_reached is False:  # Wait for attitude goal to be set
+    time.sleep(0.02) # update setpoint position at 50 Hz
+    time_sec=time_sec+0.02 # Increment print message timer
+    setpoint_positon_local_pub.publish(pose=position_local_target_msg) # Publish Setpoint
+    # Calculate setpoint attitude errors
+    pos_errors_m = np.array(current_position_ned_meters)-np.array(start_position_ned_m)
+    max_error_m = np.amax(np.abs(pos_errors_m))
+    alt_error_deg = np.array(current_heading_deg)-np.array(start_heading_deg)
+    max_error_deg = np.abs(alt_error_deg)
+    # Check for setpoint attitude goal
+    if  max_error_m > SETPOINT_POSITION_LOCAL_MAX_ERROR_M  or max_error_deg > SETPOINT_POSITION_LOCAL_MAX_ERROR_DEG :
+      if time_sec > 1:
+        time_sec=0 # Reset timer
+        # Print some information every second
+        print("Waiting for Attitude Setpoint to complete")
+        print('')
+        print("Current Attitude Degrees")
+        print(" Roll, Pitch, Yaw")
+        print(["%.2f" % attitude_ned_deg[0],"%.2f" % attitude_ned_deg[1],"%.2f" % attitude_ned_deg[2]])
+        print('')
+        print("Current Goal Degrees")
+        print(["%.2f" % attitude_sp_deg[0],"%.2f" % attitude_sp_deg[1],"%.2f" % attitude_sp_deg[2]])
+        print("Current Attitude Errors")
+        print(["%.3f" % errors_deg[0],"%.3f" % errors_deg[1],"%.3f" % errors_deg[2]])
+    else:
+      print("Position Local Setpoint Reached")
+      setpoint_position_local_reached = True
 
 ##setpoint_position_global_pub = rospy.Publisher(MAVROS_SETPOINT_POSITION_GLOBAL_TOPIC, GeoPoseStamped, queue_size=1)
 
 
 
 
+### Function to send snapshot event trigger and wait for completion
+def snapshot(wait_sec):
+  global snapshot_trigger_pub
+  snapshot_trigger_pub.publish(Empty())
+  time.sleep(wait_sec)
+  
 
-## Function for custom post setpoint operations
-def pre_setpoint_custom_actions():
-  ###########################
-  # Start Your Custom Actions
-  ###########################
-  # Update Home Position
-  set_home_position(HOME_POSITION)
-  # Set Mode to Guided
-  update_mode('GUIDED')
-  # Arm System
-  update_armed(True)
-  # Send Takeoff Command
-  takeoff(10)
-  ###########################
-  # Stop Your Custom Actions
-  ###########################
-
-## Function for sending set_home command
-def set_home_position(home_pos):
+### Function for sending set_home command
+def set_home_wgs84_position(home_wgs84_pos):
   global current_home
-  global current_location_amsl_geo
+  global current_location_wgs84_geo
   global mavros_fake_gps_sethome_pub
   # Send mavlink set home command and message
-  new_home = list(home_pos)
-  for ind, val in enumerate(new_home):
-    if new_home[ind] == -999.0: # Use current
-      new_home[ind]=current_location_amsl_geo[ind]
-  #new_home[2] = new_home[2] - HOME_GEOID_HEIGHT # Change from WGS-84 to AMSL
+  new_wgs84_home = list(home_wgs84_pos)
+  for ind, val in enumerate(new_wgs84_home):
+    if new_wgs84_home[ind] == -999.0: # Use current
+      new_wgs84_home[ind]=current_location_wgs84_geo[ind]
   print('Sending mavlink set home command')
-  print(new_home)
+  print(new_wgs84_home)
   set_home_client = rospy.ServiceProxy(MAVROS_SET_HOME_SERVICE, CommandHome)
-  set_home_client(latitude=new_home[0],longitude=new_home[1],altitude=new_home[2])
-  current_home = list(new_home)
+  time.sleep(.1)
+  set_home_client(latitude=new_wgs84_home[0],longitude=new_wgs84_home[1],altitude=new_wgs84_home[2])
+  current_home = list(new_wgs84_home)
   # Update fake gps home position if enabled
   if MAVROS_FAKE_GPS_SIM_SUPPORT:
-    home_geopoint=GeoPoint()
-    home_geopoint.latitude=home_pos[0]
-    home_geopoint.longitude=home_pos[1]
-    home_geopoint.altitude=home_pos[2]
+    home_wgs84_geopoint=GeoPoint()
+    home_wgs84_geopoint.latitude=new_wgs84_home[0]
+    home_wgs84_geopoint.longitude=new_wgs84_home[1]
+    home_wgs84_geopoint.altitude=new_wgs84_home[2]
     print('Sending fake gps set home command')
     print(home_geopoint)
-    mavros_fake_gps_sethome_pub.publish(home_geopoint)
+    mavros_fake_gps_sethome_pub.publish(home_wgs84_geopoint)
   # Wait for updates to set
   print("Waiting for set home poistion process to complete")
   time.sleep(1)
 
-## Function for sending set_home command
-def set_current_home_gps():
+
+### Function for sending set_home current command
+def set_home_current_gps():
   global mavros_fake_gps_sethome_pub
-  global current_location_amsl_geopoint
+  global current_location_wgs84_geopoint
   print("Sending Set Home Current GPS Command")
   set_home_client = rospy.ServiceProxy(MAVROS_SET_HOME_SERVICE, CommandHome)
   takeoff_client(current_gps=True)
   if MAVROS_FAKE_GPS_SIM_SUPPORT:
-    mavros_fake_gps_sethome_pub.publish(current_location_amsl_geopoint)
+    mavros_fake_gps_sethome_pub.publish(current_location_wgs84_geopoint)
   print("Waiting for takeoff process to complete")
   time.sleep(1)
 
@@ -498,9 +549,12 @@ def update_mode(mode_new):
   print(mode_new)
   mode_client = rospy.ServiceProxy(MAVROS_SET_MODE_SERVICE, SetMode)
   while current_state.mode != mode_new:
+    time.sleep(.25)
     mode_client.call(new_mode)
     print("Waiting for mode to set")
-    time.sleep(.1)
+    print(mode_new)
+    print(current_state.mode)
+
 
 ### Function to set armed state
 def update_armed(armed_new):
@@ -512,66 +566,32 @@ def update_armed(armed_new):
   print(armed_new)
   arming_client = rospy.ServiceProxy(MAVROS_ARMING_SERVICE, CommandBool)
   while current_state.armed != armed_new:
+    time.sleep(.25)
     arming_client.call(arm_cmd)
     print("Waiting for armed value to set")
-    time.sleep(.1)
+    print(armed_new)
+    print(current_state.armed)
 
 ## Function for sending takeoff command
 def takeoff(takeoff_alt_m):
   global mavros_fake_gps_takeoff_pub
-  global current_location_amsl_geo
-  cur_alt_goal_m = current_location_amsl_geo[2]+takeoff_alt_m
+  global current_location_wgs84_geo
+  cur_alt_goal_m = current_location_wgs84_geo[2]+takeoff_alt_m
   print("Sending Takeoff Command")
   takeoff_client = rospy.ServiceProxy(MAVROS_TAKEOFF_SERVICE, CommandTOL)
-  takeoff_client(altitude=takeoff_alt_m)
+  takeoff_client(altitude=cur_alt_goal_m)
   if MAVROS_FAKE_GPS_SIM_SUPPORT:
     print("Waiting for fake gps takeoff process to complete")
-    mavros_fake_gps_takeoff_pub.publish(data=takeoff_alt_m)
+    mavros_fake_gps_takeoff_pub.publish(data=cur_alt_goal_m)
     time.sleep(MAVROS_FAKE_GPS_UPDATE_TIME_SEC)
   tkoff_alt_error = abs(takeoff_alt_m)
   while tkoff_alt_error > MODE_UPDATE_MAX_POSITION_ERROR_M:
     print("Waiting for takeoff process to complete")
-    tkoff_alt_error = abs(cur_alt_goal_m-current_location_amsl_geo[2])
+    tkoff_alt_error = abs(cur_alt_goal_m-current_location_wgs84_geo[2])
+    print(current_location_wgs84_geo[2])
+    print(cur_alt_goal_m)
+    print(tkoff_alt_error)
     time.sleep(1)
-
-
-## Function for custom setpoint operations
-def at_setpoint_custom_actions():
-  ###########################
-  # Start Your Custom Actions
-  ###########################
-  ## Change Vehicle Mode to Guided
-  print("Sending snapshot event trigger")
-  snapshot(5)
-  ###########################
-  # Stop Your Custom Actions
-  ###########################
-
-### Function to send snapshot event trigger and wait for completion
-def snapshot(wait_sec):
-  global snapshot_trigger_pub
-  snapshot_trigger_pub.publish(Empty())
-  time.sleep(wait_sec)
-
-
-  
-## Function for custom post setpoint operations
-def post_setpoint_custom_actions():
-  ###########################
-  # Start Your Custom Actions
-  ###########################
-  land() # Uncomment to change to Land mode
-  #loiter() # Uncomment to change to Loiter mode
-  #home() # Uncomment to change to Home mode
-  #continue_mission() # Uncomment to return to pre setpoint state
-  time.sleep(1)
-  ###########################
-  # Stop Your Custom Actions
-  ###########################
-  # Shutdown
-  rospy.signal_shutdown("Setpoint Reached")
-
-
 
 ### Function for switching to LAND mode
 def land():
@@ -590,24 +610,24 @@ def land():
 def loiter():
   update_mode('LOITER')
 
-### Function for switching to HOME mode
-def home():
-  global current_state
-  global current_home
-  global current_location_amsl_geo
-  global mavros_fake_gps_gohome_pub
-  cur_alt_goal_m = list(current_location_amsl_geo)
-  update_mode('HOME')
-  if MAVROS_FAKE_GPS_SIM_SUPPORT:
-    print("Waiting for fake gps home process to complete")
-    mavros_fake_gps_gohome_pub.publish(Empty())
-    time.sleep(MAVROS_FAKE_GPS_UPDATE_TIME_SEC)
-  print("Waiting for drone to reach home")
-  home_error = distance_geopoints(current_location_amsl_geo,current_home)
-  while home_error > MODE_UPDATE_MAX_POSITION_ERROR_M:
-    print("Waiting for home process to complete")
-    home_error = distance_geopoints(current_location_amsl_geo,current_home)
-    time.sleep(1)
+##### Function for switching to HOME mode
+##def home():
+##  global current_state
+##  global current_home
+##  global current_location_amsl_geo
+##  global mavros_fake_gps_gohome_pub
+##  cur_alt_goal_m = list(current_location_amsl_geo)
+##  update_mode('HOME')
+##  if MAVROS_FAKE_GPS_SIM_SUPPORT:
+##    print("Waiting for fake gps home process to complete")
+##    mavros_fake_gps_gohome_pub.publish(Empty())
+##    time.sleep(MAVROS_FAKE_GPS_UPDATE_TIME_SEC)
+##  print("Waiting for drone to reach home")
+##  home_error = distance_geopoints(current_location_amsl_geo,current_home)
+##  while home_error > MODE_UPDATE_MAX_POSITION_ERROR_M:
+##    print("Waiting for home process to complete")
+##    home_error = distance_geopoints(current_location_amsl_geo,current_home)
+##    time.sleep(1)
 
 ### Function for switching back to current mission
 def continue_mission():
@@ -669,6 +689,15 @@ def convert_quat2rpy(xyzw_attitude):
   yaw_deg = rpy_attitude_ned_deg[2]
   return rpy_attitude_ned_deg
 
+### Function to Convert Yaw NED to Yaw ENU
+def convert_yaw_ned2enu(yaw_ned_deg):
+  yaw_enu_deg = -yaw_ned_deg-90
+  if yaw_enu_deg < -180:
+    yaw_enu_deg = 360 + yaw_enu_deg
+  elif yaw_enu_deg > 180:
+    yaw_enu_deg = yaw_enu_deg - 360
+  return yaw_enu_deg
+
 ### Function to Convert Roll, Pitch, Yaw Degrees to Quaternion Attitude
 def convert_rpy2quat(rpy_attitude_ned_deg):
   roll_deg = rpy_attitude_ned_deg[0] 
@@ -677,12 +706,12 @@ def convert_rpy2quat(rpy_attitude_ned_deg):
   xyzw_attitude = tf.transformations.quaternion_from_euler(math.radians(roll_deg), math.radians(pitch_deg), math.radians(yaw_deg))
   return xyzw_attitude
 
-### Function to Estimate Distance Between Two GEO Locations
+### Function to get distance between two geo latlong locations
 def distance_geopoints(geopoint1,geopoint2):
-  lon1 = radians(geopoint1[0])
-  lon2 = radians(geopoint2[0])
   lat1 = radians(geopoint1[1])
   lat2 = radians(geopoint2[0])
+  lon1 = radians(geopoint1[0])
+  lon2 = radians(geopoint2[0])
   # Haversine formula 
   dlon = lon2 - lon1 
   dlat = lat2 - lat1
@@ -695,6 +724,30 @@ def distance_geopoints(geopoint1,geopoint2):
   distance_m = math.sqrt(alt_m**2 + xy_m**2) 
   # calculate the result
   return(distance_m)
+
+### Function to get new latlong at body relative point
+def get_latlong_at_body_point(cur_location_geo, cur_heading_deg, point_body_m, R=6371):
+  """
+  lat: initial latitude, in degrees
+  lon: initial longitude, in degrees
+  d: target distance from initial in km
+  bearing: (true) heading in degrees
+  R: optional radius of sphere, defaults to mean radius of earth
+  Returns new lat/lon coordinate {d}km from initial, in degrees
+  """
+  lat1 = math.radians(cur_location_geo[0])
+  lon1 = math.radians(cur_location_geo[1])
+  d_km = math.sqrt(point_body_m[0]**2+point_body_m[1]**2)/1000
+  yaw_body_deg = 90-(math.atan2(point_body_m[0],point_body_m[1])/math.pi*180)
+  bearing_deg = current_heading_deg + yaw_body_dega = math.radians(bearing_deg)
+  
+  lat2 = math.asin(math.sin(lat1) * math.cos(d_km/R) + math.cos(lat1) * math.sin(d_km/R) * math.cos(a))
+  lon2 = lon1 + math.atan2(
+      math.sin(a) * math.sin(d_km/R) * math.cos(lat1),
+      math.cos(d_km/R) - math.sin(lat1) * math.sin(lat2)
+  )
+  new_location_geo=[math.degrees(lat2), math.degrees(lon2),cur_location_geo[2]]
+  return  new_location_geo
 
 
 ### Cleanup processes on node shutdown
@@ -709,33 +762,36 @@ def startNode():
   #initialize system including pan scan process
   initialize_actions()
   #########################################
-  # Execute custom pre-setpoint actions
+  # Execute Custom Pre-Mission Custom Actions
   print("Starting Pre-Setpoint Actions")
-  pre_setpoint_custom_actions()
+  pre_mission_custom_actions()
+##  #########################################
+##  # Send Setpoint Attitude Command
+##  sp_att_ned_degs = SETPOINT_ATTITUDE_NED_DEGS
+##  sp_att_thrust = SETPOINT_ATTITUDE_THRUST
+##  sp_att_max_error_deg = SETPOINT_ATTITUDE_MAX_ERROR_DEG
+##  print("Starting Setpoint Attitude Call")
+##  setpoint_attitude_ned_command(sp_att_ned_degs, sp_att_thrust, sp_att_max_error_deg)
+  #Execute At Setpoint Custom Actions
+  #print("Starting Setpoint Actions")
+  #setpoint_custom_actions()
   #########################################
-  # Send Setpoint Attitude Command
-  sp_att_ned_degs = SETPOINT_ATTITUDE_NED_DEGS
-  sp_att_thrust = SETPOINT_ATTITUDE_THRUST
-  sp_att_max_error_deg = SETPOINT_ATTITUDE_MAX_ERROR_DEG
-  print("Starting Setpoint Attitude Call")
-  setpoint_attitude_ned_command(sp_att_ned_degs, sp_att_thrust, sp_att_max_error_deg)
-  #########################################
-  # Execute custom setpoint actions
-  print("Starting Setpoint Actions")
-  #at_setpoint_custom_actions()
-  #########################################
+  sp_position_body_m = SETPOINT_POSITION_LOCAL_POINT_BODY_M
+  sp_yaw_body_deg = SETPOINT_POSITION_LOCAL_YAW_BODY_DEG
+  sp_max_error_m = SETPOINT_POSITION_LOCAL_MAX_ERROR_M
+  sp_max_error_deg = SETPOINT_POSITION_LOCAL_MAX_ERROR_DEG
+  setpoint_position_local(point_body_m =sp_position_body_m, yaw_body_deg =sp_yaw_body_deg, max_error_m =sp_max_error_m, max_error_deg =sp_max_error_deg)
+  
   # Send Setpoint Position Local Command
   #print("Starting Setpoint Attitude Call")
   #setpoint_attitude(sp_att_attitude_ned_deg,sp_att_thrust,sp_att_max_error_deg,sp_att_yaw_is_heading)
   #########################################
-  # Execute custom setpoint actions
-  print("Starting Setpoint Actions")
-  at_setpoint_custom_actions()
+
   #########################################
   ####### End Setpoint Attitude Send and Monitor Processes
-  # Run Custom Post-Setpoint Actions
+  # Run Custom Post-Mission Actions
   print("Starting Post-Setpoint Actions")
-  post_setpoint_custom_actions()
+  post_mission_custom_actions()
   # Run cleanup actions on rospy shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever

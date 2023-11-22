@@ -19,27 +19,23 @@ from std_msgs.msg import UInt8, Empty, String, Bool
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
-CAM_RES=1 # Number 0-3, 0 Low, 1 Med, 2 High, 3 Ultra
-ENHANCE_SENSITIVITY_RATIO=0.5
+###!!!!!!!! Set Image ROS Topic Name to Use  !!!!!!!!
+IMAGE_INPUT_TOPIC = "/nepi/s2x/nexigo_n60_fhd_webcam_audio/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/see3cam_cu81/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/sidus_ss400/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/onwote_hd_poe/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/zed2/zed_node/left/image_rect_color"
+
+ENHANCE_SENSITIVITY_RATIO = 0.5
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
-###!!!!!!!! Set Camera topics and parameters !!!!!!!!
-CAMERA_NAME = "nexigo_n60_fhd_webcam_audio/"
-#CAMERA_NAME = "sidus_ss400/"
-#CAMERA_NAME = "onwote_hd_poe/"
-#CAMERA_NAME = "see3cam_cu81/"
-CAMERA_NAMESPACE = BASE_NAMESPACE + CAMERA_NAME
-
-RESOLUTION_ADJ_TOPIC = CAMERA_NAMESPACE + "idx/set_resolution_mode"
-IMAGE_INPUT_TOPIC = CAMERA_NAMESPACE + "idx/color_2d_image"
-IMAGE_OUTPUT_TOPIC = CAMERA_NAMESPACE + "idx/enhanced_2d_image"
+IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "image_enhanced"
 
 #####################################################################################
 # Globals
 #####################################################################################
-res_adj_pub = rospy.Publisher(RESOLUTION_ADJ_TOPIC, UInt8, queue_size=10)
 enhanced_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 
 #####################################################################################
@@ -49,20 +45,15 @@ enhanced_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 ### System Initialization processes
 def initialize_actions():
   print("")
-  rospy.loginfo("Initializing " + CAMERA_NAMESPACE )
-  rospy.loginfo("Connecting to ROS Topic " + IMAGE_INPUT_TOPIC )
+  print("Starting Initialization")  
   # Check if camera topic is publishing
   topic_list=rospy.get_published_topics(namespace='/')
   topic_to_connect=[IMAGE_INPUT_TOPIC, 'sensor_msgs/Image']
-  if topic_to_connect in topic_list: 
-    print("Camera topic found, starting initializing process")
-    res_adj_pub.publish(CAM_RES)
+  while topic_to_connect not in topic_list:
+    print("!!!!! Image topic not found, waiting 1 second")
     time.sleep(1)
-    print("Initialization Complete")
-  else: 
-    print("!!!!! Camera topic not found, shutting down")
-    time.sleep(1)
-    rospy.signal_shutdown("Camera topic not found")
+  print("Image topic found")
+  print("Initialization Complete")
 
 
 ### callback to get image, enahance image, and publish new image on new topic
@@ -137,7 +128,6 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   # Unregister publishing topics
   enhanced_image_pub.unregister()
-  time.sleep(2)
 
 ### Script Entrypoint
 def startNode():

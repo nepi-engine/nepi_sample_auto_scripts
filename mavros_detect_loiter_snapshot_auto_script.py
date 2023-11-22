@@ -38,17 +38,17 @@ RESET_DELAY_S = 5 # Min delay between triggers
 
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
-MAVROS_NAMESPACE = BASE_NAMESPACE + "pixhawk_mavlink/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "pixhawk_mavlink/"
 # MAVROS Subscriber Topics
 MAVROS_STATE_TOPIC = MAVROS_NAMESPACE + "state"
 # MAVROS Required Services
 MAVROS_ARMING_SERVICE = MAVROS_NAMESPACE + "cmd/arming"
 MAVROS_SET_MODE_SERVICE = MAVROS_NAMESPACE + "set_mode"
 # AI Classifier Subscription Topic
-AI_BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
+AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
 # Snapshot Event Publish Topic
-SNAPSHOT_TOPIC = BASE_NAMESPACE + "snapshot_event"
+SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
 
 #####################################################################################

@@ -19,13 +19,13 @@ from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 ##########################################
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
 # NEPI Get NAVPOSE Solution Service Name
-NAVPOSE_SERVICE_NAME = BASE_NAMESPACE + "nav_pose_query"
+NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 
 ### NavPose Heading, Oreanation, Location, and Position Publish Topics
-NAVPOSE_CURRENT_NAVPOSE_TOPIC = BASE_NAMESPACE + "nav_pose_current/navpose"
+NAVPOSE_CURRENT_NAVPOSE_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/navpose"
 NAVPOSE_PUB_RATE_HZ = 10
 
 #####################################################################################

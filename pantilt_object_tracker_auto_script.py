@@ -35,7 +35,6 @@ from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 MIN_DETECT_BOX_AREA_RATIO = 0.15 # Filters background targets.
 OBJ_LABEL_OF_INTEREST = "person"
 
-
 # Pan and Tilt setup parameters
 PT_REVERSE_PAN = False # Relative to image pixel location reporting
 PT_REVERSE_TILT = True # Relative to image pixel location reporting
@@ -67,9 +66,9 @@ PT_GOTO_TILT_RATIO_TOPIC = PT_NAMESPACE + "ptx/jog_to_pitch_ratio"
 PT_SET_SOFT_LIMITS_TOPIC = PT_NAMESPACE + "ptx/set_soft_limits"
 
 # Classifier topics and parameters
-CL_BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
-CL_FOUND_OBJECT_TOPIC = BASE_NAMESPACE + "classifier/found_object"
-CL_DETECTION_IMAGE_TOPIC = BASE_NAMESPACE + "classifier/detection_image"
+AI_BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
+AI_FOUND_OBJECT_TOPIC = BASE_NAMESPACE + "classifier/found_object"
+AI_DETECTION_IMAGE_TOPIC = BASE_NAMESPACE + "classifier/detection_image"
 
 
 #####################################################################################
@@ -119,9 +118,9 @@ def initialize_actions():
   global pt_tilt_scan_ratio
   print("")
   rospy.loginfo("Initializing PanTilt Object Tracking")
-  rospy.loginfo("Connecting to ROS Topic " + CL_DETECTION_IMAGE_TOPIC )
+  rospy.loginfo("Connecting to ROS Topic " + AI_DETECTION_IMAGE_TOPIC )
   #Wait to get the image dimensions
-  img_sub = rospy.Subscriber(CL_DETECTION_IMAGE_TOPIC, Image, image_callback)
+  img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)
   while img_width is 0 and img_height is 0:
     print("Waiting for Classifier Detection Image")
     time.sleep(1)
@@ -315,10 +314,10 @@ def startNode():
   initialize_actions()
   #Set up object detector subscriber which only updates on AI detection
   print("Starting object detection subscriber")
-  rospy.Subscriber(CL_BOUNDING_BOXES_TOPIC, BoundingBoxes, objects_detected_callback, queue_size = 1)
+  rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, objects_detected_callback, queue_size = 1)
   #Set up found object subscriber which monitors all AI outputs
   print("Starting found object subscriber")
-  rospy.Subscriber(CL_FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback, queue_size = 1)
+  rospy.Subscriber(AI_FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback, queue_size = 1)
   #Set up cleanup on node shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever (until object is detected)

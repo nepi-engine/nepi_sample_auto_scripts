@@ -17,12 +17,12 @@ from sensor_msgs.msg import NavSatFix
 ##########################################
 
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
 ###!!!!!!!! Set NavPose initialization values !!!!!!!!
-SET_NAVPOSE_FIXED_GPS_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/set_init_gps_fix"
-SET_NAVPOSE_FIXED_HEADING_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/set_init_heading"
-REINIT_NAVPOSE_SOLUTION_TOPIC = BASE_NAMESPACE + "nav_pose_mgr/reinit_solution"
+SET_NAVPOSE_FIXED_GPS_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_init_gps_fix"
+SET_NAVPOSE_FIXED_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_init_heading"
+REINIT_NAVPOSE_SOLUTION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/reinit_solution"
 
 #Numurus Office
 LAT = 47.65412711862056
