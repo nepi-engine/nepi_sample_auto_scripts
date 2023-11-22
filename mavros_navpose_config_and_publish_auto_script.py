@@ -6,8 +6,8 @@
 # 2. call the NEPI ROS's nav_pose_mgr/query_data_products service
 # 3. gets and publishes current navpose data at set rate to topics
 #  heading_deg = Float64 (heading in degrees)
-#  orientation_ned_degs = [Float64, Float64, Float64] (roll, pitch, yaw in degrees NED frame)  
-#  orientation_enu_degs = [Float64, Float64, Float64] (roll, pitch, yaw in degrees ENU frame)  
+#  orientation_ned_degs = [Float64, Float64, Float64] (roll, pitch, yaw in +-180 degrees NED frame)  
+#  orientation_enu_degs = [Float64, Float64, Float64] (roll, pitch, yaw in +-180 degrees ENU frame)  
 #  position_ned_m = [Float64, Float64, Float64] (x, y, z in meters NED frame)  
 #  position_enu_m = [Float64, Float64, Float64] (x, y, z in meters ENU frame)  
 #  location_amsl_geo = [Float64, Float64, Float64] (lat, long, altitude in meters AMSL height)
@@ -202,20 +202,16 @@ def navpose_get_publish_callback(timer):
       xyzw_enu_o = list([pose_enu_o.x,pose_enu_o.y,pose_enu_o.z,pose_enu_o.w])
       rpy_enu_d = convert_quat2rpy(xyzw_enu_o)
       current_orientation_enu_degs = Float64MultiArray()
-      current_orientation_enu_degs.data = [rpy_enu_d[0], rpy_enu_d[1], rpy_enu_d[2]]
+      current_orientation_enu_degs.data = [rpy_enu_d[0],rpy_enu_d[1],rpy_enu_d[2]]
 
-      # Set current orientation vector (roll, pitch, yaw) in degrees ned frame
-      pose_ned_o = nav_pose_response.nav_pose.odom.pose.pose.orientation
-      xyzw_ned_o = list([pose_ned_o.x,pose_ned_o.y,pose_ned_o.z,pose_ned_o.w])
-      rpy_ned_d = convert_quat2rpy(xyzw_ned_o)
-      yaw_ned_deg = -rpy_ned_d[2] + 90
-      if yaw_ned_deg < 0:
-        yaw_ned_deg = 360 + yaw_ned_deg
-      elif yaw_ned_deg > 360:
-        yaw_ned_deg = yaw_ned_deg - 360
-      rpy_ned_d[2] = yaw_ned_deg
+      # Set current orientation vector (roll, pitch, yaw) in degrees ned frame +-180
+      pose_enu_o = nav_pose_response.nav_pose.odom.pose.pose.orientation
+      xyzw_enu_o = list([pose_enu_o.x,pose_enu_o.y,pose_enu_o.z,pose_enu_o.w])
+      rpy_enu_d = convert_quat2rpy(xyzw_enu_o)
+      yaw_ned_d = convert_yaw_enu2ned(rpy_enu_d[2])
+      rpy_ned_d = [rpy_enu_d[0],rpy_enu_d[1],yaw_ned_d]
       current_orientation_ned_degs = Float64MultiArray()
-      current_orientation_ned_degs.data = [rpy_ned_d[0], rpy_ned_d[1], rpy_ned_d[2]]
+      current_orientation_ned_degs.data = [rpy_ned_d[0],rpy_ned_d[1],rpy_ned_d[2]]
 
       # Set current position vector (x, y, z) in meters enu frame
       pose_enu_p = nav_pose_response.nav_pose.odom.pose.pose.position
@@ -283,10 +279,10 @@ def convert_yaw_ned2enu(yaw_ned_deg):
 
 ### Function to Convert Yaw ENU to Yaw NED
 def convert_yaw_enu2ned(yaw_enu_deg):
-  yaw_ned_deg = -rpy_ned_d[2] + 90
-  if yaw_ned_deg < 0:
+  yaw_ned_deg = -yaw_enu_deg + 90
+  if yaw_ned_deg < -180:
     yaw_ned_deg = 360 + yaw_ned_deg
-  elif yaw_ned_deg > 360:
+  elif yaw_ned_deg > 180:
     yaw_ned_deg = yaw_ned_deg - 360
   return yaw_ned_deg
 
