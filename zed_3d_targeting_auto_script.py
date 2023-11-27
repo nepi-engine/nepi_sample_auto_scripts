@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
 # 1. Runs a process that convert zed stereo camera depthmap depth_array and depth_image
@@ -77,34 +85,20 @@ detect_boxes=None
 
 ### System Initialization processes
 def initialize_actions():
-  topic_list=rospy.get_published_topics(namespace='/')
-  print("")
-  # Check if camera topic is publishing
-  topic_to_connect=[IMAGE_INPUT_TOPIC, 'sensor_msgs/Image']
-  rospy.loginfo("Connecting to ROS Topic " + IMAGE_INPUT_TOPIC )
-  if topic_to_connect in topic_list: 
-    print("Camera Topic found, starting initializing process")
-    print("Camera Initialization Complete")
-  else: 
-    print("!!!!! Camera topic not found, shutting down")
-    time.sleep(1)
-  # Check if depth topic is publishing
-  rospy.loginfo("Connecting to ROS Topic " + DEPTH_DATA_INPUT_TOPIC )
-  topic_to_connect=[DEPTH_DATA_INPUT_TOPIC, 'sensor_msgs/Image']
-  if topic_to_connect in topic_list: 
-    print("Depth Topic found, starting initializing process")
-    print("Depth Initialization Complete")
-  else: 
-    print("!!!!! Depth topic not found, shutting down")
-    time.sleep(1)
-    rospy.signal_shutdown("Camera topic not found")
+  print("Starting Initialization")
+  # Wait for topic
+  print("Waiting for topic: " + IMAGE_INPUT_TOPIC)
+  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')  
+  # Wait for topic
+  print("Waiting for topic: " + DEPTH_DATA_INPUT_TOPIC)
+  wait_for_topic(DEPTH_DATA_INPUT_TOPIC, 'sensor_msgs/Image')
   # Classifier initialization
   start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
   classifier_selection = ClassifierSelection(img_topic=IMAGE_INPUT_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
   time.sleep(1) # Important to sleep between publisher constructor and publish()
   print("Starting target detector: " + str(start_classifier_pub.name))
   start_classifier_pub.publish(classifier_selection)
-  print("Detector initialization complete")
+  print("Initialization Complete")
 
 
 ### Monitor Output of AI model to clear detection status
@@ -238,6 +232,17 @@ def object_targeting_callback(img_msg):
     target_overlay_pub.publish(img_out_msg)
   
 
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
+
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   global target_data_pub
@@ -265,9 +270,6 @@ def startNode():
   rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, object_targeting_callback, queue_size = 1)
   print("Starting convert depthmap subscriber")
   rospy.Subscriber(DEPTH_DATA_INPUT_TOPIC, numpy_msg(Image), get_depth_data_callback, queue_size = 1)
-
-  
-
   # run cleanup actions on shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever

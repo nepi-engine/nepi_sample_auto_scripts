@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
 # 1. Wait for specific object to be detected and centered
@@ -10,8 +18,8 @@
 # a)ai_detector_setup_start_auto_script.py
 # This automation script only sends a snapshot event trigger
 # The following automation scripts are snapshot event actions scripts you can test
-# b)(Optional)snapshot_event_save_data_auto_script.py
-# c)(Optional) snapshot_event_send_to_cloud_auto_script.py for cloud portal support
+# a)(Optional)snapshot_event_save_data_auto_script.py
+# b)(Optional) snapshot_event_send_to_cloud_auto_script.py for cloud portal support
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
@@ -59,11 +67,14 @@ def initialize_actions():
   print("Starting Initialization Processes")
   rospy.loginfo("Connecting to ROS Detector Image Topic")
   rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
-  #Wait to get the image dimensions
+ # Wait for topic
+  print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
+  wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
   img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)
   while img_width is 0 and img_height is 0:
-    print("Waiting for initial image to determine dimensions")
+    print("Waiting for Classifier Detection Image")
     time.sleep(1)
+  img_sub.unregister() # Don't need it anymore
   print("Initialization Complete")
  
 ### Simple callback to get image height and width
@@ -104,6 +115,18 @@ def object_detected_callback(bounding_box_msg):
         snapshot_trigger_pub.publish(Empty())
         print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
         time.sleep(RESET_DELAY_S)
+
+
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
 
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")

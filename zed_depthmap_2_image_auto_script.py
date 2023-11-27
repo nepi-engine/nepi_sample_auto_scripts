@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 
+
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
+
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
 # 1. convert/publish zed stereo camera depthmap image to human viewable color image
@@ -50,20 +60,12 @@ depth_image_pub = rospy.Publisher(DEPTH_IMAGE_OUTPUT_TOPIC, Image, queue_size=10
 
 ### System Initialization processes
 def initialize_actions():
-  topic_list=rospy.get_published_topics(namespace='/')
-  #print(topic_list)
   print("")
-  rospy.loginfo("Connecting to ROS Topic " + DEPTH_DATA_INPUT_TOPIC )
-  # Check if depth topic is publishing
-  topic_to_connect=[DEPTH_DATA_INPUT_TOPIC, 'sensor_msgs/Image']
-  if topic_to_connect in topic_list: 
-    print("Depth Topic found, starting initializing process")
-    print("Depth Initialization Complete")
-  else: 
-    print("!!!!! Depth topic not found, shutting down")
-    time.sleep(1)
-    rospy.signal_shutdown("Camera topic not found")
-
+  print("Starting Initialization")  
+  # Wait for topic
+  print("Waiting for topic: " + DEPTH_DATA_INPUT_TOPIC)
+  wait_for_topic(DEPTH_DATA_INPUT_TOPIC, 'sensor_msgs/Image')
+  print("Initialization Complete")
 
 ### callback to get depthmap, convert to global float array of meter depths corrisponding to image pixel location
 def convert_depthmap_callback(ros_depth_data):
@@ -107,6 +109,16 @@ def convert_depthmap_callback(ros_depth_data):
   if not rospy.is_shutdown():
     depth_image_pub.publish(ros_depth_image)
 
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
   
 ### Cleanup processes on node shutdown
 def cleanup_actions():

@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
 # 1. Converts ROS image to OpenCV image
@@ -46,13 +54,9 @@ custom_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 def initialize_actions():
   print("")
   print("Starting Initialization")  
-  # Check if camera topic is publishing
-  topic_list=rospy.get_published_topics(namespace='/')
-  topic_to_connect=[IMAGE_INPUT_TOPIC, 'sensor_msgs/Image']
-  while topic_to_connect not in topic_list:
-    print("!!!!! Image topic not found, waiting 1 second")
-    time.sleep(1)
-  print("Image topic found")
+  # Wait for topic
+  print("Waiting for topic: " + IMAGE_INPUT_TOPIC)
+  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')
   print("Initialization Complete")
 
 
@@ -77,7 +81,18 @@ def image_customization_callback(img_msg):
     custom_image_pub.publish(img_out_msg)
     # You can view the enhanced_2D_image topic at 
     # //192.168.179.103:9091/ in a connected web browser
-  
+
+
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():

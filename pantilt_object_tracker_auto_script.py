@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
 ### Expects Classifier to be running ###
@@ -119,9 +127,11 @@ def initialize_actions():
   print("")
   rospy.loginfo("Initializing PanTilt Object Tracking")
   rospy.loginfo("Connecting to ROS Topic " + AI_DETECTION_IMAGE_TOPIC )
-  #Wait to get the image dimensions
+  # Wait for topic
+  print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
+  wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
   img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)
-  while img_width is 0 and img_height is 0:
+  while img_width is 0 and img_height is 0 and not rospy.is_shutdown():
     print("Waiting for Classifier Detection Image")
     time.sleep(1)
   img_sub.unregister() # Don't need it anymore
@@ -135,9 +145,6 @@ def initialize_actions():
   set_pt_pan_ratio_pub.publish(0.5)
   set_pt_speed_ratio_pub.publish(PT_SCAN_SPEED)
   time.sleep(2) # Give time to center  
-  # Set up the timer that start scanning when no objects are detected
-  print("Setting up pan/tilt scan check timer")
-  rospy.Timer(rospy.Duration(PT_SCAN_CHECK_INTERVAL), pt_scan_timer_callback)
   print("Initialization Complete")
 
 
@@ -295,7 +302,18 @@ def pt_track_box(object_loc_y_ratio, object_loc_x_ratio):
       pan_axis_ratio_target = pt_forward_pan_limit_ratio if object_loc_x_ratio < 0.5 else pt_backward_pan_limit_ratio
       set_pt_pan_ratio_pub.publish(pan_axis_ratio_target)
       #print("Current pan_track_to_ratio: " + "%.2f" % (pan_axis_ratio_target))
- 
+
+
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
@@ -312,6 +330,9 @@ def startNode():
   rospy.init_node(name="pantilt_object_tracker_auto_script")
   #initialize system including pan scan process
   initialize_actions()
+  # Set up the timer that start scanning when no objects are detected
+  print("Setting up pan/tilt scan check timer")
+  rospy.Timer(rospy.Duration(PT_SCAN_CHECK_INTERVAL), pt_scan_timer_callback)
   #Set up object detector subscriber which only updates on AI detection
   print("Starting object detection subscriber")
   rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, objects_detected_callback, queue_size = 1)

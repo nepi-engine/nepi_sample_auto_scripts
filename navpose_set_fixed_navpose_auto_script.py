@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 
+
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
+
 # Sample NEPI Automation Script.
 # If your NEPI system does not have an attached GPS/IMU/Compass or other
 # NavPose source, this script can be set to run at startup setting fixed
@@ -34,11 +44,11 @@ HEADING = 45
 # Methods
 #####################################################################################
 
-### Script Entrypoint
-def startNode():
-  rospy.init_node("set_fixed_navpose_auto_script")
-  rospy.loginfo("Starting Set Fixed NavPose automation script")
 
+### System Initialization processes
+def initialize_actions():
+  print("")
+  print("Starting Initialization")
   # Make sure to use the correct message type: "rostopic info" can help identify it. In this case it is a sensor_msgs/NavSatFix message type
   gps_pub = rospy.Publisher(SET_NAVPOSE_FIXED_GPS_TOPIC, NavSatFix, queue_size=10)
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
@@ -53,11 +63,25 @@ def startNode():
   reinit_pub = rospy.Publisher(REINIT_NAVPOSE_SOLUTION_TOPIC, Empty, queue_size=10)
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
   reinit_pub.publish() # "Empty" message types don't require a payload
+  print("Initialization Complete")
 
-  # Sleep a bit so that the publisher threads above have time to do their work before this script exits
-  rospy.loginfo("Sleeping to let publishers finish")
-  rospy.sleep(1)
 
+### Cleanup processes on node shutdown
+def cleanup_actions():
+  print("Shutting down: Executing script cleanup actions")
+  time.sleep(2)
+
+### Script Entrypoint
+def startNode():
+  rospy.init_node("set_fixed_navpose_auto_script")
+  rospy.loginfo("Starting Set Fixed NavPose automation script")
+  # Run initialization processes
+  initialize_actions()
+  # run cleanup actions on shutdown
+  rospy.on_shutdown(cleanup_actions)
+  # Spin forever
+  rospy.spin()
+  
 #####################################################################################
 # Main
 #####################################################################################

@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
+
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
 # 1. Checks if AI input image topic exists
@@ -55,13 +64,9 @@ stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
 def initialize_actions():
   print("")
   print("Starting Initialization")  
-  # Check if camera topic is publishing
-  topic_list=rospy.get_published_topics(namespace='/')
-  topic_to_connect=[IMAGE_INPUT_TOPIC, 'sensor_msgs/Image']
-  while topic_to_connect not in topic_list:
-    print("!!!!! Image topic not found, waiting 1 second")
-    time.sleep(1)
-  print("Image topic found")
+  # Wait for topic
+  print("Waiting for topic: " + IMAGE_INPUT_TOPIC)
+  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')
   # Try updating IDX sensor resolution
   if CAM_RES is not None:
     if IMAGE_INPUT_TOPIC.find('idx')>0: # Is IDX supported sensor stream
@@ -85,6 +90,17 @@ def initialize_actions():
   rospy.loginfo("Starting object detector: " + str(start_classifier_pub.name))
   start_classifier_pub.publish(classifier_selection)
   print("Initialization Complete")
+
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
 
 
 ### Cleanup processes on node shutdown

@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
+
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
 # 1. Confirms IDX driver supported camera topic is publishing
@@ -59,12 +68,9 @@ def initialize_actions():
   global image_source_name
   print("")
   print("Starting Initialization")  
-  # Check if camera topic is publishing
-  topic_list=rospy.get_published_topics(namespace='/')
-  topic_to_connect=[IMAGE_INPUT_TOPIC, 'sensor_msgs/Image']
-  while topic_to_connect not in topic_list:
-    print("!!!!! Image topic not found, waiting 1 second")
-    time.sleep(1)
+  # Wait for image topic to exist
+  print("Waiting for image topic")  
+  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')
   print("Image topic found")
   print("Setting NEPI CONNECT data sources")
   nepi_link_set_data_sources.publish([image_source_name])
@@ -84,6 +90,17 @@ def snapshot_event_callback(event):
   print("Delaying " + str(SEND_RESET_DELAY_S) + " secs")
   time.sleep(SEND_RESET_DELAY_S)
   print("Waiting for next snapshot event trigger")
+
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
