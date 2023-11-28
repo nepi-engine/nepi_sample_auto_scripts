@@ -10,15 +10,17 @@ __version__ = "2.0.4.0"
 
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
-# 1. Runs a process that convert zed stereo camera depthmap depth_array and depth_image
-# 2. Runs a process to load an AI model and connect to left camera image
+# 1. Waits for ai detection topic
+# 2. Runs a process that convert zed stereo camera depthmap depth_array and depth_image
 # 3. Runs a process to calculate range and bearing of detected targets
-# 2. Runs until Stopped
+# 4. Publishes new target range/bearing data topic and image overlay topic
+# 5. Runs until Stopped
+
+# Requires first installing ZED SDK and Ros wrapper as described in the tutorial
+# "Setup Zed Stereo Camera" at [link text](https://numurus.com/tutorials/)
 
 # Requires the following additional scripts are running
 # a)ai_detector_setup_start_auto_script.py
-# b)snapshot_event_save_data_auto_script.py
-# c) (Optional) snapshot_event_send_to_cloud_auto_script.py for cloud portal support
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
@@ -64,17 +66,13 @@ TARGET_IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "targeting/targeting_image"
 ### Classifier topics and parameters
 BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
 FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "classifier/found_object"
-START_CLASSIFIER_TOPIC = NEPI_BASE_NAMESPACE + "start_classifier"
-STOP_CLASSIFIER_TOPIC = NEPI_BASE_NAMESPACE + "stop_classifier"
-DETECTION_MODEL = "common_object_detection"
-DETECTION_THRESHOLD = 0.5
+AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
 
 #####################################################################################
 # Globals
 #####################################################################################
 target_data_pub = rospy.Publisher(TARGET_DATA_OUTPUT_TOPIC, TargetLocalization, queue_size=10)
 target_overlay_pub = rospy.Publisher(TARGET_IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
-stop_classifier_pub = rospy.Publisher(STOP_CLASSIFIER_TOPIC, Empty, queue_size=10)
 
 np_depth_array_m=None # will be replaced when depthmap is recieved and converted
 detect_boxes=None
@@ -92,12 +90,9 @@ def initialize_actions():
   # Wait for topic
   print("Waiting for topic: " + DEPTH_DATA_INPUT_TOPIC)
   wait_for_topic(DEPTH_DATA_INPUT_TOPIC, 'sensor_msgs/Image')
-  # Classifier initialization
-  start_classifier_pub = rospy.Publisher(START_CLASSIFIER_TOPIC, ClassifierSelection, queue_size=10)
-  classifier_selection = ClassifierSelection(img_topic=IMAGE_INPUT_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
-  time.sleep(1) # Important to sleep between publisher constructor and publish()
-  print("Starting target detector: " + str(start_classifier_pub.name))
-  start_classifier_pub.publish(classifier_selection)
+  # Wait for topic
+  print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
+  wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
   print("Initialization Complete")
 
 
@@ -248,8 +243,6 @@ def cleanup_actions():
   global target_data_pub
   global target_overlay_pub
   print("Shutting down: Executing script cleanup actions")
-  # Stop classifer process
-  stop_classifier_pub.publish()
   # Unregister publishing topics
   target_data_pub.unregister()
   target_overlay_pub.unregister()
@@ -266,10 +259,10 @@ def startNode():
   rospy.Subscriber(FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback, queue_size = 1)
   print("Starting object detection subscriber")
   rospy.Subscriber(BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
-  print("Starting targeteting subscriber")
-  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, object_targeting_callback, queue_size = 1)
   print("Starting convert depthmap subscriber")
   rospy.Subscriber(DEPTH_DATA_INPUT_TOPIC, numpy_msg(Image), get_depth_data_callback, queue_size = 1)
+  print("Starting targeteting subscriber")
+  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, object_targeting_callback, queue_size = 1)
   # run cleanup actions on shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever

@@ -10,13 +10,15 @@ __version__ = "2.0.4.0"
 
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
-# 1. Wait for specific object to be detected and centered
-# 2. Publishes a snapshot event trigger out
-# 3. Delays trigger event for some set delay time
+# 1. Waits for ai detection topic
+# 2. Wait for specific object to be detected and centered
+# 3. Publishes a snapshot event trigger out
+# 4. Delays trigger event for some set delay time
 
 # Requires the following additional scripts are running
 # a)ai_detector_setup_start_auto_script.py
-# This automation script only sends a snapshot event trigger
+# This automation script only sends a snapshot event trigger.
+# You will also want one or more snapshot event action scripts running
 # The following automation scripts are snapshot event actions scripts you can test
 # a)(Optional)snapshot_event_save_data_auto_script.py
 # b)(Optional) snapshot_event_send_to_cloud_auto_script.py for cloud portal support
@@ -67,7 +69,7 @@ def initialize_actions():
   print("Starting Initialization Processes")
   rospy.loginfo("Connecting to ROS Detector Image Topic")
   rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
- # Wait for topic
+  # Wait for topic
   print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
   wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
   img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)

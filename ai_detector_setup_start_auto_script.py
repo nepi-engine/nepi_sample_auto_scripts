@@ -43,7 +43,6 @@ IMAGE_INPUT_TOPIC = "/nepi/s2x/nexigo_n60_fhd_webcam_audio/idx/color_2d_image"
 
 DETECTION_MODEL = "common_object_detection"
 DETECTION_THRESHOLD = 0.5
-OBJ_CENTERED_BUFFER_RATIO = 0.5 # acceptable band about center of image for saving purposes
 
 # NEPI ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
