@@ -28,12 +28,44 @@ __version__ = "2.0.4.0"
 #
 # Location Geo Altitudes are published in both meters above mean sea level (AMSL)and meters above the WGS-84 Ellipsoid (WGS84)
 
+# Requires the following python modules installed for real-time geoid_height calculations.
+# Not available for NEPI 2.0.# versions that use python 2.7, so will defualt to CURRENT_GEOID_HEIGHT_M user set value
+# Pre installed on NEPI 2.1.2+
+# a) geographiclib  [link text](https://pypi.org/project/geographiclib/)
+# b) PyGeodesy  [link text](https://pypi.org/project/PyGeodesy/)
+# Plus at least one geoid file data base from [link text](https://sourceforge.net/projects/geographiclib/files/geoids-distrib/)
+# The following geoid files are Pre installed on NEPI 2.1.1+ in
+# '/mnt/nepi_storage/databases/geoids/egm96-15.pgm'  - Small memory footprint, but less accurate
+# '/mnt/nepi_storage/databases/geoids/egm2008-2_5.pgm'  - Large memory footprint, but less accurate
+# Set the database to use below
+GEOID_DATABASE_FILE='/mnt/nepi_storage/databases/geoids/egm2008-2_5.pgm' # Ignored if PyGeodesy module or Geoids Database is not available
+# For NEPI 2.0.# versions, the system will default to the following user entered value for the current Lat Long working location
+# Find the geoid_height value for a Lat Long location at: [link text](https://geodesy.noaa.gov/GEOID/GEOID18/computation.html)
+FALLBACK_GEOID_HEIGHT_M = 22.0 # Ignored if if PyGeodesy module or Geoids Database are available
+
 import rospy
 import numpy as np
 import math
 import time
 import sys
 import tf
+# try and import geoid height calculation module and databases
+try:
+  print('Importing PyGeodesy module')
+  import pygeodesy
+  from pygeodesy.ellipsoidalKarney import LatLon
+  try:
+    print(['Loading Geoids Database from: ' + GEOID_DATABASE_FILE])
+    ginterpolator = pygeodesy.GeoidKarney(GEOID_DATABASE_FILE)
+    USE_FALLBACK_GEOID_HEIGHT = False
+  except:
+    print('Geoids database failed to import')
+    print(['Using FALLBACK_GEOID_HEIGHT_M value: ' + str(FALLBACK_GEOID_HEIGHT_M)])
+    USE_FALLBACK_GEOID_HEIGHT = True
+except:
+  print('PyGeodesy module not available')
+  print(['Using FALLBACK_GEOID_HEIGHT_M value: ' + str(FALLBACK_GEOID_HEIGHT_M)])
+  USE_FALLBACK_GEOID_HEIGHT = True
 
 from std_msgs.msg import Bool, String, Float64, Float64MultiArray
 from nav_msgs.msg import Odometry
@@ -42,18 +74,12 @@ from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamp
 from nepi_ros_interfaces.msg import NavPose
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
-
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-#  GEOID HEIGHT INPUT
-### Currently, the geoid_height is hard coded value entered for your current location.
-### Plan is to automate this in future updates. For now, you can use this link to get your geoid height value
-### for the current Lat Long location: [link text](https://geodesy.noaa.gov/GEOID/GEOID18/computation.html)
-CURRENT_GEOID_HEIGHT_M = 22.0
-
 
 NAVPOSE_PUB_RATE_HZ = 10
+
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -155,7 +181,11 @@ def navpose_get_publish_callback(timer):
     current_location_amsl_geo.data =  [fix_amsl.latitude,fix_amsl.longitude,fix_amsl.altitude]
 
     # Set current geoid heihgt
-    geoid_height=CURRENT_GEOID_HEIGHT_M #### Needs function for calculating geoid height at current lat long location
+    if USE_FALLBACK_GEOID_HEIGHT:
+      geoid_height=FALLBACK_GEOID_HEIGHT_M #### user hard coaded geoid height at current lat long location
+    else:
+      single_position=LatLon(fix_amsl.latitude,fix_amsl.longitude)
+      geoid_height = ginterpolator(single_position)
     current_geoid_height =  geoid_height
 
     # Set current location vector (lat, long, alt) in geopoint data with WGS84 height
@@ -222,7 +252,8 @@ def cleanup_actions():
 ### Script Entrypoint
 def startNode():
   # Wait for NEPI ROS to initialize
-  time.sleep(10)
+##  print("Waiting 10 seconds for NEPI NavPose solution to configure")
+##  time.sleep(10)
   rospy.init_node("set_mavlink_navpose_auto_script")
   rospy.loginfo("Starting Set MAVLink NavPose automation script")
   # Run initialization processes

@@ -43,6 +43,16 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
+# FAKE GPS SETTINGS
+###################################################
+# The Fake GPS Sim automation script is available at
+# https://github.com/numurus-nepi/nepi_sample_auto_scripts
+#####################################################
+MAVROS_FAKE_GPS_SIM_SUPPORT = True # Set True if running "MAVROS_fake_gps_sim_auto_script.py"
+FAKE_GPS_HOME_GEOPOINT_WGS84 = [47.6541271,-122.3189492,0.0] # [Lat, Long, Altitude_WGS84], Use -999 values to use current
+### Currently, the geoid_height for your home location must be set in the navpose_get_and_publsih_auto_script.py auto script
+### Plan is to automate this in future updates. For now, you can use this link to get your geoid height value
+### for the current Lat Long location: [link text](https://geodesy.noaa.gov/GEOID/GEOID18/computation.html)
 
 # Setpoint Position Global Settings
 ###################################################
@@ -73,19 +83,6 @@ SETPOINT_ATTITUDE_NED = [-999,30,-999] # Roll, Pitch, Yaw Degrees: Enter -999 to
 
 # SETPOINT ACTION SETTINGS
 SNAPSHOT_EVENT_WAIT_SEC = 5.0 # Time to wait for snapshot event to complete
-
-
-# FAKE GPS SETTINGS
-###################################################
-# The Fake GPS Sim automation script is available at
-# https://github.com/numurus-nepi/nepi_sample_auto_scripts
-#####################################################
-MAVROS_FAKE_GPS_SIM_SUPPORT = True # Set True if running "MAVROS_fake_gps_sim_auto_script.py"
-FAKE_GPS_HOME_GEOPOINT_WGS84 = [47.6541271,-122.3189492,0.0] # [Lat, Long, Altitude_WGS84], Use -999 values to use current
-### Currently, the geoid_height for your home location must be set in the navpose_get_and_publsih_auto_script.py auto script
-### Plan is to automate this in future updates. For now, you can use this link to get your geoid height value
-### for the current Lat Long location: [link text](https://geodesy.noaa.gov/GEOID/GEOID18/computation.html)
-
 
 
 # ROS namespace setup
