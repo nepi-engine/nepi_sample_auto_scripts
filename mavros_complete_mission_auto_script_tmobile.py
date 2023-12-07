@@ -50,7 +50,8 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 # Altitude is specified as meters above the WGS-84 and converted to AMSL before sending
 # Yaw is specified in NED frame degrees 0-360 or +-180 
 #####################################################
-SETPOINT_LOCATION_GLOBAL = [47.6541208,-122.3186620, 10, 250] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
+SETPOINT_LOCATION_GLOBAL = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
+SETPOINT_CORNERS_GLOBAL =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999],[47.65397990,-122.31912330, -999, -999]]
 
 # Setpoint Position Local Body Settings
 ###################################################
@@ -274,7 +275,7 @@ def takeoff(takeoff_height_m):
     takeoff_geopoint=[-999,-999,FAKE_GPS_HOME_GEOPOINT_WGS84[2]+takeoff_height_m]
     fake_gps_goto_geopoint(takeoff_geopoint)
   print("Waiting for takeoff process to complete")
-  time.sleep(15) # Wait for takeoff
+  time.sleep(10) # Wait for takeoff
     
 ### Function for switching to LAND mode
 def land():
@@ -448,34 +449,42 @@ def startNode():
   # Run Pre-Mission Custom Actions
   print("Starting Pre-Setpoint Actions")
   pre_mission_actions()
-  #########################################
-  # Start Mission
-  #########################################
-  # Send Setpoint Location Command
-  print("Starting Setpoint Location Global Process")
-  setpoint_location_global(SETPOINT_LOCATION_GLOBAL)
-  ##########################################
-  # Send Setpoint Position Command
-  print("Starting Setpoint Position Local Process")
-  setpoint_position_body(SETPOINT_POSITION_BODY)
-  #########################################
-  # Send Setpoint Attitude Command
-  print("Sending Setpoint Attitude Control Message")
-  setpoint_attitude_ned(SETPOINT_ATTITUDE_NED)
-  #########################################
-  # Run Setpoint Actions
-  print("Starting Setpoint Actions")
-  setpoint_actions()
-  #########################################
-  # End Mission
-  #########################################
+  while not rospy.is_shutdown():
+
+    #########################################
+    # Start Mission
+    #########################################
+    # Send Setpoint Location Command
+    print("Starting Setpoint Location Global Process")
+    setpoint_location_global(SETPOINT_LOCATION_GLOBAL)
+    ##########################################
+##    # Send Setpoint Position Command
+##    print("Starting Setpoint Position Local Process")
+##    setpoint_position_body(SETPOINT_POSITION_BODY)
+##    #########################################
+##    # Send Setpoint Attitude Command
+##    print("Sending Setpoint Attitude Control Message")
+##    setpoint_attitude_ned(SETPOINT_ATTITUDE_NED)
+    #########################################
+    # Run Setpoint Actions
+    print("Starting Setpoint Actions")
+    setpoint_actions()
+   #########################################
+    # Send Setpoint Location Loop Command
+    for ind in range(4):
+      # Send Setpoint Location Command
+      print("Starting Setpoint Location Corners Process")
+      setpoint_location_global(SETPOINT_CORNERS_GLOBAL[ind])
+    #########################################
+    # End Mission
+    #########################################
   # Run Post-Mission Actions
   print("Starting Post-Setpoint Actions")
   post_mission_actions()
   #########################################
   # Mission Complete, Shutting Down
-  print("Shutting Mission Down in 10 Seconds")
-  time.sleep(10)
+  print("Shutting Mission Restarting in 20 Seconds")
+  time.sleep(20)
   rospy.signal_shutdown("Mission Complete, Shutting Down")
   #########################################
   # Run cleanup actions on rospy shutdown

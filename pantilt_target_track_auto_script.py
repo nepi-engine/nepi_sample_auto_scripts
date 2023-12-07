@@ -61,11 +61,12 @@ PT_OBJ_CENTERED_BUFFER_RATIO = 0.3 # Hysteresis band about center of image for t
 # SETUP - Env Settings
 ############################################################################
 # ROS namespace setup
-BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+PT_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/"
 
-PT_NAME = "iqr_pan_tilt/"
-PT_NAMESPACE = BASE_NAMESPACE + PT_NAME
+# PanTilt Subscribe Topics
 PT_GET_STATUS_TOPIC = PT_NAMESPACE + "ptx/status"
+# PanTilt Control Publish Topics
 PT_SET_SPEED_RATIO_TOPIC = PT_NAMESPACE + "ptx/set_speed_ratio"
 PT_GOHOME_TOPIC = PT_NAMESPACE + "ptx/go_home"
 PT_STOP_TOPIC = PT_NAMESPACE + "ptx/stop_moving"
@@ -74,9 +75,9 @@ PT_GOTO_TILT_RATIO_TOPIC = PT_NAMESPACE + "ptx/jog_to_pitch_ratio"
 PT_SET_SOFT_LIMITS_TOPIC = PT_NAMESPACE + "ptx/set_soft_limits"
 
 # Classifier topics and parameters
-AI_BOUNDING_BOXES_TOPIC = BASE_NAMESPACE + "classifier/bounding_boxes"
-AI_FOUND_OBJECT_TOPIC = BASE_NAMESPACE + "classifier/found_object"
-AI_DETECTION_IMAGE_TOPIC = BASE_NAMESPACE + "classifier/detection_image"
+AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
+AI_FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "classifier/found_object"
+AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
 
 
 #####################################################################################
@@ -131,7 +132,7 @@ def initialize_actions():
   print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
   wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
   img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)
-  while img_width == 0 and img_height == 0 and not rospy.is_shutdown():
+  while img_width is 0 and img_height is 0 and not rospy.is_shutdown():
     print("Waiting for Classifier Detection Image")
     time.sleep(1)
   img_sub.unregister() # Don't need it anymore

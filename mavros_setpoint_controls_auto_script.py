@@ -959,7 +959,8 @@ def get_geopoint_at_body_point(cur_geopoint_geo, cur_bearing_deg, point_body_m):
 def setpoint_process_complete_pub_callback(timer):
   global setpoint_complete_status
   global setpoint_process_complete_pub
-  setpoint_process_complete_pub.publish(data=setpoint_complete_status)
+  if not rospy.is_shutdown():
+    setpoint_process_complete_pub.publish(data=setpoint_complete_status)
 
 
 ### Callback to set setpoint command status subscriber
