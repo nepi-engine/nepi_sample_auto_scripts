@@ -50,7 +50,8 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 # Altitude is specified as meters above the WGS-84 and converted to AMSL before sending
 # Yaw is specified in NED frame degrees 0-360 or +-180 
 #####################################################
-SETPOINT_LOCATION_GLOBAL = [47.6541208,-122.3186620, 10, 250] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
+SETPOINT_LOCATION_GLOBAL = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
+SETPOINT_CORNERS_GLOBAL =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999],[47.65397990,-122.31912330, -999, -999]]
 
 # Setpoint Position Local Body Settings
 ###################################################
@@ -343,7 +344,7 @@ def fake_gps_reset_geopoint(reset_geopoint_wgs84):
   geopoint_msg.altitude = reset_geopoint_wgs84[2]
   fake_gps_reset_geopoint_pub.publish(geopoint_msg)
   print("Waiting for fake gps update to reset")
-  time.sleep(12)
+  time.sleep(15)
   
 
 ### Callback to update setpoint process status value
@@ -466,6 +467,15 @@ def startNode():
   # Run Setpoint Actions
   print("Starting Setpoint Actions")
   setpoint_actions()
+ #########################################
+  # Send Setpoint Location Loop Command
+  for ind in range(4):
+    # Send Setpoint Location Command
+    print("Starting Setpoint Location Corners Process")
+    setpoint_location_global(SETPOINT_CORNERS_GLOBAL[ind])
+    # Run Setpoint Actions
+    print("Starting Setpoint Actions")
+    setpoint_actions()
   #########################################
   # End Mission
   #########################################
@@ -474,8 +484,8 @@ def startNode():
   post_mission_actions()
   #########################################
   # Mission Complete, Shutting Down
-  print("Shutting Mission Down in 10 Seconds")
-  time.sleep(10)
+  print("Shutting Mission Restarting in 20 Seconds")
+  time.sleep(20)
   rospy.signal_shutdown("Mission Complete, Shutting Down")
   #########################################
   # Run cleanup actions on rospy shutdown

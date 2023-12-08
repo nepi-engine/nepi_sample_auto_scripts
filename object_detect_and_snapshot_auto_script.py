@@ -73,7 +73,7 @@ def initialize_actions():
   print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
   wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
   img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)
-  while img_width is 0 and img_height is 0:
+  while img_width == 0 and img_height == 0:
     print("Waiting for Classifier Detection Image")
     time.sleep(1)
   img_sub.unregister() # Don't need it anymore
