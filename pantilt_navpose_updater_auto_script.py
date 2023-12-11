@@ -15,6 +15,16 @@ __version__ = "2.0.4.0"
 # 1. Subscribes to NEPI PTX supported pantilt status message
 # 2. Creates an Orientation Publishers and Sets NEPI NavPose to connect to them
 
+###################################################
+# Local Body Position Setpoint Function use these body relative x,y,z,yaw conventions
+# x+ axis is forward
+# y+ axis is right
+# z+ axis is down
+# Only yaw orientation updated
+# yaw+ clockwise, yaw- counter clockwise from x axis (0 degrees faces x+ and rotates positive using right hand rule around z+ axis down)
+#####################################################
+
+
 import rospy
 import time
 import numpy as np
@@ -38,7 +48,7 @@ NAVPOSE_UPDATE_RATE_HZ = 10
 PT_REVERSE_PAN = False # Flip Axis Values
 PT_REVERSE_TILT = True # Flip Axis Values
 # Set Start roll pitch yaw body frame values
-START_RPY_DEGS =  [20.0,30.0,40.0]# Roll, Pitch, Yaw
+START_RPY_DEGS =  [0.0,0.0,0.0]# Roll, Pitch, Yaw in body frame degs
 
 
 ### ROS namespace setup
@@ -56,9 +66,9 @@ NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_ori
 #####################################################################################
 # Globals
 #####################################################################################
-pantilt_orientation_pub = rospy.Publisher(PANTILT_NAVPOSE_PUBLISH_TOPIC, Odometry , queue_size=1)
+navpose_pt_orientation_pub = rospy.Publisher(PANTILT_NAVPOSE_PUBLISH_TOPIC, Odometry , queue_size=1)
 navpose_update_interval_sec = float(1.0)/NAVPOSE_UPDATE_RATE_HZ
-current_rpy_degs = START_RPY_DEGS
+current_rpy_pt_degs = START_RPY_DEGS
 
 pt_yaw_now_deg=0
 pt_pitch_now_deg=0
@@ -72,7 +82,7 @@ pt_speed_now_ratio=0
 
 ### System Initialization processes
 def initialize_actions():
-  global current_rpy_degs
+  global current_rpy_pt_degs
   global navpose_update_interval_sec
   print("")
   print("Starting Initialization")
@@ -96,14 +106,14 @@ def initialize_actions():
 
 ### Setup a regular background navpose update timer callback
 def orienation_update_publish_callback(timer):
-  global current_rpy_degs
-  global pantilt_orientation_pub
+  global current_rpy_pt_degs
+  global navpose_pt_orientation_pub
   new_pos = Point()
   new_pos.x = 0
   new_pos.y = 0
   new_pos.z = 0
 
-  current_orientation_quat = convert_rpy2quat(current_rpy_degs)
+  current_orientation_quat = convert_rpy2quat(current_rpy_pt_degs)
   new_quat = Quaternion()
   new_quat.x = current_orientation_quat[0]
   new_quat.y = current_orientation_quat[1]
@@ -120,11 +130,11 @@ def orienation_update_publish_callback(timer):
   new_odometry.child_frame_id = 'nepi_center_frame'
   new_odometry.pose.pose = new_pose
   if not rospy.is_shutdown():
-    pantilt_orientation_pub.publish(new_odometry)
+    navpose_pt_orientation_pub.publish(new_odometry)
 
 ### Simple callback to get pt status info
 def pt_status_callback(PanTiltStatus):
-  global current_rpy_degs
+  global current_rpy_pt_degs
   # This is just to get the current pt positions
   pt_yaw_now_deg=PanTiltStatus.yaw_now_deg
   pt_pitch_now_deg=PanTiltStatus.pitch_now_deg
@@ -132,7 +142,7 @@ def pt_status_callback(PanTiltStatus):
     pt_yaw_now_deg = -pt_yaw_now_deg
   if PT_REVERSE_TILT:
     pt_pitch_now_deg = -pt_pitch_now_deg
-  current_rpy_degs=[START_RPY_DEGS[0],pt_pitch_now_deg,pt_yaw_now_deg]
+  current_rpy_pt_degs=[START_RPY_DEGS[0],pt_pitch_now_deg,pt_yaw_now_deg]
 
 
 ### Function to Convert Roll, Pitch, Yaw Degrees to Quaternion Attitude

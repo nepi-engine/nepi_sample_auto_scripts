@@ -251,9 +251,6 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
-  # Wait for NEPI ROS to initialize
-##  print("Waiting 10 seconds for NEPI NavPose solution to configure")
-##  time.sleep(10)
   rospy.init_node("set_mavlink_navpose_auto_script")
   rospy.loginfo("Starting Set MAVLink NavPose automation script")
   # Run initialization processes

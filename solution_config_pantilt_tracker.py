@@ -11,13 +11,9 @@ __version__ = "2.0.4.0"
 
 
 # Sample NEPI Automation Script.
-# If your NEPI system does not have an attached GPS/IMU/Compass or other
-# NavPose source, this script can be set to run at startup setting fixed
-# NavPose values on your system.
 # Uses onboard ROS python library to
-# 1. Creates an Orientation Publishers and Sets NEPI NavPose to connect to them
-# 3. Creates Body Orientation Subscriber that applies to Start
-# 2. Exit after setting
+# 1. Subscribes to NEPI PTX supported pantilt status message
+# 2. Creates an Orientation Publishers and Sets NEPI NavPose to connect to them
 
 import rospy
 import time
@@ -30,6 +26,7 @@ from std_msgs.msg import String, Float64, Float64MultiArray, Empty
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped, QuaternionStamped
+from nepi_ros_interfaces.msg import PanTiltStatus, StringArray
 
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
@@ -37,30 +34,37 @@ from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamp
 
 
 NAVPOSE_UPDATE_RATE_HZ = 10
+# Pan and Tilt setup parameters
+PT_REVERSE_PAN = False # Flip Axis Values
+PT_REVERSE_TILT = True # Flip Axis Values
 # Set Start roll pitch yaw body frame values
 START_RPY_DEGS =  [20.0,30.0,40.0]# Roll, Pitch, Yaw
 
 
-# ROS namespace setup
+### ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+PT_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/"
 
-
+### PanTilt Subscribe Topics
+PT_GET_STATUS_TOPIC = PT_NAMESPACE + "ptx/status"
+### PanTilt NavPose Publish Topic
+PANTILT_NAVPOSE_PUBLISH_TOPIC = PT_NAMESPACE + "odometry"
+### NEPI NavPose Setting Publish Topic
 NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
-
-### Setup NEPI NavPose Orientation Update Publisher Namespace
-NEPI_ORIENTATION_BODY_ODOMETRY_TOPIC = NEPI_BASE_NAMESPACE + "odom_body_odometry"
-
-### Setup NEPI NavPose Orientation Update Relative Subscriber Namespace
-NEPI_RPY_BODY_DEGS_TOPIC = NEPI_BASE_NAMESPACE + "rpy_body_degs"
 
 
 #####################################################################################
 # Globals
 #####################################################################################
-navpose_update_orientation_pub = rospy.Publisher(NEPI_ORIENTATION_BODY_ODOMETRY_TOPIC, Odometry , queue_size=1)
+pantilt_orientation_pub = rospy.Publisher(PANTILT_NAVPOSE_PUBLISH_TOPIC, Odometry , queue_size=1)
 navpose_update_interval_sec = float(1.0)/NAVPOSE_UPDATE_RATE_HZ
 current_rpy_degs = START_RPY_DEGS
 
+pt_yaw_now_deg=0
+pt_pitch_now_deg=0
+pt_yaw_now_ratio=0
+pt_pitch_now_ratio=0
+pt_speed_now_ratio=0
 #####################################################################################
 # Methods
 #####################################################################################
@@ -71,7 +75,11 @@ def initialize_actions():
   global current_rpy_degs
   global navpose_update_interval_sec
   print("")
-  print("Starting Initialization") 
+  print("Starting Initialization")
+  # Start PT Status Callback
+  wait_for_topic(PT_GET_STATUS_TOPIC, 'nepi_ros_interfaces/PanTiltStatus')
+  print("Starting Pan Tilt Stutus callback")
+  rospy.Subscriber(PT_GET_STATUS_TOPIC, PanTiltStatus, pt_status_callback)  
   ##############################
   # Start our Update NavPose Publisher Topic
   print("Starting NavPose Update Publisher at: " + str(NAVPOSE_UPDATE_RATE_HZ) + " Hz")
@@ -79,20 +87,17 @@ def initialize_actions():
   time.sleep(2) # Wait for publiser to start
   ##############################
   # Update Orientation source to our new update orientation publisher
-  wait_for_topic(NEPI_ORIENTATION_BODY_ODOMETRY_TOPIC, 'nav_msgs/Odometry')
+  wait_for_topic(PANTILT_NAVPOSE_PUBLISH_TOPIC, 'nav_msgs/Odometry')
   set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=10)
   time.sleep(1) # Wait between creating and using publisher
-  set_orientation_pub.publish(NEPI_ORIENTATION_BODY_ODOMETRY_TOPIC)
-  print("Orientation Topic Set to: " + NEPI_ORIENTATION_BODY_ODOMETRY_TOPIC)
-  ##############################
-  ## Start Get RPY Body Subscriber Callback
-  rospy.Subscriber(NEPI_RPY_BODY_DEGS_TOPIC, Float64MultiArray, get_rpy_body_callback)
+  set_orientation_pub.publish(PANTILT_NAVPOSE_PUBLISH_TOPIC)
+  print("Orientation Topic Set to: " + PANTILT_NAVPOSE_PUBLISH_TOPIC)
   print("Initialization Complete")
 
 ### Setup a regular background navpose update timer callback
 def orienation_update_publish_callback(timer):
   global current_rpy_degs
-  global navpose_update_orientation_pub
+  global pantilt_orientation_pub
   new_pos = Point()
   new_pos.x = 0
   new_pos.y = 0
@@ -110,34 +115,29 @@ def orienation_update_publish_callback(timer):
   new_pose.orientation = new_quat
 
   new_odometry = Odometry()
-  new_odometry.header.stamp = rospy.Time.now()
-  new_odometry.header.frame_id = 'map'
-  new_odometry.child_frame_id = 'nepi_center_frame'
   new_odometry.pose.pose = new_pose
   if not rospy.is_shutdown():
-    navpose_update_orientation_pub.publish(new_odometry)
+    pantilt_orientation_pub.publish(new_odometry)
 
-### Callback to get relative orientations applied to start
-def get_rpy_body_callback(rpy_body_degs_msg):
+### Simple callback to get pt status info
+def pt_status_callback(PanTiltStatus):
   global current_rpy_degs
-  new_rpy_body_degs = rpy_body_degs_msg.data
-  print("Received roll pitch yaw body degs update message")
-  print(new_rpy_body_degs)
-  new_orien_body_degs = list(START_RPY_DEGS) # Initialize to current
-  new_orien_body_degs[0] = new_rpy_body_degs[0] 
-  new_orien_body_degs[1] = new_rpy_body_degs[1] 
-  new_orien_body_degs[2] = new_rpy_body_degs[2] 
-  print("Setting new current orienation body degs")
-  print(new_orien_body_degs)
-  current_rpy_degs = new_orien_body_degs
+  # This is just to get the current pt positions
+  pt_yaw_now_deg=PanTiltStatus.yaw_now_deg
+  pt_pitch_now_deg=PanTiltStatus.pitch_now_deg
+  if PT_REVERSE_PAN:
+    pt_yaw_now_deg = -pt_yaw_now_deg
+  if PT_REVERSE_TILT:
+    pt_pitch_now_deg = -pt_pitch_now_deg
+  current_rpy_degs=[START_RPY_DEGS[0],pt_pitch_now_deg,pt_yaw_now_deg]
+
 
 ### Function to Convert Roll, Pitch, Yaw Degrees to Quaternion Attitude
 def convert_rpy2quat(rpy_attitude_deg):
   roll_rad = math.radians(rpy_attitude_deg[0])
   pitch_rad = math.radians(rpy_attitude_deg[1]) 
   yaw_rad = math.radians(rpy_attitude_deg[2])
-  #xyzw_attitude = tf.transformations.quaternion_from_euler(roll_rad,pitch_rad,yaw_rad,axes="sxyz")
-  xyzw_attitude = tf.transformations.quaternion_from_euler(pitch_rad, yaw_rad, roll_rad, axes="ryzx")
+  xyzw_attitude = tf.transformations.quaternion_from_euler(roll_rad,pitch_rad,yaw_rad,axes="sxyz")
   return xyzw_attitude
 
 
@@ -159,8 +159,8 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("navpose_orienatation_updater_auto_script")
-  rospy.loginfo("Starting NavPose Orienation Updater automation script")
+  rospy.init_node("pantilt_navpose_orienatation_updater_auto_script")
+  rospy.loginfo("Starting Pantilt NavPose Orienation Updater automation script")
   # Run initialization processes
   initialize_actions()
   # run cleanup actions on shutdown
