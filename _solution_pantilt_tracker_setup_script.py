@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+
 __author__ = "Jason Seawall"
 __copyright__ = "Copyright 2023, Numurus LLC"
 __email__ = "nepi@numurus.com"
@@ -8,7 +9,8 @@ __credits__ = ["Jason Seawall", "Josh Maximoff"]
 __license__ = "GPL"
 __version__ = "2.0.4.0"
 
-# Sample NEPI Helper Script. 
+
+# Sample Solution Config Script. 
 # 1. launches scripts from list NEPI ROS service
 # 2. Waits for shutdown
 # 3. Stops scripts from list
@@ -27,7 +29,10 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["image_enhance_auto_script.py"] #  Add script filenames to start/stop
+SCRIPT_LIST = ["ai_detector_setup_start_auto_script.py",
+               "navpose_set_fixed_navpose_auto_script.py",
+               "pantilt_navpose_updater_auto_script.py",
+               "pantilt_target_track_auto_script.py"] #  Script filenames to start/stop
 
 
 # ROS namespace setup
@@ -218,13 +223,13 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   # Stop scripts from list
   stop_scripts(SCRIPT_LIST,scripts_running_at_start)
-  time.sleep(1)
+  time.sleep(5)
 
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("start_stop_scripts_helper_script")
-  rospy.loginfo("Starting Start Stop Scripts helper script")
+  rospy.init_node("solution_pantilt_tracker_setup_script")
+  rospy.loginfo("Starting Solution PanTilt Tracker Setup Script")
   # Run initialization processes
   initialize_actions()
   # Launch scripts from list
@@ -240,3 +245,5 @@ def startNode():
 
 if __name__ == '__main__':
   startNode()
+
+

@@ -45,8 +45,8 @@ from nepi_ros_interfaces.msg import PanTiltStatus, StringArray
 
 NAVPOSE_UPDATE_RATE_HZ = 10
 # Pan and Tilt setup parameters
-PT_REVERSE_PAN = False # Flip Axis Values
-PT_REVERSE_TILT = True # Flip Axis Values
+PT_REVERSE_PAN = True # Flip Sensor Feedback Values for NavPose Body Frame
+PT_REVERSE_TILT = True # Flip Sensor Feedback Values for NavPose Body Frame
 # Set Start roll pitch yaw body frame values
 START_RPY_DEGS =  [0.0,0.0,0.0]# Roll, Pitch, Yaw in body frame degs
 
