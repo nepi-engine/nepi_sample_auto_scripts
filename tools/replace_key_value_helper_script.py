@@ -23,7 +23,7 @@ import fileinput
 # SETUP - Edit as Necessary ##################################
 ##########################################
 SCRIPT_FOLDER = "/mnt/nepi_storage/temp/"
-SCRIPT_LIST = ["image_enhance_auto_script.py"] # Leave empty to update all files in folder. Add files to limit which files are updated
+SCRIPT_LIST = ["image_enhance_process_script.py"] # Leave empty to update all files in folder. Add files to limit which files are updated
 
 KEY_WORD_STRING = "IMAGE_INPUT_TOPIC"
 KEY_WORD_VALUE_OR_STRING = "/nepi/s2x/testcam2/idx/color_2d_image"

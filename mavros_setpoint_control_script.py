@@ -21,9 +21,9 @@ __version__ = "2.0.4.0"
 # 3)Publishes setpoint command status tipic
 
 # Requires the following additional scripts are running
-# a) navpose_get_and_publish_auto_script.py
-# b) (Optional) mavros_navpose_config_auto_script to automate conecting NEPI NavPose with MAVLink
-# c) (Optional) MAVROS_fake_gps_sim_auto_script.py if a real GPS fix is not available
+# a) navpose_publish_process_script.py
+# b) mavros_navpose_config_script.py
+# c) (Optional) MAVROS_fake_gps_config_script.py if a real GPS fix is not available
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 

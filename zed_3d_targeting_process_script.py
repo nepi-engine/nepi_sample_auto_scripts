@@ -20,7 +20,7 @@ __version__ = "2.0.4.0"
 # "Setup Zed Stereo Camera" at [link text](https://numurus.com/tutorials/)
 
 # Requires the following additional scripts are running
-# a)ai_detector_setup_start_auto_script.py
+# a)ai_detector_config_script.py
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 

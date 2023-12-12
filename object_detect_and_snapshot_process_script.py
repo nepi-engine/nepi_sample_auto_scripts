@@ -16,12 +16,12 @@ __version__ = "2.0.4.0"
 # 4. Delays trigger event for some set delay time
 
 # Requires the following additional scripts are running
-# a)ai_detector_setup_start_auto_script.py
+# a)ai_detector_config_script.py
 # This automation script only sends a snapshot event trigger.
 # You will also want one or more snapshot event action scripts running
-# The following automation scripts are snapshot event actions scripts you can test
-# a)(Optional)snapshot_event_save_data_auto_script.py
-# b)(Optional) snapshot_event_send_to_cloud_auto_script.py for cloud portal support
+# The following automation scripts are snapshot event action scripts you can test
+# a)(Optional)snapshot_event_save_to_disk_action_script.py
+# b)(Optional) snapshot_event_send_to_cloud_action_script.py for cloud portal support
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 

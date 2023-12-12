@@ -21,8 +21,8 @@ __version__ = "2.0.4.0"
 
 # Requires the following additional scripts are running
 # (Optional) Some Snapshot Action Automation Script like the following
-# a)snapshot_event_save_data_auto_script.py
-# b)snapshot_event_send_to_cloud_auto_script.py
+# a)snapshot_event_save_to_disk_action_script.py
+# b)snapshot_event_send_to_cloud_action_script.py
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 

@@ -29,10 +29,13 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["ai_detector_setup_start_config_script.py",
-               "navpose_set_fixed_navpose_config_script.py",
-               "pantilt_navpose_config_script.py",
-               "pantilt_target_track_action_script.py"] #  Script filenames to start/stop
+SCRIPT_LIST = ["ai_detector_config_script.py",
+               "mavros_fake_gps_config_script.py",
+               "mavros_navpose_config_script.py",
+               "mavros_setpoint_control_script.py",
+               "navpose_publish_process_script.py",
+               "snapshot_event_send_to_cloud_action_script.py",
+               "mavros_complete_mission_action_script.py"] #  Script filenames to start/stop
 
 
 # ROS namespace setup
@@ -216,13 +219,12 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   # Stop scripts from list
   stop_scripts(SCRIPT_LIST,scripts_running_at_start)
-  time.sleep(5)
 
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("solution_pantilt_tracker_setup_script")
-  rospy.loginfo("Starting Solution PanTilt Tracker Setup Script")
+  rospy.init_node("solution_drone_mission_startup_script")
+  rospy.loginfo("Starting Drone Mission Startup Script")
   # Run initialization processes
   initialize_actions()
   # Launch scripts from list

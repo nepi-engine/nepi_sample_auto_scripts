@@ -29,7 +29,7 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["ai_detector_setup_start_config_script.py",
+SCRIPT_LIST = ["ai_detector_config_script.py",
                "navpose_set_fixed_navpose_config_script.py",
                "snapshot_event_save_to_disk_action_script.py",
                "snapshot_event_send_to_cloud_action_script.py"] #  Script filenames to start/stop
@@ -216,7 +216,6 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   # Stop scripts from list
   stop_scripts(SCRIPT_LIST,scripts_running_at_start)
-  time.sleep(1)
 
 
 ### Script Entrypoint

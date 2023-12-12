@@ -18,10 +18,10 @@ __version__ = "2.0.4.0"
 # 5) Runs post-mission processes
 
 # Requires the following additional scripts are running
-# a) navpose_get_and_publish_auto_script.py
-# b) mavros_setpoint_controls_auto_script.py
-# c) mavros_navpose_config_auto_script.py
-# d) (Optional) MAVROS_fake_gps_sim_auto_script.py if a real GPS fix is not available
+# a) navpose_publish_process_script.py
+# b) mavros_setpoint_control_script.py
+# c) mavros_navpose_config_script.py
+# d) (Optional) MAVROS_fake_gps_config_script.py if a real GPS fix is not available
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 

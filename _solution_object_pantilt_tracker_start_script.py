@@ -29,10 +29,10 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["ai_detector_setup_start_config_script.py",
-               "navpose_set_fixed_navpose_config_script.py",
-               "zed_3d_targeting_process_script.py",
-               "zed_depthmap_2_image_process_script.py"] #  Script filenames to start/stop
+SCRIPT_LIST = ["ai_detector_config_script.py",
+               "navpose_set_fixed_config_script.py",
+               "pantilt_navpose_config_script.py",
+               "pantilt_target_track_action_script.py"] #  Script filenames to start/stop
 
 
 # ROS namespace setup
@@ -216,13 +216,12 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   # Stop scripts from list
   stop_scripts(SCRIPT_LIST,scripts_running_at_start)
-  time.sleep(1)
 
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("solution_3d_object_detect_range_bearing_setup_script")
-  rospy.loginfo("Starting Solution Object Detect Range Bearing Setup Script")
+  rospy.init_node("solution_pantilt_tracker_setup_script")
+  rospy.loginfo("Starting Solution PanTilt Tracker Setup Script")
   # Run initialization processes
   initialize_actions()
   # Launch scripts from list
