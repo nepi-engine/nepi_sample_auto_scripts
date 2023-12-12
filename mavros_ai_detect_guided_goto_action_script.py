@@ -334,8 +334,8 @@ def wait_for_setpoint_started():
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global org_mode
-  time.sleep(.1)
+  print("Shutting down: Executing script cleanup actions")
+
   
 ### Script Entrypoint
 def startNode():

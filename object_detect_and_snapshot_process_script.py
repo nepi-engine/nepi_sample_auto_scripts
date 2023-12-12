@@ -132,7 +132,7 @@ def wait_for_topic(topic_name,message_name):
 
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
-  time.sleep(0.1)  
+  
 
 
 ### Script Entrypoint

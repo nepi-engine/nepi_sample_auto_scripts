@@ -322,7 +322,6 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   print("Send pan and tilt to home position")
   send_pt_home_pub.publish()
-  time.sleep(2)
 
 
 ### Script Entrypoint

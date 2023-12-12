@@ -104,7 +104,7 @@ def wait_for_topic(topic_name,message_name):
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  print("Cleanup Complete")
+  print("Shutting down: Executing script cleanup actions")
 
 ### Script Entrypoint
 def startNode():

@@ -108,7 +108,6 @@ def convert_rpy2quat(rpy_attitude_deg):
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
-  time.sleep(2)
 
 ### Script Entrypoint
 def startNode():

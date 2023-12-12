@@ -436,7 +436,7 @@ def create_setpoint_message(setpoint):
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  time.sleep(.1)
+  print("Shutting down: Executing script cleanup actions")
 
   
 ### Script Entrypoint

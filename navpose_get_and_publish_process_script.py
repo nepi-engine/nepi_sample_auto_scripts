@@ -246,7 +246,6 @@ def convert_yaw_enu2ned(yaw_enu_deg):
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
-  time.sleep(2)
 
 
 ### Script Entrypoint

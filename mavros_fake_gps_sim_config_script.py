@@ -255,10 +255,7 @@ def wait_for_topic(topic_name,message_name):
 
   ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global mavros_fake_gps_mavlink_pub
   print("Shutting down: Executing script cleanup actions")
-  # Stop geopoint publisher
-  time.sleep(2)
 
 
 ### Script Entrypoint

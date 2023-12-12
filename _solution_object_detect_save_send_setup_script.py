@@ -29,10 +29,10 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["ai_detector_setup_start_auto_script.py",
-               "navpose_set_fixed_navpose_auto_script.py",
-               "snapshot_event_save_data_auto_script.py",
-               "snapshot_event_send_to_cloud_auto_script.py"] #  Script filenames to start/stop
+SCRIPT_LIST = ["ai_detector_setup_start_config_script.py",
+               "navpose_set_fixed_navpose_config_script.py",
+               "snapshot_event_save_to_disk_action_script.py",
+               "snapshot_event_send_to_cloud_action_script.py"] #  Script filenames to start/stop
 
 
 # ROS namespace setup
@@ -187,13 +187,6 @@ def stop_scripts(script_list,optional_ignore_script_list=[]):
             script_stop = stop_script(script2stop)
             if script_stop:
               print("Script stop call success")
-              script_running = True
-              while script_running is True and not rospy.is_shutdown():
-                running_scripts = get_running_scripts()
-                script_running = val_in_list(script2stop,running_scripts)
-                print("Waiting for script to stop")
-                time.sleep(.5) # Sleep before checking again
-              print("Script stopped successfully")
             else:
                print("Scipt stop call failed")
         else:

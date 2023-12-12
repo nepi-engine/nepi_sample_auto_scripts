@@ -107,7 +107,6 @@ def cleanup_actions():
   global stop_classifier_pub
   print("Shutting down: Executing script cleanup actions")
   stop_classifier_pub.publish(Empty())
-  time.sleep(0.1)
 
 ### Script Entrypoint
 def startNode():

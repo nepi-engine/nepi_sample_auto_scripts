@@ -27,7 +27,7 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["image_enhance_auto_script.py"] #  Add script filenames to start/stop
+SCRIPT_LIST = ["image_enhance_process_script.py"] #  Add script filenames to start/stop
 
 
 # ROS namespace setup
@@ -182,13 +182,6 @@ def stop_scripts(script_list,optional_ignore_script_list=[]):
             script_stop = stop_script(script2stop)
             if script_stop:
               print("Script stop call success")
-              script_running = True
-              while script_running is True and not rospy.is_shutdown():
-                running_scripts = get_running_scripts()
-                script_running = val_in_list(script2stop,running_scripts)
-                print("Waiting for script to stop")
-                time.sleep(.5) # Sleep before checking again
-              print("Script stopped successfully")
             else:
                print("Scipt stop call failed")
         else:
@@ -218,7 +211,6 @@ def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
   # Stop scripts from list
   stop_scripts(SCRIPT_LIST,scripts_running_at_start)
-  time.sleep(1)
 
 
 ### Script Entrypoint
