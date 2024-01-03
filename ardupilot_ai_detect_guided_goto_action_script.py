@@ -1,12 +1,28 @@
 #!/usr/bin/env python
-
-__author__ = "Jason Seawall"
-__copyright__ = "Copyright 2023, Numurus LLC"
-__email__ = "nepi@numurus.com"
-__credits__ = ["Jason Seawall", "Josh Maximoff"]
-
-__license__ = "GPL"
-__version__ = "2.0.4.0"
+#
+# NEPI Dual-Use License
+# Project: nepi_sample_auto_scripts
+#
+# This license applies to any user of NEPI Engine software
+#
+# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
+# see https://github.com/numurus-nepi/nepi_edge_sdk_base
+#
+# This software is dual-licensed under the terms of either a NEPI software developer license
+# or a NEPI software commercial license.
+#
+# The terms of both the NEPI software developer and commercial licenses
+# can be found at: www.numurus.com/licensing-nepi-engine
+#
+# Redistributions in source code must retain this top-level comment block.
+# Plagiarizing this software to sidestep the license obligations is illegal.
+#
+# Contact Information:
+# ====================
+# - https://www.numurus.com/licensing-nepi-engine
+# - mailto:nepi@numurus.com
+#
+#
 
 
 # Sample NEPI Automation Script.
@@ -70,7 +86,7 @@ FAKE_GPS_START_GEOPOINT_WGS84 = [47.6540828,-122.3187578,3.0] # [Lat, Long, Alti
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "pixhawk_mavlink/"
+MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/"
 MAVROS_CONTROLS_NAMESPACE = MAVROS_NAMESPACE + "controls/"
 # MAVROS Subscriber Topics
 MAVROS_STATE_TOPIC = MAVROS_NAMESPACE + "state"

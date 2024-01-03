@@ -1,12 +1,28 @@
 #!/usr/bin/env python
-
-__author__ = "Jason Seawall"
-__copyright__ = "Copyright 2023, Numurus LLC"
-__email__ = "nepi@numurus.com"
-__credits__ = ["Jason Seawall", "Josh Maximoff"]
-
-__license__ = "GPL"
-__version__ = "2.0.4.0"
+#
+# NEPI Dual-Use License
+# Project: nepi_sample_auto_scripts
+#
+# This license applies to any user of NEPI Engine software
+#
+# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
+# see https://github.com/numurus-nepi/nepi_edge_sdk_base
+#
+# This software is dual-licensed under the terms of either a NEPI software developer license
+# or a NEPI software commercial license.
+#
+# The terms of both the NEPI software developer and commercial licenses
+# can be found at: www.numurus.com/licensing-nepi-engine
+#
+# Redistributions in source code must retain this top-level comment block.
+# Plagiarizing this software to sidestep the license obligations is illegal.
+#
+# Contact Information:
+# ====================
+# - https://www.numurus.com/licensing-nepi-engine
+# - mailto:nepi@numurus.com
+#
+#
 
 # Sample NEPI Automation Script.
 # Uses onboard ROS python libraries to
@@ -88,15 +104,15 @@ NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 
 ### NavPose Heading, Orientation, Location, and Position Publish Topics
-NAVPOSE_PUBLISH_NAVPOSE_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/navpose"
-NAVPOSE_PUBLISH_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/heading_deg"
-NAVPOSE_PUBLISH_ORIENTATION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/orientation_ned_degs"
-NAVPOSE_PUBLISH_ORIENTATION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/orientation_enu_degs"
-NAVPOSE_PUBLISH_POSITION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/position_ned_m"
-NAVPOSE_PUBLISH_POSITION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/position_enu_m"
-NAVPOSE_PUBLISH_LOCATION_AMSL_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/location_amsl_geo"
-NAVPOSE_PUBLISH_LOCATION_WGS84_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/location_wgs84_geo"
-NAVPOSE_PUBLISH_GEOID_HEIGHT_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_current/geoid_height_m"
+NAVPOSE_PUBLISH_NAVPOSE_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/navpose"
+NAVPOSE_PUBLISH_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/heading_deg"
+NAVPOSE_PUBLISH_ORIENTATION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/orientation_ned_degs"
+NAVPOSE_PUBLISH_ORIENTATION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/orientation_enu_degs"
+NAVPOSE_PUBLISH_POSITION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/position_ned_m"
+NAVPOSE_PUBLISH_POSITION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/position_enu_m"
+NAVPOSE_PUBLISH_LOCATION_AMSL_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/location_amsl_geo"
+NAVPOSE_PUBLISH_LOCATION_WGS84_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/location_wgs84_geo"
+NAVPOSE_PUBLISH_GEOID_HEIGHT_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/geoid_height_m"
 
 
 #####################################################################################
