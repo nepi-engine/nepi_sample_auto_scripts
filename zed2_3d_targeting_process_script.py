@@ -32,11 +32,10 @@
 # 4. Publishes new target range/bearing data topic and image overlay topic
 # 5. Runs until Stopped
 
-# Requires first installing ZED SDK and Ros wrapper as described in the tutorial
-# "Setup Zed Stereo Camera" at [link text](https://numurus.com/tutorials/)
 
 # Requires the following additional scripts are running
-# a)ai_detector_config_script.py
+# a)zed2_idx_driver_script.py
+# b)ai_detector_config_script.py
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
@@ -68,12 +67,12 @@ TARGET_MIN_VALUES=10 # Sets the minimum number of valid points to consider for a
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
 ###!!!!!!!! Set data input stream topics and parameters !!!!!!!!
-IMAGE_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2/zed_node/left/image_rect_color"
+IMAGE_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/color_2d_image"
 FOV_VERT_DEG=70 # Camera Vertical Field of View (FOV)
 FOV_HORZ_DEG=110 # Camera Horizontal Field of View (FOV)
 
-DEPTH_DATA_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2/zed_node/depth/depth_registered"
-DEPTH_IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2/zed_node/depth/depth_image"
+DEPTH_DATA_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/depth_map"
+DEPTH_IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/depth_image"
 
 ###!!!!!!!! Set data output stream topics and parameters !!!!!!!!
 TARGET_DATA_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "targeting/targeting_data"

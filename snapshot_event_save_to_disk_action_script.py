@@ -55,16 +55,13 @@ from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 SAVE_NAVPOSE_DATA_ENABLED = True # True-Save NavPose File  with each image
 
 
-###!!!!!!!! Set Image ROS Topic Name to Save  !!!!!!!!
-IMAGE_INPUT_TOPIC = "/nepi/s2x/nexigo_n60_fhd_webcam_audio/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/see3cam_cu81/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/sidus_ss400/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/onwote_hd_poe/idx/color_2d_image"
+#Set Image Type to Save
+IMAGE_INPUT_TOPIC_TYPE = "color_2d_image"
 
 ###!!!!!!!! Set Automation action parameters !!!!!!!!
 SAVE_DURATION_S = 5.0 # Seconds. Length of time to save data
 SAVE_DATA_MAX_RATE_HZ = 1.0
-SAVE_RESET_DELAY_S = 5.0 # Seconds. Delay before starting over search/save process
+SAVE_RESET_DELAY_S = 30.0 # Seconds. Delay before starting over search/save process
 SAVE_FOLDER_NAME = "snapshot_event/" # Use "" to ignore
 SAVE_FILE_PREFIX = "snapshot_event" # Use "" to ignore
 SAVE_IMAGE_TYPE = "jpg"
@@ -84,6 +81,7 @@ save_folder = "/mnt/nepi_storage/data/" + SAVE_FOLDER_NAME
 save_data_min_interval_s = float(1.0)/SAVE_DATA_MAX_RATE_HZ
 save_data_enable = False
 last_save_time_s = None
+image_topic_to_save = None
 
 #####################################################################################
 # Methods
@@ -92,12 +90,14 @@ last_save_time_s = None
 ### System Initialization processes
 def initialize_actions():
   global save_folder
+  global image_topic_to_save
   print("")
   print("Starting Initialization")  
-  # Wait for image topic to exist
-  print("Waiting for image topic")  
-  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')
-  print("Image topic found")
+  # Wait for message
+  print("Waiting for topic type: " + IMAGE_INPUT_TOPIC_TYPE)
+  topic_name=wait_for_topic_type(IMAGE_INPUT_TOPIC_TYPE)
+  print("Found topic: " + topic_name)
+  image_topic_to_save = topic_name
   # Create save folder if needed
   print("Checking Save Folder")
   Save_Folder_Exist = os.path.exists(save_folder)
@@ -179,13 +179,27 @@ def image_saver_callback(img_msg):
           except rospy.ServiceException as e:
             print("NavPose service call failed: %s"%e)
             time.sleep(1)
-
-
-      
       last_save_time_s =  time.time() # Reset last save time
   else:
     last_save_time = None
     
+
+### Function to find topic type if exist
+def find_topic_type(topic_type):
+  topic_name = ""
+  topic_list=rospy.get_published_topics(namespace='/')
+  for topic in topic_list:
+    if topic[0].find(topic_type) != -1:
+      topic_name = topic[0]
+  return topic_name
+
+### Function to wait for topic type to exist
+def wait_for_topic_type(topic_type):
+  topic_name = ""
+  while topic_name == "" and not rospy.is_shutdown():
+    topic_name=find_topic_type(topic_type)
+    time.sleep(.1)
+  return topic_name
 
 ### Function to wait for topic to exist
 def wait_for_topic(topic_name,message_name):
@@ -205,12 +219,13 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
+  global image_topic_to_save
   rospy.loginfo("Starting Snapshot Event Detect and Save automation script", disable_signals=True) # Disable signals so we can force a shutdown
   rospy.init_node(name="snapshot_event_detect_save_auto_script")
   # Run Initialization processes
   initialize_actions()
   # Start image saver callback
-  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, image_saver_callback, queue_size = 1)
+  rospy.Subscriber(image_topic_to_save, Image, image_saver_callback, queue_size = 1)
   # Set up snapshot event callback
   rospy.Subscriber(SNAPSHOT_TOPIC, Empty, snapshot_event_callback, queue_size = 1)
   #Set up cleanup on node shutdown

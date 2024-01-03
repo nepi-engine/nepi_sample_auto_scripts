@@ -80,12 +80,6 @@ PTX_OBJ_CENTERED_BUFFER_RATIO = 0.3 # Hysteresis band about center of image for 
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 PTX_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/ptx/"
 
-### NEPI NavPose Setting Publish Topic
-NEPI_SET_NAVPOSE_SET_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
-
-### PanTilt NavPose Publish Topic
-NEPI_PTX_NAVPOSE_ODOM_TOPIC = NEPI_PTX_NAMESPACE + "odom"
-
 # PanTilt Subscribe Topics
 PTX_GET_STATUS_TOPIC = PTX_NAMESPACE + "status"
 # PanTilt Control Publish Topics
@@ -146,18 +140,8 @@ def initialize_actions():
   global set_pt_soft_limits_pub
   global pt_tilt_scan_ratio
   print("")
-  rospy.loginfo("Initializing PanTilt Object Tracking")
-  ##############################
-  print("Waiting for PTX odom message to publish on " + NEPI_PTX_NAVPOSE_ODOM_TOPIC)
-  # Update Orientation source to our new update orientation publisher
-  wait_for_topic(NEPI_PTX_NAVPOSE_ODOM_TOPIC, 'nav_msgs/Odometry')
-  set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_SET_ORIENTATION_TOPIC, String, queue_size=10)
-  time.sleep(1) # Wait between creating and using publisher
-  set_orientation_pub.publish(NEPI_PTX_NAVPOSE_ODOM_TOPIC)
-  ##############################
-  print("Orientation Topic Set to: " + NEPI_PTX_NAVPOSE_ODOM_TOPIC)
-  rospy.loginfo("Connecting to ROS Topic " + AI_DETECTION_IMAGE_TOPIC )
-  # Wait for topic
+  print("Starting Initialization")
+  # Wait for AI detection topic
   print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
   wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
   img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)

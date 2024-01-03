@@ -43,11 +43,11 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["ai_detector_config_script.py",
-               "navpose_set_fixed_config_script.py",
-               "pantilt_navpose_config_script.py",
-               "pantilt_target_track_action_script.py"] #  Script filenames to start/stop
-
+SCRIPT_LIST = ["pantilt_ptx_navpose_driver_script.py",
+		"ai_detector_config_script.py",
+               	"navpose_set_fixed_config_script.py",
+		"pantilt_navpose_config_script.py",
+               	"pantilt_target_track_action_script.py"] #  Script filenames to start/stop
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"

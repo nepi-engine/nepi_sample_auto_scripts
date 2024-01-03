@@ -43,10 +43,16 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["ai_detector_config_script.py",
+
+SCRIPT_KEY_VALUE_UPDATE_LIST = 
+
+
+
+SCRIPT_LIST = ["zed2_idx_driver_script.py",
+               "ai_detector_config_script.py",
                "navpose_set_fixed_config_script.py",
-               "zed_3d_targeting_process_script.py",
-               "zed_depth_image_process_script.py"] #  Script filenames to start/stop
+               "zed2_navpose_config_script.py",
+               "zed2_3d_targeting_process_script.py"] #  Script filenames to start/stop
 
 
 # ROS namespace setup
@@ -100,6 +106,41 @@ def initialize_actions():
   print("Scripts running at start:")
   print(scripts_running_at_start)
   print("Initialization Complete")
+
+
+### Function for updating values in automation script files (All or From List)
+def update_script_key_word_value(script_folder_path="",key_word="",key_value_or_string="",optional_script_list=[]):
+  filelist=os.listdir(script_folder_path)
+  if len(optional_script_list) != 0: # Just These Scripts
+    scriptlist=[]
+    for ind, file in enumerate(filelist):
+      for script in optional_script_list:
+        if file.find(script)!= -1:
+          scriptlist.append([script_folder_path + file])
+  else: # All Scripts
+    scriptlist=[]
+    for ind, file in enumerate(filelist):
+     scriptlist.append([script_folder_path + file])
+  print("Checking and updating the following files")
+  print(scriptlist)
+  search_str_len=len(key_word)
+  for file in scriptlist:
+    print("")
+    print(file)
+    lnum = []
+    for ind, line in enumerate(fileinput.input(file, inplace=1)):
+      line = line.strip()
+      if line[0:search_str_len] == key_word:
+        lnum.append(ind)
+        if type(key_value_or_string) == str:
+          new_line = '{} = "{}"'.format(key_word, key_value_or_string)
+        else:
+          new_line = '{} = {}'.format(key_word, key_value_or_string)
+      else:
+        new_line = line
+      print(new_line)
+    print('Replaced line numbers')
+    print(lnum)    
 
 
 ### Function to get list of installed scripts

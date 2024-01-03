@@ -44,15 +44,10 @@ from nepi_ros_interfaces.msg import IDXStatus, SaveData, SaveDataRate, StringArr
 # SETUP - Edit as Necessary 
 #############################################################
 
-###!!!!!!!! Set Image ROS Topic Name to Send  !!!!!!!!
-IMAGE_INPUT_TOPIC = "/nepi/s2x/nexigo_n60_fhd_webcam_audio/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/see3cam_cu81/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/sidus_ss400/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/onwote_hd_poe/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/zed2/zed_node/left/image_rect_color"
+#Configure Your Connect Topics to Send in NEPI RUI
 
 ###!!!!!!!! Set Automation action parameters !!!!!!!!
-SEND_RESET_DELAY_S = 5.0 # Seconds. Delay before starting over
+SEND_RESET_DELAY_S = 30.0 # Seconds. Delay before starting over
 
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
@@ -73,7 +68,6 @@ nepi_link_enable_pub = rospy.Publisher(NEPI_LINK_ENABLE_TOPIC, Bool, queue_size=
 nepi_link_set_data_sources = rospy.Publisher(NEPI_LINK_SET_DATA_SOURCES_TOPIC, StringArray, queue_size=10)
 nepi_link_collect_data_pub = rospy.Publisher(NEPI_LINK_COLLECT_DATA_TOPIC, Empty, queue_size=10)
 nepi_link_connect_now_pub = rospy.Publisher(NEPI_LINK_CONNECT_TOPIC, Empty, queue_size=10)
-image_source_name = IMAGE_INPUT_TOPIC.replace(NEPI_BASE_NAMESPACE,'')
 
 #############################################################
 # Methods
@@ -84,12 +78,6 @@ def initialize_actions():
   global image_source_name
   print("")
   print("Starting Initialization")  
-  # Wait for image topic to exist
-  print("Waiting for image topic")  
-  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')
-  print("Image topic found")
-  print("Setting NEPI CONNECT data sources")
-  nepi_link_set_data_sources.publish([image_source_name])
   print("Initialization Complete")
   print("Waiting for snapshot event trigger topic to publish on:")
   print(SNAPSHOT_TOPIC)
@@ -106,6 +94,23 @@ def snapshot_event_callback(event):
   print("Delaying " + str(SEND_RESET_DELAY_S) + " secs")
   time.sleep(SEND_RESET_DELAY_S)
   print("Waiting for next snapshot event trigger")
+
+### Function to find topic type if exist
+def find_topic_type(topic_type):
+  topic_name = ""
+  topic_list=rospy.get_published_topics(namespace='/')
+  for topic in topic_list:
+    if topic[0].find(topic_type) != -1:
+      topic_name = topic[0]
+  return topic_name
+
+### Function to wait for topic type to exist
+def wait_for_topic_type(topic_type):
+  topic_name = ""
+  while topic_name == "" and not rospy.is_shutdown():
+    topic_name=find_topic_type(topic_type)
+    time.sleep(.1)
+  return topic_name
 
 ### Function to wait for topic to exist
 def wait_for_topic(topic_name,message_name):

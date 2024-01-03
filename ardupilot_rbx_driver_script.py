@@ -1,28 +1,12 @@
 #!/usr/bin/env python
-#
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
-#
-# This license applies to any user of NEPI Engine software
-#
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
+
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
 
 # Sample NEPI RBX Driver Script.
 
@@ -80,6 +64,8 @@ NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/rbx/"
 
 # NEPI MAVLINK RBX Driver Capabilities Publish Topics
 NEPI_RBX_CAPABILITIES_RATE_HZ = 1
+NEPI_RBX_CAPABILITIES_CONTROLS_TOPIC = NEPI_RBX_NAMESPACE + "control_support"
+NEPI_RBX_CAPABILITIES_FEEDBACK_TOPIC = NEPI_RBX_NAMESPACE + "feedack_support"
 NEPI_RBX_CAPABILITIES_STATES_TOPIC = NEPI_RBX_NAMESPACE + "state_options"
 NEPI_RBX_CAPABILITIES_MODES_TOPIC = NEPI_RBX_NAMESPACE + "mode_options"
 
@@ -111,10 +97,6 @@ NEPI_RBX_GOTO_POSITION_TOPIC = NEPI_RBX_NAMESPACE + "goto_position" # Ignored if
 NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location" # Ignored if any active goto processes
 NEPI_RBX_GO_HOME_TOPIC = NEPI_RBX_NAMESPACE + "go_home" # Aborts any active goto processes
 NEPI_RBX_HOLD_STATION_TOPIC = NEPI_RBX_NAMESPACE + "go_hold" # Aborts any active goto processes
-
-
-
-
 
 ###################################################
 MAVLINK_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/"
@@ -616,8 +598,6 @@ def setpoint_attitude_ned(setpoint_attitude):
   print("Setpoint Attitude Reached")
   current_rbx_goto_status = True
   
-
-
 
 
 ### Function to set and check setpoint position local body command

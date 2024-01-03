@@ -24,44 +24,41 @@
 #
 #
 
-# Sample NEPI Automation Script. 
-# Uses onboard ROS python library to
-# 1. Checks if AI input image topic exists
-# 2. Try's to set reslution on camera 
-# 3. Loads selected AI model
-# 4. Starts AI detection process using input image stream
-# 5. Stops AI detection process on shutdown
+# Sample NEPI Automation Script.
+# Uses onboard ROS libraries to
+# 1. Connect NEPI NavPose topics to appropriate navpose topics
 
+
+import rospy
 import time
-import sys
-import rospy   
 
-from sensor_msgs.msg import Image
-from std_msgs.msg import UInt8, Empty, String, Bool
-from nepi_ros_interfaces.msg import ClassifierSelection, StringArray
+from std_msgs.msg import String, Bool, Float64
+from nav_msgs.msg import Odometry
+from sensor_msgs.msg import NavSatFix
+from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
+from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
+
 
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-
-#Set AI Detector Image ROS Topic Type
-IMAGE_INPUT_TOPIC_TYPE = "color_2d_image"
-
-#Set AI Detector Parameters
-DETECTION_MODEL = "common_object_detection"
-DETECTION_THRESHOLD = 0.5
-
-# NEPI ROS namespace setup
+# ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+IDX_NAMESPACE = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/"
 
-# AI Detector Publish Topics
-AI_START_TOPIC = NEPI_BASE_NAMESPACE + "start_classifier"
-AI_STOP_TOPIC = NEPI_BASE_NAMESPACE + "stop_classifier"
+# NavPose Source Topics
+NAVPOSE_SOURCE_ORIENTATION_TOPIC = IDX_NAMESPACE + "odom"
+
+### Setup NEPI NavPose Settings Topic Namespaces
+NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
 
 #####################################################################################
 # Globals
 #####################################################################################
-stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
+mavros_global_msg=None
+mavros_heading_msg=None
+mavros_orientation_msg=None
+
 #####################################################################################
 # Methods
 #####################################################################################
@@ -69,35 +66,29 @@ stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
 ### System Initialization processes
 def initialize_actions():
   print("")
-  print("Starting Initialization")  
-  # Wait for message
-  print("Waiting for topic type: " + IMAGE_INPUT_TOPIC_TYPE)
-  topic_name=wait_for_topic_type(IMAGE_INPUT_TOPIC_TYPE)
-  print("Found topic: " + topic_name)
-  # Classifier initialization, and wait for it to publish
-  start_classifier_pub = rospy.Publisher(AI_START_TOPIC, ClassifierSelection, queue_size=1)
-  classifier_selection = ClassifierSelection(img_topic=topic_name, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
-  time.sleep(1) # Important to sleep between publisher constructor and publish()
-  rospy.loginfo("Starting object detector: " + str(start_classifier_pub.name))
-  start_classifier_pub.publish(classifier_selection)
+  print("Starting Initialization")
   print("Initialization Complete")
 
-### Function to wait for topic type to exist
-def find_topic_type(topic_type):
-  topic_name = ""
-  topic_list=rospy.get_published_topics(namespace='/')
-  for topic in topic_list:
-    if topic[0].find(topic_type) != -1:
-      topic_name = topic[0]
-  return topic_name
 
-### Function to wait for topic type to exist
-def wait_for_topic_type(topic_type):
-  topic_name = ""
-  while topic_name == "" and not rospy.is_shutdown():
-    topic_name=find_topic_type(topic_type)
-    time.sleep(.1)
-  return topic_name
+### Callback to set NEPI navpose topics
+def set_nepi_navpose_topics_callback(timer):
+  # Update Orientation source
+  print("Waiting for topic: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
+  wait_for_topic(NAVPOSE_SOURCE_ORIENTATION_TOPIC, 'nav_msgs/Odometry')
+  set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
+  time.sleep(.1) # Wait between creating and using publisher
+  set_orientation_pub.publish(NAVPOSE_SOURCE_ORIENTATION_TOPIC)
+  print("Orientation Topic Set to: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
+
+### Function to wait for topic to exist
+def check_for_topic(topic_name,message_name):
+  topic_list=rospy.get_published_topics(namespace='/')
+  topic_to_connect=[topic_name, message_name]
+  topic_exists = False
+  if topic_to_connect in topic_list:
+    topic_exists = True
+  print(topic_exists)
+  return topic_exists
 
 ### Function to wait for topic to exist
 def wait_for_topic(topic_name,message_name):
@@ -113,21 +104,22 @@ def wait_for_topic(topic_name,message_name):
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global stop_classifier_pub
   print("Shutting down: Executing script cleanup actions")
-  stop_classifier_pub.publish(Empty())
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting AI Detection Start automation script", disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name="ai_detection_setup_start_auto_script")
+  rospy.init_node("mavros_navpose_config_autos_script")
+  rospy.loginfo("Starting Mavros NavPose config automation script")
   # Run initialization processes
   initialize_actions()
-  # run cleanup actions on shutdown
+  # Start timer callback that sends regular set navepose updates
+  print("Starting set navpose topics timer callback")
+  rospy.Timer(rospy.Duration(5.0), set_nepi_navpose_topics_callback)
+  #########################################
+  # Run cleanup actions on rospy shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever
-  rospy.spin()
-  
+  rospy.spin()  
   
 
 

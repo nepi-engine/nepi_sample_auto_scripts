@@ -44,7 +44,8 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 # SETUP - Edit as Necessary ##################################
 ##########################################
 SCRIPT_LIST = ["ai_detector_config_script.py",
-               "navpose_set_fixed_navpose_config_script.py",
+               "navpose_set_fixed_config_script.py",
+               "object_detect_and_snapshot_process_script.py",
                "snapshot_event_save_to_disk_action_script.py",
                "snapshot_event_send_to_cloud_action_script.py"] #  Script filenames to start/stop
 
