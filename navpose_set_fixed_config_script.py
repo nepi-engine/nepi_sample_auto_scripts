@@ -77,12 +77,10 @@ def initialize_actions():
   long = START_GEOPOINT[1]
   alt = START_GEOPOINT[2]
   gps_pub.publish(latitude=lat, longitude=long, altitude=alt) # Keyword args are a nice way to construct messages right in the publish() function
-
   heading_pub = rospy.Publisher(SET_NAVPOSE_FIXED_HEADING_TOPIC, Float64, queue_size=1)
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
   heading = START_HEADING_DEG
   heading_pub.publish(data=heading)
-
   orientation_pub = rospy.Publisher(SET_NAVPOSE_FIXED_ORIENTATION_TOPIC, QuaternionStamped, queue_size=1)
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
   current_orientation_quat = convert_rpy2quat(START_ORIENTATION_DEGS)
@@ -92,7 +90,6 @@ def initialize_actions():
   new_quat.z = current_orientation_quat[2]
   new_quat.w = current_orientation_quat[3]
   orientation_pub.publish(quaternion=new_quat)
-
   # At this point, the "init" fields have been updated, but they haven't yet been applied as the current values for GPS and HEADING, 
   # so we do that here via the "reinit_solution" topic.
   rospy.sleep(1) # Give new navpose values time to get captured
@@ -100,6 +97,9 @@ def initialize_actions():
   rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
   reinit_pub.publish() # "Empty" message types don't require a payload
   print("Initialization Complete")
+
+#######################
+# Process Functions
 
 ### Function to Convert Quaternion Attitude to Roll, Pitch, Yaw Degrees
 def convert_quat2rpy(xyzw_attitude):
@@ -120,14 +120,17 @@ def convert_rpy2quat(rpy_attitude_deg):
   print("Norm is " + str(xyzw_norm))
   return xyzw_attitude
 
+#######################
+# StartNode and Cleanup Functions
+
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("set_fixed_navpose_auto_script")
-  rospy.loginfo("Starting Set Fixed NavPose automation script")
+  rospy.loginfo("Starting NavPose Set Fixed NavPose Config Script")
+  rospy.init_node("navpose_set_fixed_navpose_config_script")
   # Run initialization processes
   initialize_actions()
   # run cleanup actions on shutdown

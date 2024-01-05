@@ -25,7 +25,7 @@
 #
 
 
-# Sample NEPI IDX Driver Script for ZED 2 Camera.
+# Concept NEPI IDX Driver Script for ZED2 Camera.
 
 ###################################################
 # NEPI NavPose Axis Info
@@ -37,11 +37,12 @@
 # yaw: RHR about z axis
 #####################################################
 
-import time
-import sys
 ### Set the namespace before importing rospy
 import os
 os.environ["ROS_NAMESPACE"] = "/nepi/s2x"
+
+import time
+import sys
 import rospy
 import dynamic_reconfigure.client
 import numpy as np
@@ -86,10 +87,10 @@ IDX_MAX_RANGE_RATIO=0.15
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-ZED_BASE_NAMESPACE = NEPI_BASE_NAMESPACE + "zed2/zed_node/"
-NEPI_IDX_SENSOR_NAME = "zed2_stereo_camera"
-NEPI_IDX_SENSOR_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_IDX_SENSOR_NAME + "/idx/"
+NEPI_IDX_NAME = "zed2_stereo_camera"
+NEPI_IDX_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_IDX_NAME + "/idx/"
 
+ZED_BASE_NAMESPACE = NEPI_BASE_NAMESPACE + "zed2/zed_node/"
 # Zed control topics
 ZED_PARAMETER_UPDATES_TOPIC = ZED_BASE_NAMESPACE + "parameter_updates"
 
@@ -101,27 +102,27 @@ ZED_POINTCLOUD_TOPIC = ZED_BASE_NAMESPACE + "point_cloud/cloud_registered"
 ZED_ODOM_TOPIC = ZED_BASE_NAMESPACE + "odom"
 
 ### NEPI IDX NavPose Publish Topic
-NEPI_IDX_NAVPOSE_ODOM_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "odom"
+NEPI_IDX_NAVPOSE_ODOM_TOPIC = NEPI_IDX_NAMESPACE + "odom"
 
 # NEPI IDX status and control topics
-NEPI_IDX_STATUS_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "status"
-NEPI_IDX_SET_BRIGHTNESS_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "set_brightness"
-NEPI_IDX_SET_CONTRAST_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "set_contrast"
-NEPI_IDX_SET_FRAMERATE_MODE_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "set_framerate_mode"
-NEPI_IDX_SET_RESOLUTION_MODE_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "set_resolution_mode"
-NEPI_IDX_SET_THRESHOLDING_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "set_thresholding"
-NEPI_IDX_SET_RANGE_WINDOW_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "set_range_window"
+NEPI_IDX_STATUS_TOPIC = NEPI_IDX_NAMESPACE + "status"
+NEPI_IDX_SET_BRIGHTNESS_TOPIC = NEPI_IDX_NAMESPACE + "set_brightness"
+NEPI_IDX_SET_CONTRAST_TOPIC = NEPI_IDX_NAMESPACE + "set_contrast"
+NEPI_IDX_SET_FRAMERATE_MODE_TOPIC = NEPI_IDX_NAMESPACE + "set_framerate_mode"
+NEPI_IDX_SET_RESOLUTION_MODE_TOPIC = NEPI_IDX_NAMESPACE + "set_resolution_mode"
+NEPI_IDX_SET_THRESHOLDING_TOPIC = NEPI_IDX_NAMESPACE + "set_thresholding"
+NEPI_IDX_SET_RANGE_WINDOW_TOPIC = NEPI_IDX_NAMESPACE + "set_range_window"
 
 # NEPI IDX data stream topics
-NEPI_IDX_COLOR_2D_IMAGE_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "color_2d_image"
-NEPI_IDX_BW_2D_IMAGE_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "bw_2d_image"
-NEPI_IDX_DEPTH_MAP_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "depth_map"
-NEPI_IDX_DEPTH_IMAGE_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "depth_image"
-NEPI_IDX_POINTCLOUD_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "pointcloud"
-NEPI_IDX_POINTCLOUD_IMAGE_TOPIC = NEPI_IDX_SENSOR_NAMESPACE + "pointcloud_image"
+NEPI_IDX_COLOR_2D_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "color_2d_image"
+NEPI_IDX_BW_2D_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "bw_2d_image"
+NEPI_IDX_DEPTH_MAP_TOPIC = NEPI_IDX_NAMESPACE + "depth_map"
+NEPI_IDX_DEPTH_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "depth_image"
+NEPI_IDX_POINTCLOUD_TOPIC = NEPI_IDX_NAMESPACE + "pointcloud"
+NEPI_IDX_POINTCLOUD_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "pointcloud_image"
 
 # NEPI IDX capabilities query service
-NEPI_IDX_CAPABILITY_REPORT_SERVICE = NEPI_IDX_SENSOR_NAMESPACE + "capabilities_query"
+NEPI_IDX_CAPABILITY_REPORT_SERVICE = NEPI_IDX_NAMESPACE + "capabilities_query"
 
 #####################################################################################
 # Globals
@@ -157,16 +158,15 @@ def initialize_actions():
   ##############################
   print("Waiting for ZED odom message to publish on " + ZED_ODOM_TOPIC)
   # Update Orientation source to our new update orientation publisher
-  wait_for_topic(ZED_ODOM_TOPIC, 'nav_msgs/Odometry')
+  wait_for_topic(ZED_ODOM_TOPIC)
   rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, idx_odom_topic_callback) 
   # Wait for zed depth topic
   print("Waiting for topic: " + ZED_DEPTH_MAP_TOPIC)
-  wait_for_topic(ZED_DEPTH_MAP_TOPIC, 'sensor_msgs/Image')
+  wait_for_topic(ZED_DEPTH_MAP_TOPIC)
   # Initialize IDX status msg and sensor
   idx_status_msg.resolution_mode = IDX_RES_MODE  # Not sure if this is adjustable
   idx_status_msg.framerate_mode = IDX_FRAMERATE_MODE # Not sure if this is adjustable
   idx_status_msg.brightness = IDX_BRIGHTNESS_RATIO
-  print(idx_status_msg.brightness)
   update_sensor_brightness(idx_status_msg.brightness)
   idx_status_msg.contrast = IDX_CONTRAST_RATIO
   update_sensor_contrast(idx_status_msg.contrast)  
@@ -183,7 +183,6 @@ def initialize_actions():
   #rospy.Subscriber(NEPI_IDX_SET_RESOLUTION_MODE_TOPIC, UInt8, idx_set_resolution_mode_callback)
   rospy.Subscriber(NEPI_IDX_SET_THRESHOLDING_TOPIC, Float32, idx_set_thresholding_callback)
   rospy.Subscriber(NEPI_IDX_SET_RANGE_WINDOW_TOPIC, RangeWindow, idx_set_range_window_callback)
-
   # Populate and advertise IDX Capability Report
   global idx_capabilities_report
   idx_capabilities_report.adjustable_resolution = False # Pending callback implementation
@@ -199,22 +198,36 @@ def initialize_actions():
   idx_capabilities_report.has_pointcloud_image = False # TODO: Create this data
   idx_capabilities_report.has_pointcloud = True
   rospy.Service(NEPI_IDX_CAPABILITY_REPORT_SERVICE, IDXCapabilitiesQuery, idx_capabilities_query_callback)
+  print("Starting Zed IDX subscribers and publishers")
+  rospy.Subscriber(ZED_COLOR_2D_IMAGE_TOPIC, Image, color_2d_image_callback, queue_size = 1)
+  rospy.Subscriber(ZED_BW_2D_IMAGE_TOPIC, Image, bw_2d_image_callback, queue_size = 1)
+  rospy.Subscriber(ZED_DEPTH_MAP_TOPIC, numpy_msg(Image), depth_map_callback, queue_size = 1)
+  rospy.Subscriber(ZED_POINTCLOUD_TOPIC, PointCloud2, pointcloud_callback, queue_size = 1)
   print("Initialization Complete")
+
+
+#######################
+# Driver NavPose Publishers Functions
 
 ### Callback to publish idx odom topic
 def idx_odom_topic_callback(odom_msg):
   global idx_navpose_odom_pub
-
   # TODO: Need to convert data from zed odom ref frame to nepi ref frame
-  
   if not rospy.is_shutdown():
     idx_navpose_odom_pub.publish(odom_msg)
+
+#######################
+# Driver Status Publishers Functions
 
 ### function to publish IDX status message and updates
 def idx_status_pub_callback():
   global idx_status_msg
   global idx_status_pub
-  idx_status_pub.publish(idx_status_msg)
+  if not rospy.is_shutdown():
+    idx_status_pub.publish(idx_status_msg)
+
+#######################
+# Driver Control Subscribers Functions
 
 ### callback to get and apply brightness control
 def idx_set_brightness_callback(brightness_msg):
@@ -267,14 +280,15 @@ def idx_set_range_window_callback(range_window_msg):
   global idx_status_msg
   print(range_window_msg)
   idx_range_window = range_window_msg.range_window
-  
   # TODO: What impact will this have -- depth image colormap range, or something else?
-  
   # publish IDX status update
   idx_status_msg.range_window.start_range = idx_range_window.start_range
   idx_status_msg.range_window.stop_range = idx_range_window.stop_range  
   idx_status_pub_callback()
 
+
+#######################
+# Driver Data Publishers Functions
 
 ### callback to get and republish color 2d image
 def color_2d_image_callback(image_msg):
@@ -347,6 +361,9 @@ def idx_capabilities_query_callback(_):
   global idx_capabilities_report
   return idx_capabilities_report
 
+#######################
+# Process Functions
+
 ### Function to Convert Quaternion Attitude to Roll, Pitch, Yaw Degrees
 def convert_quat2rpy(xyzw_attitude):
   rpy_attitude_rad = tf.transformations.euler_from_quaternion(xyzw_attitude)
@@ -364,16 +381,36 @@ def convert_rpy2quat(rpy_attitude_ned_deg):
   xyzw_attitude = tf.transformations.quaternion_from_euler(math.radians(roll_deg), math.radians(pitch_deg), math.radians(yaw_deg))
   return xyzw_attitude
 
-### Function to wait for topic to exist
-def wait_for_topic(topic_name,message_name):
-  topic_in_list = False
-  while topic_in_list is False and not rospy.is_shutdown():
-    topic_list=rospy.get_published_topics(namespace='/')
-    topic_to_connect=[topic_name, message_name]
-    if topic_to_connect not in topic_list:
-      time.sleep(.1)
-    else:
-      topic_in_list = True
+#######################
+# Initialization Functions
+
+### Function to find a topic
+def find_topic(topic_name):
+  topic = ""
+  topic_list=rospy.get_published_topics(namespace='/')
+  for topic_entry in topic_list:
+    if topic_entry[0].find(topic_name) != -1:
+      topic = topic_entry[0]
+  return topic
+
+### Function to check for a topic 
+def check_for_topic(topic_name):
+  topic_exists = True
+  topic=find_topic(topic_name)
+  if topic == "":
+    topic_exists = False
+  return topic_exists
+
+### Function to wait for a topic
+def wait_for_topic(topic_name):
+  topic = ""
+  while topic == "" and not rospy.is_shutdown():
+    topic=find_topic(topic_name)
+    time.sleep(.1)
+  return topic
+
+#######################
+# StartNode and Cleanup Functions
 
   
 ### Cleanup processes on node shutdown
@@ -395,14 +432,9 @@ def cleanup_actions():
 def startNode():
   rospy.loginfo("Starting ZED2 IDX driver script", disable_signals=True) # Disable signals so we can force a shutdown
   rospy.init_node
-  rospy.init_node(name= NEPI_IDX_SENSOR_NAME)
+  rospy.init_node(name= NEPI_IDX_NAME)
   # Run initialization processes
   initialize_actions()
-  print("Starting Zed IDX subscribers and publishers")
-  rospy.Subscriber(ZED_COLOR_2D_IMAGE_TOPIC, Image, color_2d_image_callback, queue_size = 1)
-  rospy.Subscriber(ZED_BW_2D_IMAGE_TOPIC, Image, bw_2d_image_callback, queue_size = 1)
-  rospy.Subscriber(ZED_DEPTH_MAP_TOPIC, numpy_msg(Image), depth_map_callback, queue_size = 1)
-  rospy.Subscriber(ZED_POINTCLOUD_TOPIC, PointCloud2, pointcloud_callback, queue_size = 1)
   # run cleanup actions on shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever

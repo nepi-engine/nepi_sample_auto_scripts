@@ -1,28 +1,4 @@
 #!/usr/bin/env python
-#
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
-#
-# This license applies to any user of NEPI Engine software
-#
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
 
 # Sample NEPI Automation Script.
 # Uses onboard ROS and MAVROS python libraries to
@@ -85,28 +61,31 @@ def initialize_actions():
 def set_nepi_navpose_topics_callback(timer):
   ##############################
   # Update Global Location source
-  print("Waiting for topic: " + MAVROS_SOURCE_NAV_TOPIC)
-  wait_for_topic(MAVROS_SOURCE_NAV_TOPIC, 'sensor_msgs/NavSatFix')
-  set_gps_pub = rospy.Publisher(NEPI_SET_NAVPOSE_GPS_TOPIC, String, queue_size=1)
-  time.sleep(.1) # Wait between creating and using publisher
-  set_gps_pub.publish(MAVROS_SOURCE_NAV_TOPIC)
-  print("GPS Topic Set to: " + MAVROS_SOURCE_NAV_TOPIC)
+  print("Checking for topic: " + MAVROS_SOURCE_NAV_TOPIC)
+  topic_exists = check_for_topic(MAVROS_SOURCE_NAV_TOPIC, 'sensor_msgs/NavSatFix')
+  if topic_exists:
+    set_gps_pub = rospy.Publisher(NEPI_SET_NAVPOSE_GPS_TOPIC, String, queue_size=1)
+    time.sleep(.1) # Wait between creating and using publisher
+    set_gps_pub.publish(MAVROS_SOURCE_NAV_TOPIC)
+    print("GPS Topic Set to: " + MAVROS_SOURCE_NAV_TOPIC)
   ##############################
   # Update Orientation source
-  print("Waiting for topic: " + MAVROS_SOURCE_ORIENTATION_TOPIC)
-  wait_for_topic(MAVROS_SOURCE_ORIENTATION_TOPIC, 'nav_msgs/Odometry')
-  set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
-  time.sleep(.1) # Wait between creating and using publisher
-  set_orientation_pub.publish(MAVROS_SOURCE_ORIENTATION_TOPIC)
-  print("Orientation Topic Set to: " + MAVROS_SOURCE_ORIENTATION_TOPIC)
+  print("Checking for topic: " + MAVROS_SOURCE_ORIENTATION_TOPIC)
+  topic_exists = check_for_topic(MAVROS_SOURCE_ORIENTATION_TOPIC, 'nav_msgs/Odometry')
+  if topic_exists:
+    set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
+    time.sleep(.1) # Wait between creating and using publisher
+    set_orientation_pub.publish(MAVROS_SOURCE_ORIENTATION_TOPIC)
+    print("Attitude Topic Set to: " + MAVROS_SOURCE_ORIENTATION_TOPIC)
   ##############################
   # Update Heading source
-  print("Waiting for topic: " + MAVROS_SOURCE_HEADING_TOPIC)
-  wait_for_topic(MAVROS_SOURCE_HEADING_TOPIC, 'std_msgs/Float64')
-  set_heading_pub = rospy.Publisher(NEPI_SET_NAVPOSE_HEADING_TOPIC, String, queue_size=1)
-  time.sleep(.1) # Wait between creating and using publisher
-  set_heading_pub.publish(MAVROS_SOURCE_HEADING_TOPIC)
-  print("Heading Topic Set to: " + MAVROS_SOURCE_HEADING_TOPIC)
+  print("Checking for topic: " + MAVROS_SOURCE_HEADING_TOPIC)
+  topic_exists = check_for_topic(MAVROS_SOURCE_HEADING_TOPIC, 'std_msgs/Float64')
+  if topic_exists:
+    set_heading_pub = rospy.Publisher(NEPI_SET_NAVPOSE_HEADING_TOPIC, String, queue_size=1)
+    time.sleep(.1) # Wait between creating and using publisher
+    set_heading_pub.publish(MAVROS_SOURCE_HEADING_TOPIC)
+    print("Heading Topic Set to: " + MAVROS_SOURCE_HEADING_TOPIC)
   ##############################
   # Sync NEPI clock to GPS timestamp
   set_gps_timesync_pub = rospy.Publisher(NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC, Bool, queue_size=1)
@@ -154,6 +133,7 @@ def wait_for_topic(topic_name,message_name):
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
+  time.sleep(2)
 
 ### Script Entrypoint
 def startNode():

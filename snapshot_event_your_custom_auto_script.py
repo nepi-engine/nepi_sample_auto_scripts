@@ -1,28 +1,13 @@
 #!/usr/bin/env python
-#
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
-#
-# This license applies to any user of NEPI Engine software
-#
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
+
+
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
 
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
@@ -64,13 +49,12 @@ SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 def initialize_actions():
   print("")
   print("Starting Initialization")  
-  # Set up snapshot event callback
-  rospy.Subscriber(SNAPSHOT_TOPIC, Empty, snapshot_event_callback, queue_size = 1)
-  print("Subscribed to : " + SNAPSHOT_TOPIC)
+  time.sleep(.1)
   print("Initialization Complete")
   print("Waiting for snapshot event trigger topic to publish on:")
-
+  print(SNAPSHOT_TOPIC)
   
+
 # Action upon detection of snapshot event trigger
 def snapshot_event_callback(event):
   ###########################################################
@@ -84,20 +68,18 @@ def snapshot_event_callback(event):
   time.sleep(TIGGER_RESET_DELAY_S)
   print("Waiting for next snapshot event trigger")
 
-
-#######################
-# StartNode and Cleanup Functions
-
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  print("Shutting down: Executing script cleanup actions")
+  time.sleep(.1)
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting Snapshot Event Your Custom Action Script", disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name="snapshot_event_your_custome_action_script")
+  rospy.loginfo("Starting Snapshot Event automation script", disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node(name="snapshot_event_auto_script")
   # Run Initialization processes
   initialize_actions()
+  # Set up snapshot event callback
+  rospy.Subscriber(SNAPSHOT_TOPIC, Empty, snapshot_event_callback, queue_size = 1)
   #Set up cleanup on node shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever (until object is detected)

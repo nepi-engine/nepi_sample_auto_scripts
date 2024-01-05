@@ -1,28 +1,12 @@
 #!/usr/bin/env python
-#
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
-#
-# This license applies to any user of NEPI Engine software
-#
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
+
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
 
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
@@ -55,13 +39,16 @@ from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 SAVE_NAVPOSE_DATA_ENABLED = True # True-Save NavPose File  with each image
 
 
-#Set Image Type to Save
-IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
+###!!!!!!!! Set Image ROS Topic Name to Save  !!!!!!!!
+IMAGE_INPUT_TOPIC = "/nepi/s2x/nexigo_n60_fhd_webcam_audio/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/see3cam_cu81/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/sidus_ss400/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/onwote_hd_poe/idx/color_2d_image"
 
 ###!!!!!!!! Set Automation action parameters !!!!!!!!
 SAVE_DURATION_S = 5.0 # Seconds. Length of time to save data
 SAVE_DATA_MAX_RATE_HZ = 1.0
-SAVE_RESET_DELAY_S = 30.0 # Seconds. Delay before starting over search/save process
+SAVE_RESET_DELAY_S = 5.0 # Seconds. Delay before starting over search/save process
 SAVE_FOLDER_NAME = "snapshot_event/" # Use "" to ignore
 SAVE_FILE_PREFIX = "snapshot_event" # Use "" to ignore
 SAVE_IMAGE_TYPE = "jpg"
@@ -81,7 +68,6 @@ save_folder = "/mnt/nepi_storage/data/" + SAVE_FOLDER_NAME
 save_data_min_interval_s = float(1.0)/SAVE_DATA_MAX_RATE_HZ
 save_data_enable = False
 last_save_time_s = None
-image_topic_to_save = None
 
 #####################################################################################
 # Methods
@@ -90,14 +76,12 @@ image_topic_to_save = None
 ### System Initialization processes
 def initialize_actions():
   global save_folder
-  global image_topic_to_save
   print("")
   print("Starting Initialization")  
-  # Wait for message
-  print("Waiting for topic type: " + IMAGE_INPUT_TOPIC_NAME)
-  topic_name=wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
-  print("Found topic: " + topic_name)
-  image_topic_to_save = topic_name
+  # Wait for image topic to exist
+  print("Waiting for image topic")  
+  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')
+  print("Image topic found")
   # Create save folder if needed
   print("Checking Save Folder")
   Save_Folder_Exist = os.path.exists(save_folder)
@@ -107,13 +91,9 @@ def initialize_actions():
     os.makedirs(save_folder,access)
   else:
     print("Save folder exists")
-  # Start image saver callback
-  rospy.Subscriber(image_topic_to_save, Image, image_saver_callback, queue_size = 1)
-  # Set up snapshot event callback
-  rospy.Subscriber(SNAPSHOT_TOPIC, Empty, snapshot_event_callback, queue_size = 1)
   print("Initialization Complete")
   print("Waiting for snapshot event trigger topic to publish on:")
-
+  print(SNAPSHOT_TOPIC)
   
 
 # Action upon detection of snapshot event trigger
@@ -183,54 +163,40 @@ def image_saver_callback(img_msg):
           except rospy.ServiceException as e:
             print("NavPose service call failed: %s"%e)
             time.sleep(1)
+
+
+      
       last_save_time_s =  time.time() # Reset last save time
   else:
     last_save_time = None
     
 
-#######################
-# Initialization Functions
-
-### Function to find a topic
-def find_topic(topic_name):
-  topic = ""
-  topic_list=rospy.get_published_topics(namespace='/')
-  for topic_entry in topic_list:
-    if topic_entry[0].find(topic_name) != -1:
-      topic = topic_entry[0]
-  return topic
-
-### Function to check for a topic 
-def check_for_topic(topic_name):
-  topic_exists = True
-  topic=find_topic(topic_name)
-  if topic == "":
-    topic_exists = False
-  return topic_exists
-
-### Function to wait for a topic
-def wait_for_topic(topic_name):
-  topic = ""
-  while topic == "" and not rospy.is_shutdown():
-    topic=find_topic(topic_name)
-    time.sleep(.1)
-  return topic
-
-#######################
-# StartNode and Cleanup Functions
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
-
+  time.sleep(.1)
 
 ### Script Entrypoint
 def startNode():
-  global image_topic_to_save
-  rospy.loginfo("Starting Snapshot Event Detect and Save Action Script", disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name="snapshot_event_detect_save_action_script")
+  rospy.loginfo("Starting Snapshot Event Detect and Save automation script", disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node(name="snapshot_event_detect_save_auto_script")
   # Run Initialization processes
   initialize_actions()
+  # Start image saver callback
+  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, image_saver_callback, queue_size = 1)
+  # Set up snapshot event callback
+  rospy.Subscriber(SNAPSHOT_TOPIC, Empty, snapshot_event_callback, queue_size = 1)
   #Set up cleanup on node shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever (until object is detected)

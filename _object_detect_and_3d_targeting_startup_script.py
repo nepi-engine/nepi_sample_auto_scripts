@@ -44,15 +44,12 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
-SCRIPT_KEY_VALUE_UPDATE_LIST = 
-
-
-
 SCRIPT_LIST = ["zed2_idx_driver_script.py",
-               "ai_detector_config_script.py",
                "navpose_set_fixed_config_script.py",
-               "zed2_navpose_config_script.py",
-               "zed2_3d_targeting_process_script.py"] #  Script filenames to start/stop
+               "zed2_idx_navpose_config_script.py",
+               "ai_detector_config_script.py",
+               "ai_3d_targeting_process_script.py"] #  Script filenames to start/stop
+
 
 
 # ROS namespace setup
@@ -275,8 +272,8 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("solution_3d_object_detect_range_bearing_setup_script")
-  rospy.loginfo("Starting Solution Object Detect Range Bearing Setup Script")
+  rospy.loginfo("Starting Object Detect and 3D Targeting Startup Script")
+  rospy.init_node("object_detect_and_3d_targeting_startup_script")
   # Run initialization processes
   initialize_actions()
   # Launch scripts from list

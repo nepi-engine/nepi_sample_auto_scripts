@@ -1,28 +1,12 @@
 #!/usr/bin/env python
-#
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
-#
-# This license applies to any user of NEPI Engine software
-#
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
+
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
 
 
 # Sample NEPI Automation Script.
@@ -37,18 +21,17 @@
 # 6) Delays, then waits for next detection
 
 # Requires the following additional scripts are running
-# a) navpose_publish_process_script.py
-# b) mavros_navpose_config_script.py
-# b) mavros_setpoint_control_script.py
-# c) ai_detector_config_script.py
-# d) zed_3d_targeting_action_script.py
-# e) (Optional) MAVROS_fake_gps_config_script.py if a real GPS fix is not available
+# a) navpose_get_and_publish_auto_script.py
+# b) mavros_navpose_config_auto_script.py
+# b) mavros_setpoint_controls_auto_script.py
+# c) ai_detector_setup_start_auto_script.py
+# d) zed_3d_targeting_auto_script.py
+# e) (Optional) MAVROS_fake_gps_sim_auto_script.py if a real GPS fix is not available
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
 import rospy
 import time
-import math
 import numpy as np
 
 from std_msgs.msg import Empty, Bool, String, Float64, Float64MultiArray
@@ -66,8 +49,8 @@ from darknet_ros_msgs.msg import BoundingBoxes
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
-OBJ_LABEL_OF_INTEREST = 'chair'
-TARGET_OFFSET_GOAL_M = 0.5 # How close to set setpoint to target
+OBJ_LABEL_OF_INTEREST = 'person'
+TARGET_OFFSET_GOAL_M = 1 # How close to set setpoint to target
 RESET_DELAY_S = 5 # Min delay between triggering a new move
 
 
@@ -77,7 +60,7 @@ RESET_DELAY_S = 5 # Min delay between triggering a new move
 # https://github.com/numurus-nepi/nepi_sample_auto_scripts
 #####################################################
 MAVROS_FAKE_GPS_SIM_SUPPORT = True # Set True if running "MAVROS_fake_gps_sim_auto_script.py"
-FAKE_GPS_START_GEOPOINT_WGS84 = [47.6540828,-122.3187578,3.0] # [Lat, Long, Altitude_WGS84], Use -999 values to use current
+FAKE_GPS_HOME_GEOPOINT_WGS84 = [47.6541271,-122.3189492,0.0] # [Lat, Long, Altitude_WGS84], Use -999 values to use current
 ### Currently, the geoid_height for your home location must be set in the navpose_get_and_publsih_auto_script.py auto script
 ### Plan is to automate this in future updates. For now, you can use this link to get your geoid height value
 ### for the current Lat Long location: [link text](https://geodesy.noaa.gov/GEOID/GEOID18/computation.html)
@@ -86,8 +69,7 @@ FAKE_GPS_START_GEOPOINT_WGS84 = [47.6540828,-122.3187578,3.0] # [Lat, Long, Alti
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/"
-MAVROS_CONTROLS_NAMESPACE = MAVROS_NAMESPACE + "controls/"
+MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "pixhawk_mavlink/"
 # MAVROS Subscriber Topics
 MAVROS_STATE_TOPIC = MAVROS_NAMESPACE + "state"
 # MAVROS Required Services
@@ -111,13 +93,8 @@ MAVROS_FAKE_GPS_RESET_GEOPOINT_TOPIC = MAVROS_NAMESPACE + "fake_gps/reset_geopoi
 #####################################################################################
 # Globals
 #####################################################################################
-setpoint_command_attitude_pub = rospy.Publisher(MAVROS_CONTROL_ATTITUDE_TOPIC, Float64MultiArray, queue_size=1)
-setpoint_command_position_pub = rospy.Publisher(MAVROS_CONTROL_POSITION_TOPIC, Float64MultiArray, queue_size=1)
-setpoint_command_location_pub = rospy.Publisher(MAVROS_CONTROL_LOCATION_TOPIC, Float64MultiArray, queue_size=1)
-
 current_state = None
 original_state = None
-setpoint_complete_status = False
 
 #####################################################################################
 # Methods
@@ -127,7 +104,6 @@ setpoint_complete_status = False
 def initialize_actions():
   global current_state
   global original_state
-  global setpoint_complete_status
   print("Starting get_state_callback")
   # Wait for topic
   print("Waiting for topic: " + MAVROS_STATE_TOPIC)
@@ -154,52 +130,56 @@ def initialize_actions():
   # Reset Fake GPS Start Location if Enabled
   if MAVROS_FAKE_GPS_SIM_SUPPORT:
     print("Calling Fake GPS reset to new geopoint")
-    print(FAKE_GPS_START_GEOPOINT_WGS84)
-    fake_gps_reset_geopoint(FAKE_GPS_START_GEOPOINT_WGS84)
+    print(FAKE_GPS_HOME_GEOPOINT_WGS84)
+    fake_gps_reset_geopoint(FAKE_GPS_HOME_GEOPOINT_WGS84)
+    current_home = FAKE_GPS_HOME_GEOPOINT_WGS84
   # Wait for Target Data topic
   print("Waiting for topic: " + TARGET_DATA_INPUT_TOPIC)
   wait_for_topic(TARGET_DATA_INPUT_TOPIC, 'nepi_ros_interfaces/TargetLocalization')
   print("Completed Initialization")
 
+### Callback to get current state
+def get_target_date_callback(target_data_msg):
+  global current_target_data
+  current_target_data = target_data_msg
 
 # Action upon detection and targeting for object of interest 
 def object_goto_callback(target_data_msg):
   global current_state
   global original_state
-  print("Recieved target data message")
-  print(target_data_msg)
-  # Check for the object of interest and take appropriate actions
-  if target_data_msg.name == OBJ_LABEL_OF_INTEREST:
-    original_state = current_state
-    print("Detected a " + OBJ_LABEL_OF_INTEREST)
-    # Get target data for detected object of interest
-    target_range_m = target_data_msg.range_m
-    target_yaw_d = target_data_msg.azimuth_deg
-    target_pitch_d = target_data_msg.elevation_deg
-    # Calculate setpoint to target using offset goal
-    setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
-    sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))
-    sp_y_m = setpoint_range_m * math.sin(math.radians(target_yaw_d))
-    sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d))
-    sp_yaw_d = target_yaw_d
-    setpoint_position_body_m = [sp_x_m,sp_y_m,sp_z_m,sp_yaw_d]
-    ##########################################
-    # Switch to Guided Mode and Send Setpoint Command
-    print("Switching to Guided mode")
-    guided() # Change mode to Guided
-    # Send setpoint command and wait for completion
-    print("Sending setpoint position body command")
-    print(setpoint_position_body_m)
-    setpoint_position_body(setpoint_position_body_m)
-    ##########################################
-    print("Switching back to original mode")
-    continue_mission()
-    print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
-    time.sleep(RESET_DELAY_S)
-    print("Waiting for next " + OBJ_LABEL_OF_INTEREST + " detection")
-  else:
-    print("No " + OBJ_LABEL_OF_INTEREST + " type for target data")
-    time.sleep(1)
+    print("Recieved target data message")
+    print(target_data_msg)
+    # Check for the object of interest and take appropriate actions
+    if target_data_msg.name == OBJ_LABEL_OF_INTEREST:
+      original_state = current_state
+      print("Detected a " + OBJ_LABEL_OF_INTEREST)
+      # Get target data for detected object of interest
+      target_range_m = target_data_msg.range_m
+      target_yaw_deg = target_data_msg.azimuth_deg
+      target_pitch_deg = target_data_msg.elevation_deg
+      # Calculate setpoint to target using offset goal
+      setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
+      setpoint_x_body_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))
+      setpoint_y_body_m = setpoint_range_m * math.sin(math.radians(target_yaw_d))
+      setpoint_z_body_m = setpoint_range_m * math.sin(math.radians(target_pitch_d))
+      setpoint_position_body_m = [setpoint_x_body_m,setpoint_z_body_m,setpoint_y_body_m]
+      ##########################################
+      # Switch to Guided Mode and Send Setpoint Command
+      print("Switching to Guided mode")
+      guided() # Change mode to Guided
+      # Send setpoint command and wait for completion
+      print("Sending setpoint position body command")
+      print(setpoint_position_body_m)
+      setpoint_position_body(setpoint_position_body_m)
+      ##########################################
+      print("Switching back to original mode")
+      continue_mission()
+      print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
+      time.sleep(RESET_DELAY_S)
+      print("Waiting for next " + OBJ_LABEL_OF_INTEREST + " detection")
+    else:
+      print("No " + OBJ_LABEL_OF_INTEREST + " type for target data)
+      time.sleep(1)
 
 ### Function to set mode
 def update_mode(mode_new):
@@ -249,10 +229,7 @@ def get_state_callback(state_msg):
   global current_state
   current_state = state_msg
 
-### Callback to update setpoint process status value
-def setpoint_complete_status_callback(status_msg):
-  global setpoint_complete_status
-  setpoint_complete_status = status_msg.data
+
 
 ### Function to wait for topic to exist
 def wait_for_topic(topic_name,message_name):
@@ -269,20 +246,6 @@ def wait_for_topic(topic_name,message_name):
 def setpoint_complete_status_callback(status_msg):
   global setpoint_complete_status
   setpoint_complete_status = status_msg.data
-
-### Function for creating setpoint messages
-def create_setpoint_message(setpoint):
-  print(setpoint)
-  setpoint_msg = Float64MultiArray()
-  setpoint_data=[]
-  for ind in range(len(setpoint)):
-    setpoint_data.append(float(setpoint[ind]))
-  print(setpoint_data)
-  setpoint_msg.data = setpoint_data
-  print("")
-  print("Setpoint Message Created")
-  print(setpoint_msg)
-  return setpoint_msg
 
 ### Function to call Setpoint Location Global control
 def setpoint_location_global(setpoint_data):
@@ -325,21 +288,6 @@ def wait_for_setpoint_clear():
     print(setpoint_complete_status)
     time.sleep(1)
 
-### Function for reseting Fake GPS and global x,y NED home position at new geopoint
-def fake_gps_reset_geopoint(reset_geopoint_wgs84):
-  # Send mavlink set home command and message
-  fake_gps_reset_geopoint_pub = rospy.Publisher(MAVROS_FAKE_GPS_RESET_GEOPOINT_TOPIC, GeoPoint, queue_size=10)
-  time.sleep(.1)
-  print("Sending Fake GPS reset to geopoint command")
-  print(reset_geopoint_wgs84)
-  geopoint_msg=GeoPoint()
-  geopoint_msg.latitude = reset_geopoint_wgs84[0]
-  geopoint_msg.longitude = reset_geopoint_wgs84[1]
-  geopoint_msg.altitude = reset_geopoint_wgs84[2]
-  fake_gps_reset_geopoint_pub.publish(geopoint_msg)
-  print("Waiting for fake gps update to reset")
-  time.sleep(12)
-
 ### Function to wait for setpoint control process to complete
 def wait_for_setpoint_started():
   global setpoint_complete_status
@@ -350,13 +298,13 @@ def wait_for_setpoint_started():
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  print("Shutting down: Executing script cleanup actions")
-
+  global org_mode
+  time.sleep(.1)
   
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting MAVROS detect and goto automation script")
-  rospy.init_node("mavros_detect_and_goto_auto_script")
+  rospy.loginfo("Starting MAVROS Set Attitude Target automation script")
+  rospy.init_node("mavros_set_attitude_target_auto_script")
   #initialize system including pan scan process
   initialize_actions()
   # Set up object detector subscriber

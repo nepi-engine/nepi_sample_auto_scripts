@@ -87,12 +87,15 @@ def initialize_actions():
   rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
   # Wait for topic
   print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-  wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
+  wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
   img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)
   while img_width == 0 and img_height == 0:
     print("Waiting for Classifier Detection Image")
     time.sleep(1)
   img_sub.unregister() # Don't need it anymore
+  # Set up object detector subscriber
+  rospy.loginfo("Starting object detection subscriber: Object of interest = " + OBJ_LABEL_OF_INTEREST + "...")
+  rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
   print("Initialization Complete")
  
 ### Simple callback to get image height and width
@@ -135,32 +138,48 @@ def object_detected_callback(bounding_box_msg):
         time.sleep(RESET_DELAY_S)
 
 
-### Function to wait for topic to exist
-def wait_for_topic(topic_name,message_name):
-  topic_in_list = False
-  while topic_in_list is False and not rospy.is_shutdown():
-    topic_list=rospy.get_published_topics(namespace='/')
-    topic_to_connect=[topic_name, message_name]
-    if topic_to_connect not in topic_list:
-      time.sleep(.1)
-    else:
-      topic_in_list = True
+#######################
+# Initialization Functions
+
+### Function to find a topic
+def find_topic(topic_name):
+  topic = ""
+  topic_list=rospy.get_published_topics(namespace='/')
+  for topic_entry in topic_list:
+    if topic_entry[0].find(topic_name) != -1:
+      topic = topic_entry[0]
+  return topic
+
+### Function to check for a topic 
+def wait_for_topic(topic_name):
+  topic_exists = True
+  topic=find_topic(topic_name)
+  if topic == "":
+    topic_exists = False
+  return topic_exists
+
+### Function to wait for a topic
+def wait_for_topic(topic_name):
+  topic = ""
+  while topic == "" and not rospy.is_shutdown():
+    topic=find_topic(topic_name)
+    time.sleep(.1)
+  return topic
+
+#######################
+# StartNode and Cleanup Functions
 
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
-  
 
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting Obj_Detect and Snapshot automation script", disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.loginfo("Starting AI Detect and Snapshot Process Script", disable_signals=True) # Disable signals so we can force a shutdown
   rospy.init_node
-  rospy.init_node(name="obj_detect_and_snapshot_auto_script")
+  rospy.init_node(name="ai_detect_and_snapshot_process_script")
   # Run Initialization processes
   initialize_actions()
-  # Set up object detector subscriber
-  rospy.loginfo("Starting object detection subscriber: Object of interest = " + OBJ_LABEL_OF_INTEREST + "...")
-  rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
   #Set up Anode shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever (until object is detected)

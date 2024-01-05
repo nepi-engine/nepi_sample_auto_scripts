@@ -43,14 +43,11 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["ai_detector_config_script.py",
-               "mavros_fake_gps_config_script.py",
-               "mavros_navpose_config_script.py",
-               "mavros_setpoint_control_script.py",
-               "navpose_publish_process_script.py",
-               "snapshot_event_send_to_cloud_action_script.py",
-               "mavros_complete_mission_action_script.py"] #  Script filenames to start/stop
-
+SCRIPT_LIST = ["ardupilot_rbx_driver_script.py",
+                "ardupilot_rbx_navpose_config_script.py",
+                "ardupilot_rbx_fake_gps_config_script.py",
+                "snapshot_event_save_to_disk_action_script.py",
+               	"drone_waypoint_inspection_mission_script.py"] #  Script filenames to start/stop
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -237,8 +234,8 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("solution_drone_mission_startup_script")
-  rospy.loginfo("Starting Drone Mission Startup Script")
+  rospy.loginfo("Starting Drone Waypoint Inspection Startup Script")
+  rospy.init_node("drone_waypoint_inspection_startup_script")
   # Run initialization processes
   initialize_actions()
   # Launch scripts from list

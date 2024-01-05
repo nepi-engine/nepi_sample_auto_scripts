@@ -43,12 +43,11 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
-SCRIPT_LIST = ["ai_detector_config_script.py",
-               "navpose_set_fixed_config_script.py",
-               "object_detect_and_snapshot_process_script.py",
-               "snapshot_event_save_to_disk_action_script.py",
-               "snapshot_event_send_to_cloud_action_script.py"] #  Script filenames to start/stop
-
+SCRIPT_LIST = ["pantilt_ptx_navpose_driver_script.py",
+               	"navpose_set_fixed_config_script.py",
+		"pantilt_ptx_navpose_config_script.py",
+		"ai_detector_config_script.py",
+               	"pantilt_object_tracker_action_script.py"] #  Script filenames to start/stop
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -235,8 +234,8 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("solution_object_detect_save_send_setup_script")
-  rospy.loginfo("Starting Solution Object Detect Save and Send Setup Script")
+  rospy.loginfo("Starting PanTilt Object Tracker Startup Script")
+  rospy.init_node("pantilt_object_tracker_startup_script")
   # Run initialization processes
   initialize_actions()
   # Launch scripts from list

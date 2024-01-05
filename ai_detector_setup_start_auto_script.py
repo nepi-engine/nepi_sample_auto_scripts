@@ -1,28 +1,13 @@
 #!/usr/bin/env python
-#
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
-#
-# This license applies to any user of NEPI Engine software
-#
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
+
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL"
+__version__ = "2.0.4.0"
+
 
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
@@ -44,12 +29,21 @@ from nepi_ros_interfaces.msg import ClassifierSelection, StringArray
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
-#Set AI Detector Image ROS Topic Name
-IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
+# Resolution control for NEPI ROS IDX supported camera drivers
 
-#Set AI Detector Parameters
+CAM_RES=0 # Number 0-3, 0 Low, 1 Med, 2 High, 3 Ultra, or None to skip step
+#CAM_RES=None
+
+###!!!!!!!! Set AI Detector Image ROS Topic Name !!!!!!!!
+IMAGE_INPUT_TOPIC = "/nepi/s2x/nexigo_n60_fhd_webcam_audio/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/see3cam_cu81/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/sidus_ss400/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/onwote_hd_poe/idx/color_2d_image"
+#IMAGE_INPUT_TOPIC = "/nepi/s2x/zed2/zed_node/left/image_rect_color"
+
 DETECTION_MODEL = "common_object_detection"
 DETECTION_THRESHOLD = 0.5
+OBJ_CENTERED_BUFFER_RATIO = 0.5 # acceptable band about center of image for saving purposes
 
 # NEPI ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -70,51 +64,43 @@ stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
 def initialize_actions():
   print("")
   print("Starting Initialization")  
-  # Wait for topic by name
-  print("Waiting for topic name: " + IMAGE_INPUT_TOPIC_NAME)
-  image_topic=wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
-  print("Found topic: " + image_topic)
+  # Wait for topic
+  print("Waiting for topic: " + IMAGE_INPUT_TOPIC)
+  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')
+  # Try updating IDX sensor resolution
+  if CAM_RES is not None:
+    if IMAGE_INPUT_TOPIC.find('idx')>0: # Is IDX supported sensor stream
+      print("Image topic has IDX sensor driver support")
+      resolution_adj_topic = IMAGE_INPUT_TOPIC.split('idx')[0] + 'idx/set_resolution_mode'
+      print("Updating resolution to value: " + str(CAM_RES) + " on topic")
+      print(resolution_adj_topic)
+      res_adj_pub = rospy.Publisher(resolution_adj_topic, UInt8, queue_size=10)
+      time.sleep(1) # Important to sleep between publisher constructor and publish()
+      res_adj_pub.publish(CAM_RES)
+    else:
+      print("Image has no IDX sensor driver")
+      print("Skipping resolution update step")
+  else:
+    print("Resolution = None")
+    print("Skipping resolution update step")
   # Classifier initialization, and wait for it to publish
   start_classifier_pub = rospy.Publisher(AI_START_TOPIC, ClassifierSelection, queue_size=1)
-  classifier_selection = ClassifierSelection(img_topic=image_topic, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
+  classifier_selection = ClassifierSelection(img_topic=IMAGE_INPUT_TOPIC, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
   time.sleep(1) # Important to sleep between publisher constructor and publish()
   rospy.loginfo("Starting object detector: " + str(start_classifier_pub.name))
   start_classifier_pub.publish(classifier_selection)
   print("Initialization Complete")
 
-#######################
-# Initialization Functions
-
-#######################
-# Initialization Functions
-
-### Function to find a topic
-def find_topic(topic_name):
-  topic = ""
-  topic_list=rospy.get_published_topics(namespace='/')
-  for topic_entry in topic_list:
-    if topic_entry[0].find(topic_name) != -1:
-      topic = topic_entry[0]
-  return topic
-
-### Function to check for a topic 
-def check_for_topic(topic_name):
-  topic_exists = True
-  topic=find_topic(topic_name)
-  if topic == "":
-    topic_exists = False
-  return topic_exists
-
-### Function to wait for a topic
-def wait_for_topic(topic_name):
-  topic = ""
-  while topic == "" and not rospy.is_shutdown():
-    topic=find_topic(topic_name)
-    time.sleep(.1)
-  return topic
-
-#######################
-# StartNode and Cleanup Functions
+### Function to wait for topic to exist
+def wait_for_topic(topic_name,message_name):
+  topic_in_list = False
+  while topic_in_list is False and not rospy.is_shutdown():
+    topic_list=rospy.get_published_topics(namespace='/')
+    topic_to_connect=[topic_name, message_name]
+    if topic_to_connect not in topic_list:
+      time.sleep(.1)
+    else:
+      topic_in_list = True
 
 
 ### Cleanup processes on node shutdown
@@ -122,11 +108,12 @@ def cleanup_actions():
   global stop_classifier_pub
   print("Shutting down: Executing script cleanup actions")
   stop_classifier_pub.publish(Empty())
+  time.sleep(0.1)
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting AI 2D Detector Config Script", disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name="ai_2d_detector_config_auto_script")
+  rospy.loginfo("Starting AI Detection Start automation script", disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node(name="ai_detection_setup_start_auto_script")
   # Run initialization processes
   initialize_actions()
   # run cleanup actions on shutdown

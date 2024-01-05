@@ -1,28 +1,12 @@
 #!/usr/bin/env python
-#
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
-#
-# This license applies to any user of NEPI Engine software
-#
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
+
+__author__ = "Jason Seawall"
+__copyright__ = "Copyright 2023, Numurus LLC"
+__email__ = "nepi@numurus.com"
+__credits__ = ["Jason Seawall", "Josh Maximoff"]
+
+__license__ = "GPL" 
+__version__ = "2.0.4.0"
 
 
 # Sample NEPI Automation Script.
@@ -34,10 +18,10 @@
 # 5) Runs post-mission processes
 
 # Requires the following additional scripts are running
-# a) navpose_publish_process_script.py
-# b) mavros_setpoint_control_script.py
-# c) mavros_navpose_config_script.py
-# d) (Optional) MAVROS_fake_gps_config_script.py if a real GPS fix is not available
+# a) navpose_get_and_publish_auto_script.py
+# b) mavros_setpoint_controls_auto_script.py
+# c) mavros_navpose_config_auto_script.py
+# d) (Optional) MAVROS_fake_gps_sim_auto_script.py if a real GPS fix is not available
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
@@ -66,8 +50,7 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 # Altitude is specified as meters above the WGS-84 and converted to AMSL before sending
 # Yaw is specified in NED frame degrees 0-360 or +-180 
 #####################################################
-SETPOINT_LOCATION_GLOBAL = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
-SETPOINT_CORNERS_GLOBAL =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999],[47.65397990,-122.31912330, -999, -999]]
+SETPOINT_LOCATION_GLOBAL = [47.6541208,-122.3186620, 10, 250] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
 
 # Setpoint Position Local Body Settings
 ###################################################
@@ -107,13 +90,20 @@ FAKE_GPS_HOME_GEOPOINT_WGS84 = [47.6541271,-122.3189492,0.0] # [Lat, Long, Altit
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/"
+MAVROS_NAMESPACE = NEPI_BASE_NAMESPACE + "pixhawk_mavlink/"
 MAVROS_CONTROLS_NAMESPACE = MAVROS_NAMESPACE + "controls/"
 
 # Setpoint Action Topics
 SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
+# MAVROS Subscriber Topics
+MAVROS_STATE_TOPIC = MAVROS_NAMESPACE + "state"
 
+# MAVROS Required Services
+MAVROS_SET_HOME_SERVICE = MAVROS_NAMESPACE + "cmd/set_home"
+MAVROS_SET_MODE_SERVICE = MAVROS_NAMESPACE + "set_mode"
+MAVROS_ARMING_SERVICE = MAVROS_NAMESPACE + "cmd/arming"
+MAVROS_TAKEOFF_SERVICE = MAVROS_NAMESPACE + "cmd/takeoff"
 
 # NEPI MAVROS Control Publisher Topics
 MAVROS_CONTROL_ATTITUDE_TOPIC = MAVROS_CONTROLS_NAMESPACE + "setpoint_command_attitude"
@@ -121,16 +111,6 @@ MAVROS_CONTROL_POSITION_TOPIC = MAVROS_CONTROLS_NAMESPACE + "setpoint_command_po
 MAVROS_CONTROL_LOCATION_TOPIC = MAVROS_CONTROLS_NAMESPACE + "setpoint_command_location"
 # NEPI MAVROS Control Subscriber Topics
 MAVROS_CONTROL_PROCESS_COMPLETE_TOPIC = MAVROS_CONTROLS_NAMESPACE + "setpoint_complete_status"
-
-
-
-
-### Setup NEPI NavPose Settings Topic Namespaces
-NEPI_NAVPOSE_SET_GPS_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_gps_fix_topic"
-NEPI_NAVPOSE_SET_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_heading_topic"
-NEPI_NAVPOSE_SET_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
-NEPI_NAVPOSE_ENABLE_GPS_CLOCK_SYNC_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/enable_gps_clock_sync"
-
 
 # MAVROS Fake GPS Publish Topics
 MAVROS_FAKE_GPS_GOTO_GEOPOINT_TOPIC = MAVROS_NAMESPACE + "fake_gps/goto_geopoint_wgs84"
@@ -185,30 +165,12 @@ def initialize_actions():
     print("Waiting for setpoint complete status to publish")
     print(setpoint_complete_status)
     time.sleep(0.1)
-  ##############################
-  # Update Global Location source
-  set_gps_pub = rospy.Publisher(NEPI_NAVPOSE_SET_GPS_TOPIC, String, queue_size=1)
-  time.sleep(.1) # Wait between creating and using publisher
-  set_gps_pub.publish(MAVROS_SOURCE_GPS_TOPIC)
-  print("GPS Topic Set to: " + MAVROS_SOURCE_GPS_TOPIC)
-  ##############################
-  # Update Orientation source
-  set_orientation_pub = rospy.Publisher(NEPI_NAVPOSE_SET_ORIENTATION_TOPIC, String, queue_size=1)
-  time.sleep(.1) # Wait between creating and using publisher
-  set_orientation_pub.publish(MAVROS_SOURCE_ODOM_TOPIC)
-  print("Orientation Topic Set to: " + MAVROS_SOURCE_ODOM_TOPIC)
-  ##############################
-  # Update Heading source
-  set_heading_pub = rospy.Publisher(NEPI_NAVPOSE_SET_HEADING_TOPIC, String, queue_size=1)
-  time.sleep(.1) # Wait between creating and using publisher
-  set_heading_pub.publish(MAVROS_SOURCE_HEADING_TOPIC)
-  print("Heading Topic Set to: " + MAVROS_SOURCE_HEADING_TOPIC)
-  ##############################
-  # Sync NEPI clock to GPS timestamp
-  set_gps_timesync_pub = rospy.Publisher(NEPI_NAVPOSE_ENABLE_GPS_CLOCK_SYNC_TOPIC, Bool, queue_size=1)
-  time.sleep(.1) # Wait between creating and using publisher
-  set_gps_timesync_pub.publish(data=True)
-  print("GPS Clock Sync Topic Set ")
+  # Reset Fake GPS Start Location if Enabled
+  if MAVROS_FAKE_GPS_SIM_SUPPORT:
+    print("Calling Fake GPS reset to new geopoint")
+    print(FAKE_GPS_HOME_GEOPOINT_WGS84)
+    fake_gps_reset_geopoint(FAKE_GPS_HOME_GEOPOINT_WGS84)
+    current_home = FAKE_GPS_HOME_GEOPOINT_WGS84
   print("Completed Initialization")
 
 ## Function for custom post setpoint operations
@@ -258,6 +220,130 @@ def post_mission_actions():
   # Stop Your Custom Actions
   ###########################
   print("Post-Mission Actions Complete")
+  
+
+### Function to set mode
+def update_mode(mode_new):
+  global current_state
+  global mode_client
+  new_mode = SetModeRequest()
+  new_mode.custom_mode = mode_new
+  print("Updating mode")
+  print(mode_new)
+  mode_client = rospy.ServiceProxy(MAVROS_SET_MODE_SERVICE, SetMode)
+  while current_state.mode != mode_new and not rospy.is_shutdown():
+    time.sleep(.25)
+    mode_client.call(new_mode)
+    print("Waiting for mode to set")
+    print("Set Value: " + mode_new)
+    print("Cur Value: " + str(current_state.mode))
+
+
+### Function to set armed state
+def update_armed(armed_new):
+  global current_state
+  global arming_client
+  arm_cmd = CommandBoolRequest()
+  arm_cmd.value = armed_new
+  print("Updating armed")
+  print(armed_new)
+  arming_client = rospy.ServiceProxy(MAVROS_ARMING_SERVICE, CommandBool)
+  while current_state.armed != armed_new and not rospy.is_shutdown():
+    time.sleep(.25)
+    arming_client.call(arm_cmd)
+    print("Waiting for armed value to set")
+    print("Set Value: " + str(armed_new))
+    print("Cur Value: " + str(current_state.armed))
+
+### Function for sending set home current
+def sethome_current():
+  global current_home
+  print('Sending mavlink set home current command')
+  set_home_client = rospy.ServiceProxy(MAVROS_SET_HOME_SERVICE, CommandHome)
+  time.sleep(.1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it
+  set_home_client(current_gps=True)
+
+## Function for sending takeoff command
+def takeoff(takeoff_height_m):
+  print("Sending Takeoff Command to Altitude")
+  takeoff_client = rospy.ServiceProxy(MAVROS_TAKEOFF_SERVICE, CommandTOL)
+  time.sleep(.1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it
+  takeoff_client(min_pitch=10,altitude=takeoff_height_m)
+  if MAVROS_FAKE_GPS_SIM_SUPPORT:
+    print("Sending fake gps goto takeoff command")
+    takeoff_geopoint=[-999,-999,FAKE_GPS_HOME_GEOPOINT_WGS84[2]+takeoff_height_m]
+    fake_gps_goto_geopoint(takeoff_geopoint)
+  print("Waiting for takeoff process to complete")
+  time.sleep(15) # Wait for takeoff
+    
+### Function for switching to LAND mode
+def land():
+  global current_state
+  global mavros_fake_gps_land_pub
+  update_mode('LAND')
+  if MAVROS_FAKE_GPS_SIM_SUPPORT:
+    print("Sending fake gps goto takeoff command")
+    land_geopoint=[-999,-999,0]
+    fake_gps_goto_geopoint(land_geopoint)
+  print("Waiting for land process to complete")
+  while current_state.armed == True:
+    time.sleep(1)
+
+### Function for sending go home command
+def rtl():
+  global current_home
+  update_mode('RTL')
+  # Set Fake GPS Start Location and Reset
+  if current_home is not None:
+    if MAVROS_FAKE_GPS_SIM_SUPPORT:
+      print("Updatihg Fake GPS to New Home Location")
+      fake_gps_goto_geopoint(current_home)
+
+### Function for switching to LOITER mode
+def loiter():
+  update_mode('LOITER')
+
+### Function for switching back to current mission
+def continue_mission():
+  global original_state
+  mode_org = original_state.mode.upper()
+  update_mode(mode_org)
+
+### Callback to get current state
+def get_state_callback(state_msg):
+  global current_state
+  current_state = state_msg
+
+### Function for simulating Fake GPS movement to new geopoint
+def fake_gps_goto_geopoint(goto_geopoint_wgs84):
+  global current_location_wgs84_geo
+  # Send mavlink set home command and message
+  fake_gps_goto_geopoint_pub = rospy.Publisher(MAVROS_FAKE_GPS_GOTO_GEOPOINT_TOPIC, GeoPoint, queue_size=1)
+  time.sleep(.1)
+  print("Sending Fake GPS move command:")
+  print(goto_geopoint_wgs84)
+  geopoint_msg=GeoPoint()
+  geopoint_msg.latitude = goto_geopoint_wgs84[0]
+  geopoint_msg.longitude = goto_geopoint_wgs84[1]
+  geopoint_msg.altitude = goto_geopoint_wgs84[2]
+  fake_gps_goto_geopoint_pub.publish(geopoint_msg)
+  time.sleep(1)
+
+### Function for reseting Fake GPS and global x,y NED home position at new geopoint
+def fake_gps_reset_geopoint(reset_geopoint_wgs84):
+  global current_location_wgs84_geo
+  # Send mavlink set home command and message
+  fake_gps_reset_geopoint_pub = rospy.Publisher(MAVROS_FAKE_GPS_RESET_GEOPOINT_TOPIC, GeoPoint, queue_size=1)
+  time.sleep(.1)
+  print("Sending Fake GPS reset to geopoint command")
+  print(reset_geopoint_wgs84)
+  geopoint_msg=GeoPoint()
+  geopoint_msg.latitude = reset_geopoint_wgs84[0]
+  geopoint_msg.longitude = reset_geopoint_wgs84[1]
+  geopoint_msg.altitude = reset_geopoint_wgs84[2]
+  fake_gps_reset_geopoint_pub.publish(geopoint_msg)
+  print("Waiting for fake gps update to reset")
+  time.sleep(12)
   
 
 ### Callback to update setpoint process status value
@@ -349,7 +435,7 @@ def create_setpoint_message(setpoint):
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  print("Shutting down: Executing script cleanup actions")
+  time.sleep(.1)
 
   
 ### Script Entrypoint
@@ -380,15 +466,6 @@ def startNode():
   # Run Setpoint Actions
   print("Starting Setpoint Actions")
   setpoint_actions()
- #########################################
-  # Send Setpoint Location Loop Command
-  for ind in range(4):
-    # Send Setpoint Location Command
-    print("Starting Setpoint Location Corners Process")
-    setpoint_location_global(SETPOINT_CORNERS_GLOBAL[ind])
-    # Run Setpoint Actions
-    print("Starting Setpoint Actions")
-    setpoint_actions()
   #########################################
   # End Mission
   #########################################
@@ -397,8 +474,8 @@ def startNode():
   post_mission_actions()
   #########################################
   # Mission Complete, Shutting Down
-  print("Shutting Mission Restarting in 20 Seconds")
-  time.sleep(20)
+  print("Shutting Mission Down in 10 Seconds")
+  time.sleep(10)
   rospy.signal_shutdown("Mission Complete, Shutting Down")
   #########################################
   # Run cleanup actions on rospy shutdown

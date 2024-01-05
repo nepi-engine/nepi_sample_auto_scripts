@@ -44,12 +44,8 @@ from std_msgs.msg import UInt8, Empty, String, Bool
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
-###!!!!!!!! Set Image ROS Topic Name to Use  !!!!!!!!
-IMAGE_INPUT_TOPIC = "/nepi/s2x/nexigo_n60_fhd_webcam_audio/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/see3cam_cu81/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/sidus_ss400/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/onwote_hd_poe/idx/color_2d_image"
-#IMAGE_INPUT_TOPIC = "/nepi/s2x/zed2/zed_node/left/image_rect_color"
+## Set Image ROS Topic Name to Use
+IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
 
 ENHANCE_SENSITIVITY_RATIO = 0.5
 
@@ -72,8 +68,10 @@ def initialize_actions():
   print("")
   print("Starting Initialization")  
   # Wait for topic
-  print("Waiting for topic: " + IMAGE_INPUT_TOPIC)
-  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')
+  print("Waiting for topic: " + IMAGE_INPUT_TOPIC_NAME)
+  image_topic = wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
+  # Start image contours overlay process and pubslisher
+  rospy.Subscriber(image_topic, Image, image_enhance_callback, queue_size = 1)
   print("Initialization Complete")
 
 
@@ -142,39 +140,56 @@ def image_enhance_callback(img_msg):
   if not rospy.is_shutdown():
     enhanced_image_pub.publish(img_enhc_msg) # You can view the enhanced_2D_image topic at //192.168.179.103:9091/ in a connected web browser
 
-### Function to wait for topic to exist
-def wait_for_topic(topic_name,message_name):
-  topic_in_list = False
-  while topic_in_list is False and not rospy.is_shutdown():
-    topic_list=rospy.get_published_topics(namespace='/')
-    topic_to_connect=[topic_name, message_name]
-    if topic_to_connect not in topic_list:
-      time.sleep(.1)
-    else:
-      topic_in_list = True
+#######################
+# Initialization Functions
 
+### Function to find a topic
+def find_topic(topic_name):
+  topic = ""
+  topic_list=rospy.get_published_topics(namespace='/')
+  for topic_entry in topic_list:
+    if topic_entry[0].find(topic_name) != -1:
+      topic = topic_entry[0]
+  return topic
+
+### Function to check for a topic 
+def check_for_topic(topic_name):
+  topic_exists = True
+  topic=find_topic(topic_name)
+  if topic == "":
+    topic_exists = False
+  return topic_exists
+
+### Function to wait for a topic
+def wait_for_topic(topic_name):
+  topic = ""
+  while topic == "" and not rospy.is_shutdown():
+    topic=find_topic(topic_name)
+    time.sleep(.1)
+  return topic
+
+#######################
+# StartNode and Cleanup Functions
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global enhanced_image_pub
+  global contour_image_pub
   print("Shutting down: Executing script cleanup actions")
   # Unregister publishing topics
-  enhanced_image_pub.unregister()
+  custom_image_pub.unregister()
+
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting Image Enhance automation script", disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.loginfo("Starting OpenCV Image Contours Process Script", disable_signals=True) # Disable signals so we can force a shutdown
   rospy.init_node
-  rospy.init_node(name="image_enhance_auto_script")
+  rospy.init_node(name="opencv_image_your_custom_process_script")
   # Run Initialization processes
   initialize_actions()
-  # Start image enhance process and pubslisher
-  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, image_enhance_callback, queue_size = 1)
   #Set up cleanup on node shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever (until object is detected)
   rospy.spin()
-
 
 #####################################################################################
 # Main

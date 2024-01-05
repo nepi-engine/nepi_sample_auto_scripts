@@ -44,10 +44,10 @@ from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 ##########################################
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-IDX_NAMESPACE = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/"
+PTX_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/ptx/"
 
 # NavPose Source Topics
-NAVPOSE_SOURCE_ORIENTATION_TOPIC = IDX_NAMESPACE + "odom"
+NAVPOSE_SOURCE_ORIENTATION_TOPIC =PTX_NAMESPACE + "odom"
 
 ### Setup NEPI NavPose Settings Topic Namespaces
 NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
@@ -67,39 +67,51 @@ mavros_orientation_msg=None
 def initialize_actions():
   print("")
   print("Starting Initialization")
+  # Start timer callback that sends regular set navepose updates
+  print("Starting set navpose topics timer callback")
+  rospy.Timer(rospy.Duration(5.0), set_nepi_navpose_topics_callback)
   print("Initialization Complete")
-
 
 ### Callback to set NEPI navpose topics
 def set_nepi_navpose_topics_callback(timer):
   # Update Orientation source
   print("Waiting for topic: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
-  wait_for_topic(NAVPOSE_SOURCE_ORIENTATION_TOPIC, 'nav_msgs/Odometry')
+  wait_for_topic(NAVPOSE_SOURCE_ORIENTATION_TOPIC)
   set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
-  time.sleep(.1) # Wait between creating and using publisher
+  time.sleep(1) # Wait between creating and using publisher
   set_orientation_pub.publish(NAVPOSE_SOURCE_ORIENTATION_TOPIC)
   print("Orientation Topic Set to: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
 
-### Function to wait for topic to exist
-def check_for_topic(topic_name,message_name):
+#######################
+# Initialization Functions
+
+### Function to find a topic
+def find_topic(topic_name):
+  topic = ""
   topic_list=rospy.get_published_topics(namespace='/')
-  topic_to_connect=[topic_name, message_name]
-  topic_exists = False
-  if topic_to_connect in topic_list:
-    topic_exists = True
-  print(topic_exists)
+  for topic_entry in topic_list:
+    if topic_entry[0].find(topic_name) != -1:
+      topic = topic_entry[0]
+  return topic
+
+### Function to check for a topic 
+def check_for_topic(topic_name):
+  topic_exists = True
+  topic=find_topic(topic_name)
+  if topic == "":
+    topic_exists = False
   return topic_exists
 
-### Function to wait for topic to exist
-def wait_for_topic(topic_name,message_name):
-  topic_in_list = False
-  while topic_in_list is False and not rospy.is_shutdown():
-    topic_list=rospy.get_published_topics(namespace='/')
-    topic_to_connect=[topic_name, message_name]
-    if topic_to_connect not in topic_list:
-      time.sleep(.1)
-    else:
-      topic_in_list = True
+### Function to wait for a topic
+def wait_for_topic(topic_name):
+  topic = ""
+  while topic == "" and not rospy.is_shutdown():
+    topic=find_topic(topic_name)
+    time.sleep(.1)
+  return topic
+
+#######################
+# StartNode and Cleanup Functions
 
 
 ### Cleanup processes on node shutdown
@@ -108,14 +120,10 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
-  rospy.init_node("mavros_navpose_config_autos_script")
-  rospy.loginfo("Starting Mavros NavPose config automation script")
+  rospy.loginfo("Starting PanTilt PTX NavPose Config Script")
+  rospy.init_node("pantilt_ptx_navpose_config_script")
   # Run initialization processes
   initialize_actions()
-  # Start timer callback that sends regular set navepose updates
-  print("Starting set navpose topics timer callback")
-  rospy.Timer(rospy.Duration(5.0), set_nepi_navpose_topics_callback)
-  #########################################
   # Run cleanup actions on rospy shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever

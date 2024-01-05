@@ -24,44 +24,40 @@
 #
 #
 
+
 # Sample NEPI Automation Script. 
 # Uses onboard ROS python library to
-# 1. Checks if AI input image topic exists
-# 2. Try's to set reslution on camera 
-# 3. Loads selected AI model
-# 4. Starts AI detection process using input image stream
-# 5. Stops AI detection process on shutdown
+# 1. Add contrours and text overlay to image and republish to a new topic
+# 2. Run until Stopped
+
 
 import time
 import sys
-import rospy   
+import rospy
+import numpy as np
+import cv2
 
 from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 from std_msgs.msg import UInt8, Empty, String, Bool
-from nepi_ros_interfaces.msg import ClassifierSelection, StringArray
 
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
-#Set AI Detector Image ROS Topic Name
+## Set Image ROS Topic Name to Use
 IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
 
-#Set AI Detector Parameters
-DETECTION_MODEL = "common_object_detection"
-DETECTION_THRESHOLD = 0.5
-
-# NEPI ROS namespace setup
+# ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
-# AI Detector Publish Topics
-AI_START_TOPIC = NEPI_BASE_NAMESPACE + "start_classifier"
-AI_STOP_TOPIC = NEPI_BASE_NAMESPACE + "stop_classifier"
+IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "image_contours"
 
 #####################################################################################
 # Globals
 #####################################################################################
-stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
+contour_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
+
 #####################################################################################
 # Methods
 #####################################################################################
@@ -70,20 +66,49 @@ stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
 def initialize_actions():
   print("")
   print("Starting Initialization")  
-  # Wait for topic by name
-  print("Waiting for topic name: " + IMAGE_INPUT_TOPIC_NAME)
-  image_topic=wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
-  print("Found topic: " + image_topic)
-  # Classifier initialization, and wait for it to publish
-  start_classifier_pub = rospy.Publisher(AI_START_TOPIC, ClassifierSelection, queue_size=1)
-  classifier_selection = ClassifierSelection(img_topic=image_topic, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
-  time.sleep(1) # Important to sleep between publisher constructor and publish()
-  rospy.loginfo("Starting object detector: " + str(start_classifier_pub.name))
-  start_classifier_pub.publish(classifier_selection)
+  # Wait for topic
+  print("Waiting for topic: " + IMAGE_INPUT_TOPIC_NAME)
+  image_topic = wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
+  # Start image contours overlay process and pubslisher
+  rospy.Subscriber(image_topic, Image, image_contour_callback, queue_size = 1)
   print("Initialization Complete")
 
-#######################
-# Initialization Functions
+
+### callback to get image, apply contour, and publish new image on new topic
+def image_contour_callback(img_msg):
+  global contour_image_pub
+  #Convert image from ros to cv2
+  bridge = CvBridge()
+  cv_image = bridge.imgmsg_to_cv2(img_msg, "bgr8")
+  # Get contours
+  cv_image.setflags(write=1)
+  cv_image_gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+  ret, thresh2 = cv2.threshold(cv_image_gray, 150, 255, cv2.THRESH_BINARY)
+  contours3, hierarchy3 = cv2.findContours(thresh2, cv2.RETR_LIST, 
+                                       cv2.CHAIN_APPROX_NONE)
+  # Add contours as overlay
+  cv2.drawContours(cv_image, contours3, -1, (0, 255, 0), 2, 
+                 cv2.LINE_AA)
+  # Add text overlay
+  font                   = cv2.FONT_HERSHEY_SIMPLEX
+  bottomLeftCornerOfText = (10,10)
+  fontScale              = 0.5
+  fontColor              = (0, 255, 0)
+  thickness              = 1
+  lineType               = 1
+  cv2.putText(cv_image,'Image with Contours', 
+    bottomLeftCornerOfText, 
+    font, 
+    fontScale,
+    fontColor,
+    thickness,
+    lineType)
+  #Convert image from cv2 to ros
+  img_out_msg = bridge.cv2_to_imgmsg(cv_image,"bgr8")#desired_encoding='passthrough')
+  # Publish new image to ros
+  if not rospy.is_shutdown():
+    contour_image_pub.publish(img_out_msg) # You can view the enhanced_2D_image topic at //192.168.179.103:9091/ in a connected web browser
+
 
 #######################
 # Initialization Functions
@@ -116,25 +141,25 @@ def wait_for_topic(topic_name):
 #######################
 # StartNode and Cleanup Functions
 
-
 ### Cleanup processes on node shutdown
 def cleanup_actions():
-  global stop_classifier_pub
+  global contour_image_pub
   print("Shutting down: Executing script cleanup actions")
-  stop_classifier_pub.publish(Empty())
+  # Unregister publishing topics
+  custom_image_pub.unregister()
+
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting AI 2D Detector Config Script", disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name="ai_2d_detector_config_auto_script")
-  # Run initialization processes
+  rospy.loginfo("Starting OpenCV Image Contours Process Script", disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node
+  rospy.init_node(name="opencv_image_your_custom_process_script")
+  # Run Initialization processes
   initialize_actions()
-  # run cleanup actions on shutdown
+  #Set up cleanup on node shutdown
   rospy.on_shutdown(cleanup_actions)
-  # Spin forever
+  # Spin forever (until object is detected)
   rospy.spin()
-  
-  
 
 
 #####################################################################################

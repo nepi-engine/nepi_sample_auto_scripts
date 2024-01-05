@@ -25,10 +25,7 @@
 #
 
 
-# Sample NEPI Automation Script.
-# Uses onboard ROS python library to
-# 1. Subscribes to NEPI NEPI_PTX supported pantilt status message
-# 2. Creates an Orientation Publishers and Sets NEPI NavPose to connect to them
+#Concept PTX NavPose Driver Interface for IQR PanTilt
 
 ###################################################
 # NEPI NavPose Axis Info
@@ -39,7 +36,6 @@
 # pitch: RHR about y axis
 # yaw: RHR about z axis
 #####################################################
-
 
 import rospy
 import time
@@ -69,7 +65,8 @@ START_RPY_DEGS =  [0.0,0.0,0.0]# Roll, Pitch, Yaw in body frame degs
 
 ### ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-NEPI_PTX_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/ptx/"
+NEPI_PTX_NAME = "iqr_pan_tilt"
+NEPI_PTX_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_PTX_NAME + "/ptx/"
 
 ### PanTilt Subscribe Topics
 NEPI_PTX_GET_STATUS_TOPIC = NEPI_PTX_NAMESPACE + "status"
@@ -103,7 +100,8 @@ def initialize_actions():
   print("")
   print("Starting Initialization")
   # Start PT Status Callback
-  wait_for_topic(NEPI_PTX_GET_STATUS_TOPIC, 'nepi_ros_interfaces/PanTiltStatus')
+  print("Waiting for PTX Status Topic: " + NEPI_PTX_GET_STATUS_TOPIC)
+  wait_for_topic(NEPI_PTX_GET_STATUS_TOPIC)
   print("Starting Pan Tilt Stutus callback")
   rospy.Subscriber(NEPI_PTX_GET_STATUS_TOPIC, PanTiltStatus, pt_status_callback)  
   ##############################
@@ -112,6 +110,9 @@ def initialize_actions():
   rospy.Timer(rospy.Duration(navpose_update_interval_sec), ptx_navpose_odom_publish_callback)
   time.sleep(2) # Wait for publiser to start
   print("Initialization Complete")
+
+#######################
+# Driver NavPose Publishers Functions
 
 ### Setup a regular background navpose update timer callback
 def ptx_navpose_odom_publish_callback(timer):
@@ -142,6 +143,7 @@ def ptx_navpose_odom_publish_callback(timer):
   if not rospy.is_shutdown():
     navpose_pt_orientation_pub.publish(new_odometry)
 
+
 ### Simple callback to get pt status info
 def pt_status_callback(PanTiltStatus):
   global current_rpy_pt_degs
@@ -154,6 +156,8 @@ def pt_status_callback(PanTiltStatus):
     pt_pitch_now_deg = -pt_pitch_now_deg
   current_rpy_pt_degs=[START_RPY_DEGS[0],pt_pitch_now_deg,pt_yaw_now_deg]
 
+#######################
+# Process Functions
 
 ### Function to Convert Roll, Pitch, Yaw Degrees to Quaternion Attitude
 def convert_rpy2quat(rpy_attitude_deg):
@@ -164,17 +168,36 @@ def convert_rpy2quat(rpy_attitude_deg):
   xyzw_attitude = tf.transformations.quaternion_from_euler(pitch_rad, yaw_rad, roll_rad, axes="ryzx")
   return xyzw_attitude
 
+#######################
+# Initialization Functions
 
-### Function to wait for topic to exist
-def wait_for_topic(topic_name,message_name):
-  topic_in_list = False
-  while topic_in_list is False and not rospy.is_shutdown():
-    topic_list=rospy.get_published_topics(namespace='/')
-    topic_to_connect=[topic_name, message_name]
-    if topic_to_connect not in topic_list:
-      time.sleep(.1)
-    else:
-      topic_in_list = True
+### Function to find a topic
+def find_topic(topic_name):
+  topic = ""
+  topic_list=rospy.get_published_topics(namespace='/')
+  for topic_entry in topic_list:
+    if topic_entry[0].find(topic_name) != -1:
+      topic = topic_entry[0]
+  return topic
+
+### Function to check for a topic 
+def check_for_topic(topic_name):
+  topic_exists = True
+  topic=find_topic(topic_name)
+  if topic == "":
+    topic_exists = False
+  return topic_exists
+
+### Function to wait for a topic
+def wait_for_topic(topic_name):
+  topic = ""
+  while topic == "" and not rospy.is_shutdown():
+    topic=find_topic(topic_name)
+    time.sleep(.1)
+  return topic
+
+#######################
+# StartNode and Cleanup Functions
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
@@ -182,7 +205,7 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting Pantilt PTX NavPose Orienation Driver Script")
+  rospy.loginfo("Starting Pantilt PTX NavPose Driver Script")
   rospy.init_node("pantilt_ptx_navpose_driver_script")
   # Run initialization processes
   initialize_actions()

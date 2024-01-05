@@ -66,13 +66,11 @@ TARGET_MIN_VALUES=10 # Sets the minimum number of valid points to consider for a
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
-###!!!!!!!! Set data input stream topics and parameters !!!!!!!!
-IMAGE_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/color_2d_image"
+#Set 3D Imaging Sensor Info
+IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
+DEPTH_MAP_INPUT_TOPIC_NAME = "depth_map"
 FOV_VERT_DEG=70 # Camera Vertical Field of View (FOV)
 FOV_HORZ_DEG=110 # Camera Horizontal Field of View (FOV)
-
-DEPTH_DATA_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/depth_map"
-DEPTH_IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/depth_image"
 
 ###!!!!!!!! Set data output stream topics and parameters !!!!!!!!
 TARGET_DATA_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "targeting/targeting_data"
@@ -99,17 +97,27 @@ detect_boxes=None
 ### System Initialization processes
 def initialize_actions():
   print("Starting Initialization")
-  # Wait for topic
-  print("Waiting for topic: " + IMAGE_INPUT_TOPIC)
-  wait_for_topic(IMAGE_INPUT_TOPIC, 'sensor_msgs/Image')  
-  # Wait for topic
-  print("Waiting for topic: " + DEPTH_DATA_INPUT_TOPIC)
-  wait_for_topic(DEPTH_DATA_INPUT_TOPIC, 'sensor_msgs/Image')
+  # Wait for topic by name
+  print("Waiting for topic name: " + IMAGE_INPUT_TOPIC_NAME)
+  image_topic=wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
+  print("Found topic: " + image_topic)
+  rospy.Subscriber(image_topic, Image, object_targeting_callback, queue_size = 1)
+  print("Initialization Complete")
+  # Wait for topic by name
+  print("Waiting for topic name: " + DEPTH_MAP_INPUT_TOPIC_NAME)
+  depth_map_topic=wait_for_topic(DEPTH_MAP_INPUT_TOPIC_NAME)
+  print("Found topic: " + depth_map_topic)
+  rospy.Subscriber(depth_map_topic, numpy_msg(Image), get_depth_data_callback, queue_size = 1)
+  print("Starting targeteting subscriber")
   # Wait for topic
   print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-  wait_for_topic(AI_DETECTION_IMAGE_TOPIC, 'sensor_msgs/Image')
-  print("Initialization Complete")
-
+  wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
+  # Start Subscriber Topics
+  print("Starting found object subscriber")
+  rospy.Subscriber(FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback, queue_size = 1)
+  print("Starting object detection subscriber")
+  rospy.Subscriber(BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
+  print("Starting convert depthmap subscriber")
 
 ### Monitor Output of AI model to clear detection status
 def found_object_callback(found_obj_msg):
@@ -241,17 +249,36 @@ def object_targeting_callback(img_msg):
   if not rospy.is_shutdown():
     target_overlay_pub.publish(img_out_msg)
   
+#######################
+# Initialization Functions
 
-### Function to wait for topic to exist
-def wait_for_topic(topic_name,message_name):
-  topic_in_list = False
-  while topic_in_list is False and not rospy.is_shutdown():
-    topic_list=rospy.get_published_topics(namespace='/')
-    topic_to_connect=[topic_name, message_name]
-    if topic_to_connect not in topic_list:
-      time.sleep(.1)
-    else:
-      topic_in_list = True
+### Function to find a topic
+def find_topic(topic_name):
+  topic = ""
+  topic_list=rospy.get_published_topics(namespace='/')
+  for topic_entry in topic_list:
+    if topic_entry[0].find(topic_name) != -1:
+      topic = topic_entry[0]
+  return topic
+
+### Function to check for a topic 
+def wait_for_topic(topic_name):
+  topic_exists = True
+  topic=find_topic(topic_name)
+  if topic == "":
+    topic_exists = False
+  return topic_exists
+
+### Function to wait for a topic
+def wait_for_topic(topic_name):
+  topic = ""
+  while topic == "" and not rospy.is_shutdown():
+    topic=find_topic(topic_name)
+    time.sleep(.1)
+  return topic
+
+#######################
+# StartNode and Cleanup Functions
 
 ### Cleanup processes on node shutdown
 def cleanup_actions():
@@ -265,19 +292,11 @@ def cleanup_actions():
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting Image Depthmap to Image script", disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.loginfo("Starting AI 3D Targeting Process Script", disable_signals=True) # Disable signals so we can force a shutdown
   rospy.init_node
-  rospy.init_node(name="zed_targeting_auto_script")
+  rospy.init_node(name="ai_3d_targeting_process_script")
   #initialize system including pan scan process
   initialize_actions()
-  print("Starting found object subscriber")
-  rospy.Subscriber(FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback, queue_size = 1)
-  print("Starting object detection subscriber")
-  rospy.Subscriber(BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
-  print("Starting convert depthmap subscriber")
-  rospy.Subscriber(DEPTH_DATA_INPUT_TOPIC, numpy_msg(Image), get_depth_data_callback, queue_size = 1)
-  print("Starting targeteting subscriber")
-  rospy.Subscriber(IMAGE_INPUT_TOPIC, Image, object_targeting_callback, queue_size = 1)
   # run cleanup actions on shutdown
   rospy.on_shutdown(cleanup_actions)
   # Spin forever
