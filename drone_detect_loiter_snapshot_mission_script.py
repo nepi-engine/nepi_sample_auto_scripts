@@ -24,21 +24,20 @@
 #
 #
 
-
 # Sample NEPI Automation Script.
 # Uses onboard ROS python and mavros libraries to
-# 1) Subscribes to NEPI nav_pose_current heading, orientation, position, location topics
-# 2) Runs pre-mission processes
-# 3) Runs mission goto command processes
-# 4) Runs mission goto action processes
-# 5) Runs post-mission processes
+### Expects Classifier to be running ###
+# 1) Monitors AI detector output for specfic target class 
+# 3) Changes system to Loiter mode on detection
+# 4) Sends NEPI snapshot event trigger
+# 5) Waits to achieve waits set time to complete snapshot events
+# 6) Sets system back to original mode
+# 6) Delays, then waits for next detection
 
 # Requires the following additional scripts are running
 # a) ardupilot_rbx_driver_script.py
-# (Optional) Some Snapshot Action Automation Script like the following
-#   b)snapshot_event_save_to_disk_action_script.py
-#   c)snapshot_event_send_to_cloud_action_script.py
-# d) (Optional) ardupilot_rbx_fake_gps_process_script.py if a real GPS fix is not available
+# b) ai_detector_config_script.py
+# c) (Optional) ardupilot_rbx_fake_gps_process_script.py if a real GPS fix is not available
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
@@ -50,56 +49,28 @@ import tf
 
 from std_msgs.msg import Empty, Int8, UInt8, Bool, String, Float32, Float64, Float64MultiArray
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatFix, Image
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
 from geographic_msgs.msg import GeoPoint, GeoPose, GeoPoseStamped
 from mavros_msgs.msg import State, AttitudeTarget
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandTOL, CommandHome
+from nepi_ros_interfaces.msg import TargetLocalization
+from darknet_ros_msgs.msg import BoundingBoxes
 
 #####################################################################################
 # SETUP - Edit as Necessary ##################################
 ##########################################
 
+###!!!!!!!! Set Automation action parameters !!!!!!!!
+OBJ_LABEL_OF_INTEREST = "person"
+OBJ_CENTERED_BUFFER_RATIO = 0.5 # acceptable band about center of image for saving purposes
+RESET_DELAY_S = 5 # Min delay between triggers
 
-# goto Position Global Settings
-###################################################
-# goto_location is [LAT, LONG, ALT_WGS84, YAW_NED_DEGREES]
-# Altitude is specified as meters above the WGS-84 and converted to AMSL before sending
-# Yaw is specified in NED frame degrees 0-360 or +-180 
-#####################################################
-GOTO_LOCATION = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
-GOTO_LOCATION_CORNERS =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999],[47.65397990,-122.31912330, -999, -999]]
-
-# goto Position Local Body Settings
-###################################################
-# goto_position is [X_BODY_METERS, Y_BODY_METERS, Z_BODY_METERS, YEW_BODY_DEGREES]
-# Local Body Position goto Function use these body relative x,y,z,yaw conventions
-# x+ axis is forward
-# y+ axis is right
-# z+ axis is down
-# Only yaw orientation updated
-# yaw+ clockwise, yaw- counter clockwise from x axis (0 degrees faces x+ and rotates positive using right hand rule around z+ axis down)
-#####################################################
-GOTO_POSITION = [10,5,0,0] # [X, Y, Z, YAW] Offset in xyz meters yaw body +- 180 (+Z is Down). Use 0 value for no change
-
-# goto Attitude NED Settings
-###################################################
-# goto_attitudeInp is [ROLL_NED_DEG, PITCH_NED_DEG, YEW_NED_DEGREES]
-###################################################
-GOTO_POSE = [-999,30,-999] # Roll, Pitch, Yaw Degrees: Enter -999 to use current value
-
-
-###################################################
-# RBX State and Mode Dictionaries
-RBX_STATES = ["DISARM","ARM"]
-RBX_MODES = ["STABILIZE","LAND","RTL","LOITER","GUIDED","RESUME"]
-RBX_ACTIONS = ["TAKEOFF"] 
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
-
 
 ###################################################
 # RBX State and Mode Dictionaries
@@ -169,7 +140,12 @@ rbx_status_goto_errors = None
 rbx_status_cmd_success = None
 
 snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
+img_width = 0 # Updated on receipt of first image
+img_height = 0 # Updated on receipt of first image
 
+
+reset_delay_timer = 10000
+last_reset_time = time.time()
                
 #####################################################################################
 # Methods
@@ -266,7 +242,83 @@ def initialize_actions():
   while rbx_status_cmd_success is None and not rospy.is_shutdown():
     print("Waiting for cmd success status to publish")
     time.sleep(0.1)
+  ##########################################
+  ### Subscribe to AI topics
+  # Wait for topic
+  print("Connecting to NEPI Detector Image Topic")
+  print(AI_DETECTION_IMAGE_TOPIC )
+  print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
+  wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
+  img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)
+  while img_width == 0 and img_height == 0:
+    print("Waiting for Classifier Detection Image")
+    time.sleep(1)
+  img_sub.unregister() # Don't need it anymore
+  # Set up object detector subscriber
+  print("Starting object detection subscriber: Object of interest = " + OBJ_LABEL_OF_INTEREST + "...")
+  rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
+
   print("Initialization Complete")
+
+  ### Simple callback to get image height and width
+def image_callback(img_msg):
+  # This is just to get the image size for ratio purposes
+  global img_height
+  global img_width
+  if (img_height == 0 and img_width == 0):
+    print("Initial input image received. Size = " + str(img_msg.width) + "x" + str(img_msg.height))
+    img_height = img_msg.height
+    img_width = img_msg.width
+
+# Action upon detection of object of interest
+def object_detected_callback(bounding_box_msg):
+  global img_height
+  global img_width
+  global reset_delay_timer
+  global last_reset_time
+  global snapshot_trigger_pub
+  # Iterate over all of the objects reported by the detector
+  if reset_delay_timer > RESET_DELAY_S:
+    for box in bounding_box_msg.bounding_boxes:
+      print("Target type " + box.Class + " detected")
+      # Check for the object of interest and take appropriate actions
+      if box.Class == OBJ_LABEL_OF_INTEREST:
+        box_of_interest=box
+        print(box_of_interest.Class)
+        # Calculate the box center in image ratio terms
+        object_loc_y_pix = box_of_interest.ymin + ((box_of_interest.ymax - box_of_interest.ymin)  / 2) 
+        object_loc_x_pix = box_of_interest.xmin + ((box_of_interest.xmax - box_of_interest.xmin)  / 2)
+        object_loc_y_ratio = float(object_loc_y_pix) / img_height
+        object_loc_x_ratio = float(object_loc_x_pix) / img_width
+        print("Object Detected " + OBJ_LABEL_OF_INTEREST + " with box center (" + str(object_loc_x_ratio) + ", " + str(object_loc_y_ratio) + ")")
+        # check if we are AIose enough to center in either dimension to stop motion: Hysteresis band
+        box_abs_error_x_ratio = 2.0 * abs(object_loc_x_ratio - 0.5)
+        box_abs_error_y_ratio = 2.0 * abs(object_loc_y_ratio - 0.5)
+        print("Object Detection Error Ratios Horz: " "%.2f" % (box_abs_error_x_ratio) + " Vert: " + "%.2f" % (box_abs_error_y_ratio))
+        if (box_abs_error_y_ratio <= OBJ_CENTERED_BUFFER_RATIO ) and \
+           (box_abs_error_x_ratio <= OBJ_CENTERED_BUFFER_RATIO ):
+          print("Detected a " + OBJ_LABEL_OF_INTEREST + " close to image center")
+          ##########################################
+          # Switch to Loiter Mode and Send Snapshot Event Trigger
+          print("Switching to Loiter mode")
+          set_rbx_mode("LOITER") # Change mode to Loiter
+          #########################################
+          # Run Mission Actions
+          print("Starting Mission Actions")
+          success = mission_actions()
+          #########################################
+          print("Switching back to original mode")
+          set_rbx_mode("RESUME")
+          #########################################
+          print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
+          reset_delay_timer = 0
+          last_reset_time = time.time()
+      else:
+        print("Target not type " + OBJ_LABEL_OF_INTEREST)
+  else:
+    reset_delay_timer = time.time() - last_reset_time
+
+
 
 ## Function for custom pre-mission actions
 def pre_mission_actions():
@@ -274,12 +326,12 @@ def pre_mission_actions():
   # Start Your Custom Actions
   ###########################
   success = True
-  # Set Mode to Guided
-  success = set_rbx_mode("GUIDED")
-  # Arm System
-  success = set_rbx_state("ARM")
-  # Send Takeoff Command
-  success=go_rbx_action("TAKEOFF")
+##  # Set Mode to Guided
+##  success = set_rbx_mode("GUIDED")
+##  # Arm System
+##  success = set_rbx_state("ARM")
+##  # Send Takeoff Command
+##  success=go_rbx_action("TAKEOFF")
   ###########################
   # Stop Your Custom Actions
   ###########################
@@ -293,8 +345,8 @@ def mission_actions():
   ###########################
   ## Change Vehicle Mode to Guided
   success = True
-##  print("Sending snapshot event trigger")
-##  snapshot()
+  print("Sending snapshot event trigger")
+  snapshot()
   ###########################
   # Stop Your Custom Actions
   ###########################
@@ -307,11 +359,11 @@ def post_mission_actions():
   # Start Your Custom Actions
   ###########################
   success = True
-  #success = set_rbx_mode("LAND") # Uncomment to change to Land mode
-  #success = set_rbx_mode("LOITER") # Uncomment to change to Loiter mode
-  success = set_rbx_mode("RTL") # Uncomment to change to home mode
-  #success = set_rbx_mode("RESUME") # Uncomment to return to last mode
-  time.sleep(1)
+##  #success = set_rbx_mode("LAND") # Uncomment to change to Land mode
+##  #success = set_rbx_mode("LOITER") # Uncomment to change to Loiter mode
+##  success = set_rbx_mode("RTL") # Uncomment to change to home mode
+##  #success = set_rbx_mode("RESUME") # Uncomment to return to last mode
+##  time.sleep(1)
   ###########################
   # Stop Your Custom Actions
   ###########################
@@ -585,57 +637,32 @@ def wait_for_topic(topic_name):
 #######################
 # StartNode and Cleanup Functions
 
+
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
+  print("Starting Post-Mission Actions")
+  success = post_mission_actions()
 
   
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting Drone Waypoint Inspection Mission Script")
-  rospy.init_node("drone_waypoint_inspection_mission_script")
+  rospy.loginfo("Starting Drone Follow Object action Script")
+  rospy.init_node("drone_follow_object_action_script")
   #initialize system including pan scan process
   initialize_actions()
   #########################################
   # Run Pre-Mission Custom Actions
-  print("Starting Pre-goto Actions")
+  print("Starting Pre-Mission Actions")
   success = pre_mission_actions()
   #########################################
-  # Start Mission
+  # Set up object detector subscriber
+  print("Starting object detection subscriber: Object of interest = " + OBJ_LABEL_OF_INTEREST + "...")
+  print("Waiting for " + OBJ_LABEL_OF_INTEREST + " detection")
+  rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
   #########################################
-  # Send goto Location Command
-  print("Starting goto Location Global Process")
-  success = goto_rbx_location(GOTO_LOCATION)
-  ##########################################
-  # Send goto Position Command
-  print("Starting goto Position Local Process")
-  success = goto_rbx_position(GOTO_POSITION)
-  #########################################
-  # Send goto Attitude Command
-  print("Sending goto Attitude Control Message")
-  success = goto_rbx_pose(GOTO_POSE)
-  #########################################
-  # Run Mission Actions
-  print("Starting Mission Actions")
-  success = mission_actions()
- #########################################
-  # Send goto Location Loop Command
-  for ind in range(4):
-    # Send goto Location Command
-    print("Starting goto Location Corners Process")
-    success = goto_rbx_location(GOTO_LOCATION_CORNERS[ind])
-    # Run Mission Actions
-    print("Starting Mission Actions")
-    success = mission_actions()
-  #########################################
-  # End Mission
-  #########################################
-  # Run Post-Mission Actions
-  print("Starting Post-Goto Actions")
-  success = post_mission_actions()
-  #########################################
-  # Mission Complete, Shutting Down
-  rospy.signal_shutdown("Mission Complete, Shutting Down")
+  # run cleanup actions on shutdown
+  rospy.on_shutdown(cleanup_actions)
   #########################################
   # Run cleanup actions on rospy shutdown
   rospy.on_shutdown(cleanup_actions)

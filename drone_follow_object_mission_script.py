@@ -30,7 +30,7 @@
 # 1) Connects to Target Range and Bearing data Topic
 # 2) Monitors AI detector output for specfic target class 
 # 3) Changes system to Guided mode
-# 4) Sends Setpoint position command based on target range and bearing
+# 4) Sends GoTo Position command based on target range and bearing
 # 5) Waits to achieve setpoint
 # 6) Sets system back to original mode
 # 6) Delays, then waits for next detection
@@ -86,19 +86,23 @@ NEPI_RBX_CAPABILITIES_STATES_TOPIC = NEPI_RBX_NAMESPACE + "state_options"
 NEPI_RBX_CAPABILITIES_MODES_TOPIC = NEPI_RBX_NAMESPACE + "mode_options"
 NEPI_RBX_CAPABILITIES_ACTIONS_TOPIC = NEPI_RBX_NAMESPACE + "actions_options"
 
-# NEPI MAVLINK RBX Driver Status Publish Topics
+# NEPI MAVLINK RBX Driver Status Publish Topic
 NEPI_RBX_STATUS_STATE_TOPIC = NEPI_RBX_NAMESPACE + "state"  # Int to Defined Dictionary RBX_STATES
 NEPI_RBX_STATUS_MODE_TOPIC = NEPI_RBX_NAMESPACE + "mode" # Int to Defined Dictionary RBX_MODES
 NEPI_RBX_STATUS_READY_TOPIC = NEPI_RBX_NAMESPACE + "ready" # Bool, True if goto is complete or no active goto process
 NEPI_RBX_STATUS_GOTO_ERRORS_TOPIC = NEPI_RBX_NAMESPACE + "goto_errors" # Floats [X_Meters,Y_Meters,Z_Meters,Heading_Degrees,Roll_Degrees,Pitch_Degrees,Yaw_Degrees]
 NEPI_RBX_STATUS_CMD_SUCCESS_TOPIC = NEPI_RBX_NAMESPACE + "cmd_success" # Bool - Any command that changes ready state
+
 # NEPI MAVLINK RBX Driver Settings Subscriber Topics
+NEPI_RBX_SET_TIMEOUT_SEC = 5
 NEPI_RBX_SET_STATE_TOPIC = NEPI_RBX_NAMESPACE + "set_state" # Int to Defined Dictionary RBX_STATES
 NEPI_RBX_SET_MODE_TOPIC = NEPI_RBX_NAMESPACE + "set_mode"  # Int to Defined Dictionary RBX_MODES
 NEPI_RBX_SET_HOME_CURRENT_TOPIC = NEPI_RBX_NAMESPACE + "set_home_current" # Emplty
 
 # NEPI MAVLINK RBX Driver Control Subscriber Topics
-NEPI_RBX_SET_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "set_action"  # Int to Defined Dictionary RBX_MODES
+NEPI_RBX_GO_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "go_action"  # Int to Defined Dictionary RBX_ACTIONS
+NEPI_RBX_GO_HOME_TOPIC = NEPI_RBX_NAMESPACE + "go_home" # Aborts any active goto processes
+NEPI_RBX_GO_STOP_TOPIC = NEPI_RBX_NAMESPACE + "go_stop" # Aborts any active goto processes
 NEPI_RBX_GOTO_POSE_TOPIC = NEPI_RBX_NAMESPACE + "goto_pose" # Ignored if any active goto processes
 NEPI_RBX_GOTO_POSITION_TOPIC = NEPI_RBX_NAMESPACE + "goto_position" # Ignored if any active goto processes
 NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location" # Ignored if any active goto processes
@@ -106,13 +110,19 @@ NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location" # Ignored if
 # AI 3D Targeting Subscriber Topic
 TARGET_DATA_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "targeting/targeting_data"
 
+# Mission Action Topics
+SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
+
 #####################################################################################
 # Globals
 #####################################################################################
 rbx_set_state_pub = rospy.Publisher(NEPI_RBX_SET_STATE_TOPIC, UInt8, queue_size=1)
 rbx_set_mode_pub = rospy.Publisher(NEPI_RBX_SET_MODE_TOPIC, UInt8, queue_size=1)
-rbx_set_action_pub = rospy.Publisher(NEPI_RBX_SET_ACTION_TOPIC, UInt8, queue_size=1)
+rbx_set_home_current_pub = rospy.Publisher(NEPI_RBX_SET_HOME_CURRENT_TOPIC, Empty, queue_size=1)
 
+rbx_go_action_pub = rospy.Publisher(NEPI_RBX_GO_ACTION_TOPIC, UInt8, queue_size=1)
+rbx_go_home_pub = rospy.Publisher(NEPI_RBX_GO_HOME_TOPIC, Empty, queue_size=1)
+rbx_go_stop_pub = rospy.Publisher(NEPI_RBX_GO_STOP_TOPIC, Empty, queue_size=1)
 rbx_goto_pose_pub = rospy.Publisher(NEPI_RBX_GOTO_POSE_TOPIC, Float64MultiArray, queue_size=1)
 rbx_goto_position_pub = rospy.Publisher(NEPI_RBX_GOTO_POSITION_TOPIC, Float64MultiArray, queue_size=1)
 rbx_goto_location_pub = rospy.Publisher(NEPI_RBX_GOTO_LOCATION_TOPIC, Float64MultiArray, queue_size=1)
@@ -128,6 +138,7 @@ rbx_status_ready = None
 rbx_status_goto_errors = None
 rbx_status_cmd_success = None
 
+snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
                
 #####################################################################################
 # Methods
@@ -143,6 +154,9 @@ def initialize_actions():
   global rbx_status_mode
   global rbx_status_ready
   global rbx_status_cmd_success
+  global img_height
+  global img_width
+  ##########################################
   ### Capabilities Subscribers
   # Wait for topic
   print("Waiting for topic: " + NEPI_RBX_CAPABILITIES_NAVPOSE_TOPIC)
@@ -180,6 +194,7 @@ def initialize_actions():
     print("Waiting for capabilities actions to publish")
     time.sleep(0.1)
   print(rbx_cap_actions)
+  ##########################################
   ### Status Subscribers
   # Wait for topic
   print("Waiting for topic: " + NEPI_RBX_STATUS_STATE_TOPIC)
@@ -195,8 +210,8 @@ def initialize_actions():
   wait_for_topic(NEPI_RBX_STATUS_MODE_TOPIC)
   print("Starting mode scubscriber callback")
   rospy.Subscriber(NEPI_RBX_STATUS_MODE_TOPIC, Int8, rbx_mode_callback)
-  while rbx_status_state is None and not rospy.is_shutdown():
-    print("Waiting for current state to publish")
+  while rbx_status_mode is None and not rospy.is_shutdown():
+    print("Waiting for current mode to publish")
     time.sleep(0.1)
   print(rbx_status_mode)
   # Wait for goto controls status to publish
@@ -244,10 +259,10 @@ def move_to_object_callback(target_data_msg):
     sp_yaw_d = target_yaw_d
     setpoint_position_body_m = [sp_x_m,sp_y_m,sp_z_m,sp_yaw_d]
     ##########################################
-    # Switch to Guided Mode and Send Setpoint Command
+    # Switch to Guided Mode and Send GoTo Position Command
     print("Switching to Guided mode")
     set_rbx_mode("GUIDED") # Change mode to Guided
-    # Send setpoint command and wait for completion
+    # Send goto command and wait for completion
     print("Sending setpoint position body command")
     print(setpoint_position_body_m)
     success = goto_rbx_position(setpoint_position_body_m)
@@ -272,16 +287,12 @@ def pre_mission_actions():
   # Start Your Custom Actions
   ###########################
   success = True
-  # Set Mode to Guided
-  set_rbx_mode("GUIDED")
-  # Arm System
-  set_rbx_state("ARM")
-  # Send Takeoff Command
-  success=set_rbx_action("TAKEOFF")
-  if success:
-    print("Takeoff Successful")
-  else:
-    print("Takeoff Failed")
+##  # Set Mode to Guided
+##  success = set_rbx_mode("GUIDED")
+##  # Arm System
+##  success = set_rbx_state("ARM")
+##  # Send Takeoff Command
+##  success=go_rbx_action("TAKEOFF")
   ###########################
   # Stop Your Custom Actions
   ###########################
@@ -295,8 +306,8 @@ def mission_actions():
   ###########################
   ## Change Vehicle Mode to Guided
   success = True
-  #print("Sending snapshot event trigger")
-  #snapshot(5)
+##  print("Sending snapshot event trigger")
+##  snapshot()
   ###########################
   # Stop Your Custom Actions
   ###########################
@@ -309,11 +320,11 @@ def post_mission_actions():
   # Start Your Custom Actions
   ###########################
   success = True
-  #land() # Uncomment to change to Land mode
-  #loiter() # Uncomment to change to Loiter mode
-  set_rbx_mode("RTL") # Uncomment to change to Home mode
-  #continue_mission() # Uncomment to return to pre goto state
-  time.sleep(1)
+##  #success = set_rbx_mode("LAND") # Uncomment to change to Land mode
+##  #success = set_rbx_mode("LOITER") # Uncomment to change to Loiter mode
+##  success = set_rbx_mode("RTL") # Uncomment to change to home mode
+##  #success = set_rbx_mode("RESUME") # Uncomment to return to last mode
+##  time.sleep(1)
   ###########################
   # Stop Your Custom Actions
   ###########################
@@ -353,7 +364,7 @@ def rbx_state_callback(state_msg):
 ### Callback to update rbx current mode value
 def rbx_mode_callback(mode_msg):
   global rbx_status_mode
-  rbx_status_state = mode_msg.data
+  rbx_status_mode = mode_msg.data
 
 ### Callback to update rbx ready status value
 def rbx_status_ready_callback(ready_msg):
@@ -375,60 +386,105 @@ def rbx_status_cmd_success_callback(cmd_success_msg):
 
 ### Function to set rbx state
 def set_rbx_state(state_str):
+  global rbx_status_state
   global rbx_set_state_pub
-  print("Setting state")
-  print(state_str)
-  state_ind = -1
+  print("*******************************")  
+  print("Set State Request Recieved: " + state_str)
+  success = False
+  new_state_ind = -1
   for ind, state in enumerate(rbx_cap_states):
     if state == state_str:
-      state_ind = ind
-  if state_ind == -1:
+      new_state_ind = ind
+  if new_state_ind == -1:
     print("No matching state found")
   else:
-    print(state_ind)
-    rbx_set_state_pub.publish(state_ind)
-    wait_for_rbx_status_busy()
-    wait_for_rbx_status_ready()
-    time.sleep(1)
-
-### Function to set rbx state
+    print("Setting state to: " + state_str)
+    rbx_set_state_pub.publish(new_state_ind)
+    timeout_timer = 0
+    sleep_time_sec = 1
+    while rbx_status_state != new_state_ind and timeout_timer < NEPI_RBX_SET_TIMEOUT_SEC and not rospy.is_shutdown():
+      print("Waiting for rbx state " + RBX_STATES[new_state_ind] + " to set")
+      print("Current rbx state is " + RBX_STATES[rbx_status_state])
+      time.sleep(sleep_time_sec)
+      timeout_timer = timeout_timer + sleep_time_sec
+    if rbx_status_state == new_state_ind:
+      success = True
+  print("Current rbx state is " + RBX_STATES[rbx_status_state])
+  return success
+  
+### Function to set rbx mode
 def set_rbx_mode(mode_str):
-  print("Setting mode")
+  global rbx_status_mode
   global rbx_set_mode_pub
-  mode_ind = -1
+  print("*******************************")  
+  print("Set Mode Request Recieved: " + mode_str)
+  success = False
+  new_mode_ind = -1
   for ind, mode in enumerate(rbx_cap_modes):
     if mode == mode_str:
-      mode_ind = ind
-  if mode_ind == -1:
+      new_mode_ind = ind
+  if new_mode_ind == -1:
     print("No matching mode found")
   else:
-    print(mode_ind)
-    rbx_set_mode_pub.publish(mode_ind)
-    wait_for_rbx_status_busy()
-    wait_for_rbx_status_ready()
-  time.sleep(1)
-    
+    print("Setting mode to: " + mode_str)
+    rbx_set_mode_pub.publish(new_mode_ind)
+    timeout_timer = 0
+    sleep_time_sec = 1
+    while rbx_status_mode != new_mode_ind and timeout_timer < NEPI_RBX_SET_TIMEOUT_SEC and not rospy.is_shutdown():
+      print("Waiting for rbx mode " + RBX_MODES[new_mode_ind] + " to set")
+      print("Current rbx mode is " + RBX_MODES[rbx_status_mode])
+      time.sleep(sleep_time_sec)
+      timeout_timer = timeout_timer + sleep_time_sec
+    if rbx_status_mode == new_mode_ind:
+      success = True
+  print("Current rbx mode is " + RBX_MODES[rbx_status_mode])
+  return success
 
+### Function to set home current
+def set_rbx_set_home_current():
+  global rbx_set_home_current_pub
+  print("*******************************")  
+  print("Set Home Current Request Recieved: ")
+  success = False
+  rbx_set_home_current_pub.publish(Empty())
+  success = True
+  return success
 
 #######################
 # RBX Control Functions
 
-### Function to set rbx action
-def set_rbx_action(action_str):
+### Function to send rbx action control
+def go_rbx_action(action_str):
   global rbx_status_cmd_success
   global rbx_set_action_pub
+  print("*******************************")  
+  print("Go Action Request Recieved: " + action_str)
+  success = False
   action_ind = -1
   for ind, action in enumerate(rbx_cap_actions):
     if action == action_str:
       action_ind = ind
   if action_ind == -1:
     print("No matching action found")
-    return False
   else:
-    rbx_set_action_pub.publish(action_ind)
+    rbx_go_action_pub.publish(action_ind)
     wait_for_rbx_status_busy()
     wait_for_rbx_status_ready()
-    return rbx_status_cmd_success
+    success = rbx_status_cmd_success
+  return success
+
+### Function to send rbx home control
+def go_rbx_home():
+  global rbx_status_cmd_success
+  global rbx_set_home_pub
+  print("*******************************")  
+  print("Go Home Request Recieved: ")
+  success = False
+  rbx_go_home_pub.publish(action_ind)
+  wait_for_rbx_status_busy()
+  wait_for_rbx_status_ready()
+  success = rbx_status_cmd_success
+  return success
 
 ### Function to call goto Location Global control
 def goto_rbx_location(goto_data):
@@ -483,6 +539,15 @@ def wait_for_rbx_status_busy():
     print("Waiting for cmd process to start")
     print(rbx_status_ready)
     time.sleep(1)
+
+#######################
+# Mission Action Functions
+
+### Function to send snapshot event trigger and wait for completion
+def snapshot():
+  global snapshot_trigger_pub
+  snapshot_trigger_pub.publish(Empty())
+  print("Snapshot trigger sent")
 
 #######################
 # Process Functions

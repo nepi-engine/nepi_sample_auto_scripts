@@ -94,7 +94,7 @@ GPS_PUB_RATE_HZ = 50
 MOVE_UPDATE_TIME_SEC=10
 MOVE_UPDATE_STEPS = GPS_PUB_RATE_HZ*MOVE_UPDATE_TIME_SEC # Number of moves to reach new position
 
-PRINT_STATE_POSITION_1HZ = False # Print State and Position data at 1Hz
+PRINT_LOCATION_1HZ = False # Print current location at 1Hz
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -162,7 +162,7 @@ def initialize_actions():
   rospy.Subscriber(NEPI_RBX_SET_ACTION_TOPIC, UInt8, rbx_set_action_callback)
   
   # Start Print Callback if Enabled
-  if PRINT_STATE_POSITION_1HZ:
+  if PRINT_LOCATION_1HZ:
     rospy.Timer(rospy.Duration(1.0), mavlink_fake_gps_print_callback)
   #####
   rospy.Timer(rospy.Duration(navpose_update_interval), update_current_heading_callback)
@@ -401,7 +401,7 @@ def takeoff():
   mavlink_fake_gps_move(new_geopoint_wgs84)
 
 ### Function for switching to STABILIZE mode
-def stabilized():
+def stabilize():
   print("")
     
 ### Function for switching to LAND mode
@@ -434,6 +434,8 @@ def resume():
 def sethome_current():
   print("")
 
+#######################
+# Process Functions
 
 ### Function to get new latlong at body relative point
 def get_geopoint_at_body_point(cur_geopoint_geo, cur_bearing_deg, point_body_m):

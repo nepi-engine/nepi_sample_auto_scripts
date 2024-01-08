@@ -60,9 +60,11 @@ RESET_DELAY_S = 5 # Min delay between triggers
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+
 # AI Detector Subscriber Topics
 AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
 AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
+
 # Snapshot Publish Topic
 SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
@@ -83,8 +85,8 @@ def initialize_actions():
   global img_width
   print("")
   print("Starting Initialization Processes")
-  rospy.loginfo("Connecting to ROS Detector Image Topic")
-  rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
+  print("Connecting to NEPI Detector Image Topic")
+  print(AI_DETECTION_IMAGE_TOPIC )
   # Wait for topic
   print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
   wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
@@ -94,7 +96,7 @@ def initialize_actions():
     time.sleep(1)
   img_sub.unregister() # Don't need it anymore
   # Set up object detector subscriber
-  rospy.loginfo("Starting object detection subscriber: Object of interest = " + OBJ_LABEL_OF_INTEREST + "...")
+  print("Starting object detection subscriber: Object of interest = " + OBJ_LABEL_OF_INTEREST + "...")
   rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
   print("Initialization Complete")
  
@@ -136,6 +138,9 @@ def object_detected_callback(bounding_box_msg):
         snapshot_trigger_pub.publish(Empty())
         print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
         time.sleep(RESET_DELAY_S)
+    else:
+      print("No " + OBJ_LABEL_OF_INTEREST + " type for target data")
+      time.sleep(1)
 
 
 #######################

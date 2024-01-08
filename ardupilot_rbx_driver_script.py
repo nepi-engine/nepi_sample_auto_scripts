@@ -75,7 +75,11 @@ from pygeodesy.ellipsoidalKarney import LatLon
 RBX_NAVPOSE = 7 # Byte Mask [GPS, Heading, Orienation]
 RBX_STATES = ["DISARM","ARM"]
 RBX_MODES = ["STABILIZE","LAND","RTL","LOITER","GUIDED","RESUME"]
-RBX_ACTIONS = ["TAKEOFF"] 
+RBX_ACTIONS = ["TAKEOFF"]
+
+RBX_STATE_FUNCTIONS = ["disarm","arm"]
+RBX_MODE_FUNCTIONS = ["stabilize","land","rtl","loiter","guided","resume"]
+RBX_ACTION_FUNCTIONS = ["takeoff"]
 
 ###################################################
 # RBX Initialization Values
@@ -85,11 +89,16 @@ GOTO_MAX_ERROR_M = 2.0 # Goal reached when all translation move errors are less 
 GOTO_MAX_ERROR_DEG = 2.0 # Goal reached when all rotation move errors are less than this value
 GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be good before proceeding
 CMD_TIMEOUT_SEC = 20 # Any action that changes 
+PRINT_STATUS_1HZ = True # Print current rbx status at 1Hz
+
+
 
 ###################################################
 # ARDUPILOT Settings
 TAKEOFF_MIN_PITCH_DEG = 10
 TAKEOFF_ALT_M = 10
+
+
 
 ###################################################
 # ROS namespace setup
@@ -131,12 +140,12 @@ NEPI_RBX_SET_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "set_goto_goals" # Float [M
 NEPI_RBX_SET_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "set_cmd_timeout" # Int Seconds  - Any command that changes ready state
 
 # NEPI MAVLINK RBX Driver Control Subscriber Topics
-NEPI_RBX_SET_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "set_action"  # Int to Defined Dictionary RBX_MODES
+NEPI_RBX_GO_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "go_action"  # Int to Defined Dictionary RBX_ACTIONS
+NEPI_RBX_GO_HOME_TOPIC = NEPI_RBX_NAMESPACE + "go_home" # Ignored if any active goto processes
+NEPI_RBX_GO_STOP_TOPIC = NEPI_RBX_NAMESPACE + "go_stop" # Aborts any active goto processes
 NEPI_RBX_GOTO_POSE_TOPIC = NEPI_RBX_NAMESPACE + "goto_pose" # Ignored if any active goto processes
 NEPI_RBX_GOTO_POSITION_TOPIC = NEPI_RBX_NAMESPACE + "goto_position" # Ignored if any active goto processes
 NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location" # Ignored if any active goto processes
-NEPI_RBX_GO_HOME_TOPIC = NEPI_RBX_NAMESPACE + "go_home" # Aborts any active goto processes
-NEPI_RBX_STOP_TOPIC = NEPI_RBX_NAMESPACE + "stop" # Aborts any active goto processes
 
 ###################################################
 MAVLINK_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/"
@@ -205,16 +214,13 @@ rbx_cmd_timeout = CMD_TIMEOUT_SEC
 rbx_cmd_success = True
 
 rbx_state_start = None
+rbx_state_last = None
 rbx_mode_start = None
-rbx_mode_resume = None
+rbx_mode_last = None
 
 rbx_capabilities_pub_interval = float(1.0)/float(NEPI_RBX_CAPABILITIES_RATE_HZ)
 rbx_status_pub_interval = float(1.0)/float(NEPI_RBX_STATUS_RATE_HZ)
 
-
-rbx_state_functions = ["disarm","arm"]
-rbx_mode_functions = ["stabilize","land","rtl","loiter","guided","resume"]
-rbx_action_functions = ["takeoff"]
 
 mavlink_state = None
                 
@@ -229,6 +235,9 @@ def initialize_actions():
   global rbx_battery
   global rbx_state_start
   global rbx_mode_start
+  global rbx_state_last
+  global rbx_mode_last
+  print("*******************************")  
   print("Starting Initialization Process")
   # Wait for MAVLink State topic to publish then subscribe
   print("Waiting for topic: " + MAVLINK_STATE_TOPIC)
@@ -236,11 +245,17 @@ def initialize_actions():
   print("Starting state scubscriber callback")
   rospy.Subscriber(MAVLINK_STATE_TOPIC, State, get_state_callback)
   while rbx_state is None and not rospy.is_shutdown():
-    print("Waiting for current state message to publish")
+    print("Waiting for rbx state status to set")
     time.sleep(0.1)
+  while rbx_mode is None and not rospy.is_shutdown():
+    print("Waiting for rbx mode status to set")
+    time.sleep(0.1)
+  print("Starting State: " + RBX_STATES[rbx_state])
+  print("Starting Mode: " + RBX_MODES[rbx_mode])
   rbx_state_start = rbx_state
   rbx_mode_start = rbx_mode
-  rbx_mode_resume = rbx_mode
+  rbx_state_last = rbx_state
+  rbx_mode_last = rbx_mode
   # Subscribe to MAVLink Battery topic
   rospy.Subscriber(MAVLINK_BATTERY_TOPIC, BatteryState, get_mavlink_battery_callback)
   # Start NavPose Data Updater
@@ -262,12 +277,18 @@ def initialize_actions():
   rospy.Subscriber(NEPI_RBX_SET_GOTO_GOALS_TOPIC, Float64MultiArray, rbx_set_goto_goals_callback)
   rospy.Subscriber(NEPI_RBX_SET_CMD_TIMEOUT_TOPIC, UInt32, rbx_set_cmd_timeout_callback)
   ### Start RBX Control Subscribe Topics
-  rospy.Subscriber(NEPI_RBX_SET_ACTION_TOPIC, UInt8, rbx_set_action_callback)
+  rospy.Subscriber(NEPI_RBX_GO_ACTION_TOPIC, UInt8, rbx_go_action_callback)
+  rospy.Subscriber(NEPI_RBX_GO_HOME_TOPIC, Empty, rbx_go_home_callback)
+  rospy.Subscriber(NEPI_RBX_GO_STOP_TOPIC, Empty, rbx_go_stop_callback)
   rospy.Subscriber(NEPI_RBX_GOTO_POSE_TOPIC, Float64MultiArray, rbx_goto_pose_callback)
   rospy.Subscriber(NEPI_RBX_GOTO_POSITION_TOPIC, Float64MultiArray, rbx_goto_position_callback)
   rospy.Subscriber(NEPI_RBX_GOTO_LOCATION_TOPIC, Float64MultiArray, rbx_goto_location_callback)
-  rospy.Subscriber(NEPI_RBX_GO_HOME_TOPIC, Empty, rbx_go_home_callback)
-  rospy.Subscriber(NEPI_RBX_STOP_TOPIC, Empty, rbx_stop_callback)
+
+  # Start Print Callback if Enabled
+  if PRINT_STATUS_1HZ:
+    
+    rospy.Timer(rospy.Duration(1.0), print_rbx_status_callback)
+  #####
   print("Initialization Complete")
 
 
@@ -318,6 +339,31 @@ def rbx_status_pub_callback(timer):
     rbx_status_cmd_success_pub.publish(data=rbx_cmd_success)
 
 
+### Callback to print the current rbx status at 1Hz
+def print_rbx_status_callback(timer):
+  global rbx_state
+  global rbx_mode
+  global rbx_mode_last
+  global rbx_battery
+  global rbx_ready
+  global rbx_goto_speeds
+  global rbx_goto_goals
+  global rbx_goto_errors
+  global rbx_cmd_timeout
+  global rbx_cmd_success
+  print("*******************************")
+  print("Current RBX Status")
+  print("State: " + RBX_STATES[rbx_state])
+  print("Mode Current: " + RBX_MODES[rbx_mode])
+  print("Mode Last: " + RBX_MODES[rbx_mode_last])
+  print("Battery: " + str(rbx_battery))
+  print("Ready: " + str(rbx_ready))
+  print("Speeds: " + str(rbx_goto_speeds))
+  print("Goals: " + str(rbx_goto_goals))
+  print("Errors: " + str(rbx_goto_errors))
+  print("Timeout: " + str(rbx_cmd_timeout))
+  print("Success: " + str(rbx_cmd_success))
+
 ##############################
 # RBX NavPose Topic Publishers
 ### Callback to publish RBX navpose gps topic
@@ -348,39 +394,62 @@ def rbx_heading_topic_callback(heading_msg):
 # ToDo: Create a custom RBX status message
 ### Callback to set state
 def rbx_set_state_callback(state_msg):
-  global rbx_state
+  print("*******************************")
   print("Received set state message")
   print(state_msg)
-  state_ind = state_msg.data
-  if state_ind < 0 or state_ind > (len(rbx_state_functions)-1):
+  state_val = state_msg.data
+  rbx_set_state(state_val)
+  
+### Function to set state
+def rbx_set_state(new_state_ind):
+  global rbx_state
+  global rbx_state_last
+  if new_state_ind < 0 or new_state_ind > (len(RBX_STATE_FUNCTIONS)-1):
     print("No matching rbx state found")
   else:
-    set_state_function = globals()[rbx_state_functions[state_ind]]
+    rbx_state_last = rbx_state
+    print("Waiting for rbx state " + RBX_STATES[new_state_ind] + " to set")
+    print("Current rbx state is " + RBX_STATES[rbx_state])
+    set_state_function = globals()[RBX_STATE_FUNCTIONS[new_state_ind]]
     set_state_function()
-    rbx_state = state_ind
+    rbx_state = new_state_ind
 
 ### Callback to set mode
 def rbx_set_mode_callback(mode_msg):
-  global rbx_mode
-  global rbx_mode_resume
+  print("*******************************")
   print("Received set mode message")
   print(mode_msg)
-  rbx_mode_resume = rbx_mode
-  mode_ind = mode_msg.data
-  if mode_ind < 0 or mode_ind > (len(rbx_mode_functions)-1):
+  mode_val = mode_msg.data
+  rbx_set_mode(mode_val)
+
+### Function to set mode
+def rbx_set_mode(new_mode_ind):
+  global rbx_mode
+  global rbx_mode_last
+  if new_mode_ind < 0 or new_mode_ind > (len(RBX_MODE_FUNCTIONS)-1):
     print("No matching rbx mode found")
   else:
-    set_mode_function = globals()[rbx_mode_functions[mode_ind]]
-    set_mode_function() 
-    rbx_mode = mode_ind
+    if RBX_MODES[new_mode_ind] != "RESUME":
+      rbx_mode_last = rbx_mode # Don't update last on resume
+    print("Setting rbx mode to : " + RBX_MODES[new_mode_ind])
+    print("Calling rbx mode function: " + RBX_MODE_FUNCTIONS[new_mode_ind])
+    set_mode_function = globals()[RBX_MODE_FUNCTIONS[new_mode_ind]]
+    set_mode_function()
+    rbx_mode = new_mode_ind
 
 ### Callback to set home
 def rbx_set_home_current_callback(set_home_msg):
+  print("*******************************")
+  print("Received set home message")
+  print(set_home_msg)
   sethome_current()
   
 ### Callback to start rbx set goto speeds process
 def rbx_set_goto_speeds_callback(goto_speeds_msg):
   global rbx_goto_speeds
+  print("*******************************")
+  print("Received set speeds message")
+  print(goto_speeds_msg)
   goto_speeds_list=list(goto_speeds_msg.data)
   if len(goto_speeds_list) != 2:
     print("Ignoring this Request")
@@ -391,6 +460,9 @@ def rbx_set_goto_speeds_callback(goto_speeds_msg):
 ### Callback to start rbx set goto goals process
 def rbx_set_goto_goals_callback(goto_goals_msg):
   global rbx_goto_goals
+  print("*******************************")
+  print("Received set goals message")
+  print(goto_goals_msg)
   goto_goals_list=list(goto_goals_msg.data)
   if len(goto_goals_list) != 3:
     print("Ignoring this Request")
@@ -401,27 +473,59 @@ def rbx_set_goto_goals_callback(goto_goals_msg):
 ### Callback to set cmd timeout
 def rbx_set_cmd_timeout_callback(cmd_timeout_msg):
   global rbx_cmd_timeout
+  print("*******************************")
+  print("Received set timeout message")
+  print(cmd_timeout_msg)
   rbx_cmd_timeout=cmd_timeout_msg.data
 
 
 ##############################
 # RBX Control Topic Callbacks
 
-### Callback to set action
-def rbx_set_action_callback(action_msg):
+### Callback to execute action
+def rbx_go_action_callback(action_msg):
   global rbx_ready
   global rbx_cmd_timeout
   global rbx_cmd_success
-  print("Received set action message")
+  print("*******************************")
+  print("Received go action message")
   print(action_msg)
+  rbx_cmd_success = False
   action_ind = action_msg.data
-  if action_ind < 0 or action_ind > (len(rbx_action_functions)-1):
+  if action_ind < 0 or action_ind > (len(RBX_ACTION_FUNCTIONS)-1):
     print("No matching rbx action found")
   else:
     rbx_ready = False
-    set_action_function = globals()[rbx_action_functions[action_ind]]
+    set_action_function = globals()[RBX_ACTION_FUNCTIONS[action_ind]]
     rbx_cmd_success = set_action_function(rbx_cmd_timeout)
+    time.sleep(1)
     rbx_ready = True
+
+### Callback to start rbx go home
+def rbx_go_home_callback(home_msg):
+  global rbx_ready
+  global rbx_cmd_timeout
+  global rbx_cmd_success
+  print("*******************************")
+  print("Received go home message")
+  print(home_msg)
+  rtl()
+  rbx_cmd_success = True
+  time.sleep(1)
+  rbx_ready = True 
+
+### Callback to start rbx stop
+def rbx_go_stop_callback(stop_msg):
+  global rbx_ready
+  global rbx_cmd_timeout
+  global rbx_cmd_success
+  print("*******************************")
+  print("Received go stop message")
+  print(stop_msg)
+  loiter()
+  rbx_cmd_success = True
+  time.sleep(1)
+  rbx_ready = True  
 
 ### Callback to start rbx goto pose process
 def rbx_goto_pose_callback(pose_cmd_msg):
@@ -494,13 +598,6 @@ def rbx_goto_location_callback(location_cmd_msg):
       rbx_cmd_success = setpoint_location_global_wgs84(setpoint_data,rbx_cmd_timeout)
       rbx_ready = True
 
-### Callback to start rbx go home
-def rbx_go_home_callback(home_msg):
-  rtl()
-
-### Callback to start rbx stop
-def rbx_stop_callback(hold_msg):
-  loiter() 
 
 #######################
 # Mavlink Interface Methods
@@ -532,27 +629,6 @@ def get_mavlink_battery_callback(battery_msg):
   rbx_battery = battery_msg.percentage
 
 
-### Function to set mavlink mode
-def update_mavlink_mode(mode_new):
-  global mavlink_state
-  global rbx_ready
-  global mode_client
-  new_mode = SetModeRequest()
-  new_mode.custom_mode = mode_new
-  print("Updating mode")
-  print(mode_new)
-  mode_client = rospy.ServiceProxy(MAVLINK_SET_MODE_SERVICE, SetMode)
-  rbx_ready = False
-  time.sleep(1) # Give time for other process to see busy
-  while mavlink_state.mode != mode_new and not rospy.is_shutdown():
-    time.sleep(.25)
-    mode_client.call(new_mode)
-    print("Waiting for mode to set")
-    print("Set Value: " + mode_new)
-    print("Cur Value: " + str(mavlink_state.mode))
-  rbx_ready = True
-
-
 ### Function to set mavlink armed state
 def set_mavlink_arm_state(arm_value):
   global mavlink_state
@@ -572,6 +648,29 @@ def set_mavlink_arm_state(arm_value):
     print("Set Value: " + str(arm_value))
     print("Cur Value: " + str(mavlink_state.armed))
   rbx_ready = True
+
+### Function to set mavlink mode
+def set_mavlink_mode(mode_new):
+  global mavlink_state
+  global rbx_ready
+  global mode_client
+  new_mode = SetModeRequest()
+  new_mode.custom_mode = mode_new
+  print("Updating mode")
+  print(mode_new)
+  mode_client = rospy.ServiceProxy(MAVLINK_SET_MODE_SERVICE, SetMode)
+  rbx_ready = False
+  time.sleep(1) # Give time for other process to see busy
+  while mavlink_state.mode != mode_new and not rospy.is_shutdown():
+    time.sleep(.25)
+    mode_client.call(new_mode)
+    print("Waiting for mode to set")
+    print("Set Value: " + mode_new)
+    print("Cur Value: " + str(mavlink_state.mode))
+  rbx_ready = True
+
+
+
 
 
 
@@ -1184,11 +1283,6 @@ def arm():
 def disarm():
   set_mavlink_arm_state(False)
 
-### Function for switching to LOITER mode
-def guided():
-  update_mavlink_mode('GUIDED')
-
-
 ## Function for sending takeoff command
 def takeoff(timeout_sec):
   global current_location_wgs84_geo
@@ -1227,33 +1321,39 @@ def takeoff(timeout_sec):
   if cmd_success:
     print("Takeoff action complete")
   return cmd_success
+
+
+### Function for switching to STABILIZE mode
+def stabilize():
+  set_mavlink_mode('STABILIZE')
     
 ### Function for switching to LAND mode
 def land():
-  global rbx_ready
-  update_mavlink_mode('LAND')
-  print("Waiting for land process to complete")
-  while current_state.armed == True:
+  global rbx_state
+  set_mavlink_mode('LAND')
+  print("Waiting for land process to complete and disarm")
+  while rbx_state == 1:
     time.sleep(1)
 
 ### Function for sending go home command
 def rtl():
-  global current_home
-  update_mavlink_mode('RTL')
+  set_mavlink_mode('RTL')
 
 ### Function for switching to LOITER mode
 def loiter():
-  update_mavlink_mode('LOITER')
+  set_mavlink_mode('LOITER')
 
-### Function for switching to LOITER mode
+### Function for switching to Guided mode
 def guided():
-  update_mavlink_mode('GUIDED')
+  set_mavlink_mode('GUIDED')
 
 ### Function for switching back to current mission
 def resume():
-  global rbx_mode_resume
-  mode_org = RBX_MODES[rbx_mode_resume]
-  update_mavlink_mode(mode_org)
+  global rbx_mode
+  global rbx_mode_last
+  # Reset mode to last
+  print("Switching mavlink mode from " + RBX_MODES[rbx_mode] + " back to " + RBX_MODES[rbx_mode_last])
+  rbx_set_mode(rbx_mode_last)
 
 ### Function for sending set home current
 def sethome_current():
