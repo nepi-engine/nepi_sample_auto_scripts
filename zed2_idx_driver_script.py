@@ -43,6 +43,7 @@ os.environ["ROS_NAMESPACE"] = "/nepi/s2x"
 
 import time
 import sys
+import os
 import rospy
 import dynamic_reconfigure.client
 import numpy as np
@@ -50,9 +51,10 @@ import cv2
 import math
 import tf
 
+from datetime import datetime
 from std_msgs.msg import UInt8, Empty, String, Bool, Float32
 from sensor_msgs.msg import Image, PointCloud2
-from nepi_ros_interfaces.msg import IDXStatus, RangeWindow
+from nepi_ros_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveData, SaveDataRate
 from nepi_ros_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import NavSatFix
@@ -87,8 +89,9 @@ IDX_MAX_RANGE_RATIO=0.15
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-NEPI_IDX_NAME = "zed2_stereo_camera"
-NEPI_IDX_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_IDX_NAME + "/idx/"
+NEPI_IDX_SENSOR_NAME = "zed2_stereo_camera"
+NEPI_IDX_SENSOR_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_IDX_SENSOR_NAME
+NEPI_IDX_NAMESPACE = NEPI_IDX_SENSOR_NAMESPACE + "/idx/"
 
 ZED_BASE_NAMESPACE = NEPI_BASE_NAMESPACE + "zed2/zed_node/"
 # Zed control topics
@@ -103,6 +106,12 @@ ZED_ODOM_TOPIC = ZED_BASE_NAMESPACE + "odom"
 
 ### NEPI IDX NavPose Publish Topic
 NEPI_IDX_NAVPOSE_ODOM_TOPIC = NEPI_IDX_NAMESPACE + "odom"
+
+
+# NEPI IDX capabilities query service
+NEPI_IDX_CAPABILITY_REPORT_SERVICE = NEPI_IDX_NAMESPACE + "capabilities_query"
+NEPI_IDX_CAPABILITY_NAVPOSE_TOPIC = NEPI_IDX_NAMESPACE + "navpose_support"
+NEPI_IDX_CAPABILITY_NAVPOSE = 2 # Bit Mask [GPS,ODOM,HEADING]
 
 # NEPI IDX status and control topics
 NEPI_IDX_STATUS_TOPIC = NEPI_IDX_NAMESPACE + "status"
@@ -121,12 +130,19 @@ NEPI_IDX_DEPTH_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "depth_image"
 NEPI_IDX_POINTCLOUD_TOPIC = NEPI_IDX_NAMESPACE + "pointcloud"
 NEPI_IDX_POINTCLOUD_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "pointcloud_image"
 
-# NEPI IDX capabilities query service
-NEPI_IDX_CAPABILITY_REPORT_SERVICE = NEPI_IDX_NAMESPACE + "capabilities_query"
+# NEPI IDX save data subscriber topics
+SAVE_FOLDER = "/mnt/nepi_storage/data/"
+NEPI_IDX_SAVE_DATA_TOPIC = NEPI_BASE_NAMESPACE + "save_data"
+NEPI_IDX_SAVE_DATA_PREFIX_TOPIC = NEPI_BASE_NAMESPACE + "save_data_prefix"
+NEPI_IDX_SAVE_DATA_RATE_TOPIC = NEPI_BASE_NAMESPACE + "save_data_rate"
+
 
 #####################################################################################
 # Globals
 #####################################################################################
+
+idx_capability_navpose_pub = rospy.Publisher(NEPI_IDX_CAPABILITY_NAVPOSE_TOPIC, UInt8, queue_size=1)
+idx_navpose_odom_pub = rospy.Publisher(NEPI_IDX_NAVPOSE_ODOM_TOPIC, Odometry, queue_size=1)
 
 idx_status_pub = rospy.Publisher(NEPI_IDX_STATUS_TOPIC, IDXStatus, queue_size=1, latch=True)
 
@@ -137,13 +153,25 @@ idx_depth_image_pub = rospy.Publisher(NEPI_IDX_DEPTH_IMAGE_TOPIC, Image, queue_s
 idx_pointcloud_pub = rospy.Publisher(NEPI_IDX_POINTCLOUD_TOPIC, PointCloud2, queue_size=1)
 idx_pointcloud_image_pub = rospy.Publisher(NEPI_IDX_POINTCLOUD_IMAGE_TOPIC, Image, queue_size=1)
 
-idx_navpose_odom_pub = rospy.Publisher(NEPI_IDX_NAVPOSE_ODOM_TOPIC, Odometry, queue_size=1)
+
 
 #zed_parameter_update_pub = rospy.Publisher(ZED_PARAMETER_UPDATES_TOPIC, Config, queue_size=1)
 zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=30)
 
 idx_status_msg=IDXStatus()
 idx_capabilities_report = IDXCapabilitiesQueryResponse()
+idx_save_data = False
+idx_save_data_prefix = ""
+idx_save_data_rate = 1.0
+idx_capability_pub_interval = 1
+idx_save_data_status_pub_interval = 1
+save_data_timer = 0.1
+
+color_2d_image_msg = None
+bw_2d_image_msg = None
+depth_map_msg = None
+depth_image_msg = None
+pointcloud_msg = None
 
 #####################################################################################
 # Methods
@@ -157,9 +185,9 @@ def initialize_actions():
   # Wait for zed odom topic
   ##############################
   print("Waiting for ZED odom message to publish on " + ZED_ODOM_TOPIC)
-  # Update Orientation source to our new update orientation publisher
+  # Publish IDX NavPose supported topics
   wait_for_topic(ZED_ODOM_TOPIC)
-  rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, idx_odom_topic_callback) 
+  rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, idx_odom_topic_callback)
   # Wait for zed depth topic
   print("Waiting for topic: " + ZED_DEPTH_MAP_TOPIC)
   wait_for_topic(ZED_DEPTH_MAP_TOPIC)
@@ -183,6 +211,11 @@ def initialize_actions():
   #rospy.Subscriber(NEPI_IDX_SET_RESOLUTION_MODE_TOPIC, UInt8, idx_set_resolution_mode_callback)
   rospy.Subscriber(NEPI_IDX_SET_THRESHOLDING_TOPIC, Float32, idx_set_thresholding_callback)
   rospy.Subscriber(NEPI_IDX_SET_RANGE_WINDOW_TOPIC, RangeWindow, idx_set_range_window_callback)
+
+  rospy.Subscriber(NEPI_IDX_SAVE_DATA_TOPIC, SaveData, idx_save_data_callback)
+  rospy.Subscriber(NEPI_IDX_SAVE_DATA_PREFIX_TOPIC, String, idx_save_data_prefix_callback)
+  rospy.Subscriber(NEPI_IDX_SAVE_DATA_RATE_TOPIC, SaveDataRate, idx_save_data_rate_callback)
+    
   # Populate and advertise IDX Capability Report
   global idx_capabilities_report
   idx_capabilities_report.adjustable_resolution = False # Pending callback implementation
@@ -198,6 +231,8 @@ def initialize_actions():
   idx_capabilities_report.has_pointcloud_image = False # TODO: Create this data
   idx_capabilities_report.has_pointcloud = True
   rospy.Service(NEPI_IDX_CAPABILITY_REPORT_SERVICE, IDXCapabilitiesQuery, idx_capabilities_query_callback)
+  rospy.Timer(rospy.Duration(idx_capability_pub_interval), idx_capability_pub_callback)
+  rospy.Timer(rospy.Duration(0.1), idx_save_data_pub_callback)
   print("Starting Zed IDX subscribers and publishers")
   rospy.Subscriber(ZED_COLOR_2D_IMAGE_TOPIC, Image, color_2d_image_callback, queue_size = 1)
   rospy.Subscriber(ZED_BW_2D_IMAGE_TOPIC, Image, bw_2d_image_callback, queue_size = 1)
@@ -206,8 +241,58 @@ def initialize_actions():
   print("Initialization Complete")
 
 
-#######################
-# Driver NavPose Publishers Functions
+
+##############################
+# IDX Capabilities Topic Publishers
+### Callback to publish IDX capabilities lists
+def idx_capability_pub_callback(timer):
+  global idx_capability_navpose_pub
+  if not rospy.is_shutdown():
+    idx_capability_navpose_pub.publish(data=NEPI_IDX_CAPABILITY_NAVPOSE)
+
+
+##############################
+# IDX Data Saver
+### Callback to save data at set rate
+### This is just a quick fix to add some save functionality.  Will save save same data if not updated
+def idx_save_data_pub_callback(timer):
+  global idx_save_data
+  global idx_save_data_prefix
+  global idx_save_data_rate
+  global save_data_timer
+  global color_2d_image_msg
+  global depth_image_msg
+  save_data_interval = 1/idx_save_data_rate
+  if save_data_timer < save_data_interval:
+    save_data_timer = save_data_timer + 0.1
+  else:
+    if idx_save_data is True:
+      date_str=datetime.utcnow().strftime('%Y-%m-%d')
+      time_str=datetime.utcnow().strftime('%H%M%S')
+      ms_str =datetime.utcnow().strftime('%f')[:-3]
+      dt_str = (date_str + "T" + time_str + "." + ms_str)
+      if color_2d_image_msg is not None:
+        #Convert image from ros to cv2
+        bridge = CvBridge()
+        cv_image = bridge.imgmsg_to_cv2(color_2d_image_msg, "bgr8")
+        # Saving image to file type
+        image_filename=SAVE_FOLDER + idx_save_data_prefix + dt_str + '_' + NEPI_IDX_SENSOR_NAME + '_2d_color_image.png'
+        print("Saving image to file")
+        print(image_filename)
+        cv2.imwrite(image_filename,cv_image)
+      if depth_image_msg is not None:
+        #Convert image from ros to cv2
+        bridge = CvBridge()
+        cv_image = bridge.imgmsg_to_cv2(depth_image_msg, "bgr8")
+        # Saving image to file type
+        image_filename=SAVE_FOLDER + idx_save_data_prefix + dt_str + '_' + NEPI_IDX_SENSOR_NAME + '_depth_image.png'
+        print("Saving image to file")
+        print(image_filename)
+        cv2.imwrite(image_filename,cv_image)
+    save_data_timer = 0
+  #print(save_data_timer)
+
+
 
 ### Callback to publish idx odom topic
 def idx_odom_topic_callback(odom_msg):
@@ -225,6 +310,30 @@ def idx_status_pub_callback():
   global idx_status_pub
   if not rospy.is_shutdown():
     idx_status_pub.publish(idx_status_msg)
+
+
+#######################
+# Driver Save Data Subscribers
+
+### callback to update save data setting
+def idx_save_data_callback(save_data_msg):
+  global idx_save_data
+  idx_save_data = save_data_msg.save_continuous
+  print("Updating save data to: " + str(idx_save_data))
+
+### callback to update save data prefix setting
+def idx_save_data_prefix_callback(save_data_prefix_msg):
+  global idx_save_data_prefix
+  idx_save_data_prefix = save_data_prefix_msg.data
+  print("Updating save data prefix to: " + idx_save_data_prefix)
+
+### callback to update save data rate setting
+def idx_save_data_rate_callback(save_data_rate_msg):
+  global idx_save_data_rate
+  idx_save_data_rate = save_data_rate_msg.save_rate_hz
+  print("Updating save data rate to: " + str(idx_save_data_rate))
+  
+
 
 #######################
 # Driver Control Subscribers Functions
@@ -292,8 +401,10 @@ def idx_set_range_window_callback(range_window_msg):
 
 ### callback to get and republish color 2d image
 def color_2d_image_callback(image_msg):
+  global color_2d_image_msg
   global idx_color_2d_image_pub
   # Publish to IDX namespace
+  color_2d_image_msg = image_msg
   if not rospy.is_shutdown():
     idx_color_2d_image_pub.publish(image_msg)
 
@@ -307,6 +418,7 @@ def bw_2d_image_callback(image_msg):
 
 ### callback to get depthmap, republish it, convert it to global float array of meter depths corrisponding to image pixel location
 def depth_map_callback(depth_map_msg):
+  global depth_image_msg
   global idx_status_msg
   global idx_depth_map_pub
   global idx_depth_image_pub
@@ -344,6 +456,7 @@ def depth_map_callback(depth_map_msg):
   #################
   # Convert to cv2 image to Ros Image message
   ros_depth_image = cv2_bridge.cv2_to_imgmsg(cv2_depth_image_color,"bgr8")
+  depth_image_msg = ros_depth_image
   # Publish new image to ros
   if not rospy.is_shutdown():
     idx_depth_map_pub.publish(depth_map_msg)
@@ -432,7 +545,7 @@ def cleanup_actions():
 def startNode():
   rospy.loginfo("Starting ZED2 IDX driver script", disable_signals=True) # Disable signals so we can force a shutdown
   rospy.init_node
-  rospy.init_node(name= NEPI_IDX_NAME)
+  rospy.init_node(name= NEPI_IDX_SENSOR_NAME)
   # Run initialization processes
   initialize_actions()
   # run cleanup actions on shutdown
