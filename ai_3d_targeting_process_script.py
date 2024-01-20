@@ -184,9 +184,9 @@ def object_targeting_callback(img_msg):
         if depth_len > TARGET_MIN_VALUES:
           target_range_m=np.mean(depth_box_adj)
         else:
-          target_range_m=float(-999)
+          target_range_m=float(-999) # NEPI standard unset value
       else:
-        target_range_m=float(-999)
+        target_range_m=float(-999)  # NEPI standard unset value
       # Calculate target bearings
       object_loc_y_pix = float(box.ymin + ((box.ymax - box.ymin))  / 2) 
       object_loc_x_pix = float(box.xmin + ((box.xmax - box.xmin))  / 2)

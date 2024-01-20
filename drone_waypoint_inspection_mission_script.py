@@ -488,6 +488,7 @@ def goto_rbx_location(goto_data):
 
 ### Function to call goto Position Body control
 def goto_rbx_position(goto_data):
+  global rbx_status_cmd_success
   global rbx_goto_location_pub
   # Send goto Position Command
   wait_for_rbx_status_ready()
@@ -496,9 +497,11 @@ def goto_rbx_position(goto_data):
   rbx_goto_position_pub.publish(goto_position_msg)
   wait_for_rbx_status_busy()
   wait_for_rbx_status_ready()
+  return rbx_status_cmd_success
 
 ### Function to call goto Attititude NED control
 def goto_rbx_pose(goto_data):
+  global rbx_status_cmd_success
   global rbx_goto_pose_pub
   # Send goto Attitude Command
   wait_for_rbx_status_ready()
@@ -507,6 +510,7 @@ def goto_rbx_pose(goto_data):
   rbx_goto_pose_pub.publish(goto_attitude_msg)
   wait_for_rbx_status_busy()
   wait_for_rbx_status_ready()
+  return rbx_status_cmd_success
   
 ### Function to wait for goto control process to complete
 def wait_for_rbx_status_ready():

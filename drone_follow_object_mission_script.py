@@ -248,34 +248,37 @@ def move_to_object_callback(target_data_msg):
     rbx_status_mode_start = rbx_status_mode
     print("Detected a " + OBJ_LABEL_OF_INTEREST)
     # Get target data for detected object of interest
-    target_range_m = target_data_msg.range_m
-    target_yaw_d = target_data_msg.azimuth_deg
-    target_pitch_d = target_data_msg.elevation_deg
+    target_range_m = target_data_msg.range_m # [x,y,z]
+    target_yaw_d = target_data_msg.azimuth_deg  # dz
+    target_pitch_d = target_data_msg.elevation_deg # dy
     # Calculate setpoint to target using offset goal
-    setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
-    sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))
-    sp_y_m = setpoint_range_m * math.sin(math.radians(target_yaw_d))
-    sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d))
-    sp_yaw_d = target_yaw_d
-    setpoint_position_body_m = [sp_x_m,sp_y_m,sp_z_m,sp_yaw_d]
-    ##########################################
-    # Switch to Guided Mode and Send GoTo Position Command
-    print("Switching to Guided mode")
-    set_rbx_mode("GUIDED") # Change mode to Guided
-    # Send goto command and wait for completion
-    print("Sending setpoint position body command")
-    print(setpoint_position_body_m)
-    success = goto_rbx_position(setpoint_position_body_m)
-    #########################################
-    # Run Mission Actions
-    print("Starting Mission Actions")
-    success = mission_actions()
-    ##########################################
-    print("Switching back to original mode")
-    set_rbx_mode("RESUME")
-    print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
-    time.sleep(RESET_DELAY_S)
-    print("Waiting for next " + OBJ_LABEL_OF_INTEREST + " detection")
+    if target_range_m != -999:
+      setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
+      sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))
+      sp_y_m = setpoint_range_m * math.sin(math.radians(target_yaw_d))
+      sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d))
+      sp_yaw_d = target_yaw_d
+      setpoint_position_body_m = [sp_x_m,sp_y_m,sp_z_m,sp_yaw_d]
+      ##########################################
+      # Switch to Guided Mode and Send GoTo Position Command
+      print("Switching to Guided mode")
+      set_rbx_mode("GUIDED") # Change mode to Guided
+      # Send goto command and wait for completion
+      print("Sending setpoint position body command")
+      print(setpoint_position_body_m)
+      success = goto_rbx_position(setpoint_position_body_m)
+      #########################################
+      # Run Mission Actions
+      print("Starting Mission Actions")
+      success = mission_actions()
+      ##########################################
+      print("Switching back to original mode")
+      set_rbx_mode("RESUME")
+      print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
+      time.sleep(RESET_DELAY_S)
+      print("Waiting for next " + OBJ_LABEL_OF_INTEREST + " detection")
+    else:
+      print("No valid range value for target, skipping actions")
   else:
     print("No " + OBJ_LABEL_OF_INTEREST + " type for target data")
     time.sleep(1)
@@ -501,6 +504,7 @@ def goto_rbx_location(goto_data):
 
 ### Function to call goto Position Body control
 def goto_rbx_position(goto_data):
+  global rbx_status_cmd_success
   global rbx_goto_location_pub
   # Send goto Position Command
   wait_for_rbx_status_ready()
@@ -509,9 +513,11 @@ def goto_rbx_position(goto_data):
   rbx_goto_position_pub.publish(goto_position_msg)
   wait_for_rbx_status_busy()
   wait_for_rbx_status_ready()
+  return rbx_status_cmd_success
 
 ### Function to call goto Attititude NED control
 def goto_rbx_pose(goto_data):
+  global rbx_status_cmd_success
   global rbx_goto_pose_pub
   # Send goto Attitude Command
   wait_for_rbx_status_ready()
@@ -520,6 +526,7 @@ def goto_rbx_pose(goto_data):
   rbx_goto_pose_pub.publish(goto_attitude_msg)
   wait_for_rbx_status_busy()
   wait_for_rbx_status_ready()
+  return rbx_status_cmd_success
   
 ### Function to wait for goto control process to complete
 def wait_for_rbx_status_ready():
