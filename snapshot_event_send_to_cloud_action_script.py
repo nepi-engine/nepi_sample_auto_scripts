@@ -25,7 +25,7 @@
 #
 
 
-# Sample NEPI Automation Script. 
+ Sample NEPI Action Script. 
 # Uses onboard ROS python library to
 # 1. Confirms IDX driver supported camera topic is publishing
 # 2. Waits for snapshot_event topic message
@@ -40,14 +40,19 @@ from std_msgs.msg import UInt8, Empty, String, Bool
 from nepi_ros_interfaces.msg import IDXStatus, SaveData, SaveDataRate, StringArray
 
 
-#############################################################
-# SETUP - Edit as Necessary 
-#############################################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
 #Configure Your Connect Topics to Send in NEPI RUI
 
 ###!!!!!!!! Set Automation action parameters !!!!!!!!
 SEND_RESET_DELAY_S = 30.0 # Seconds. Delay before starting over
+
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
@@ -61,17 +66,18 @@ NEPI_LINK_CONNECT_TOPIC = NEPI_LINK_NAMESPACE + "connect_now"
 ### Snapshot Topic Name
 SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
-#############################################################
+#########################################
 # Globals
-#############################################################
+#########################################
+
 nepi_link_enable_pub = rospy.Publisher(NEPI_LINK_ENABLE_TOPIC, Bool, queue_size=10)
 nepi_link_set_data_sources = rospy.Publisher(NEPI_LINK_SET_DATA_SOURCES_TOPIC, StringArray, queue_size=10)
 nepi_link_collect_data_pub = rospy.Publisher(NEPI_LINK_COLLECT_DATA_TOPIC, Empty, queue_size=10)
 nepi_link_connect_now_pub = rospy.Publisher(NEPI_LINK_CONNECT_TOPIC, Empty, queue_size=10)
 
-#############################################################
+#########################################
 # Methods
-#############################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -116,9 +122,9 @@ def startNode():
   rospy.spin()
 
 
-#############################################################
+#########################################
 # Main
-#############################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

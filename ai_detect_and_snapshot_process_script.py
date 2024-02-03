@@ -24,10 +24,9 @@
 #
 #
 
-# Sample NEPI Automation Script. 
-# Uses onboard ROS python library to
+# Sample NEPI Process Script. 
 # 1. Waits for ai detection topic
-# 2. Wait for specific object to be detected and centered
+# 2. Waits for specific object to be detected and centered
 # 3. Publishes a snapshot event trigger out
 # 4. Delays trigger event for some set delay time
 
@@ -49,14 +48,17 @@ from std_msgs.msg import Empty
 from sensor_msgs.msg import Image
 from darknet_ros_msgs.msg import BoundingBoxes
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
-###!!!!!!!! Set Automation action parameters !!!!!!!!
 OBJ_LABEL_OF_INTEREST = "person"
 OBJ_CENTERED_BUFFER_RATIO = 0.5 # acceptable band about center of image for saving purposes
 RESET_DELAY_S = 5 # Min delay between triggers
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -68,16 +70,17 @@ AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
 # Snapshot Publish Topic
 SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
 img_width = 0 # Updated on receipt of first image
 img_height = 0 # Updated on receipt of first image
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -191,9 +194,9 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

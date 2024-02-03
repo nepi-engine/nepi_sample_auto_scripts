@@ -24,7 +24,8 @@
 #
 #
 
-# Sample NEPI Concept Ardupilot RBX Driver Script.
+# Sample NEPI Driver Script. 
+# NEPI RBX Driver for Ardupilot Autopilot Systems
 
 ### Set the namespace before importing rospy
 import os
@@ -66,11 +67,11 @@ from pygeodesy.ellipsoidalKarney import LatLon
 
 
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# DRIVER SETTINGS
+#########################################
 
-###################################################
+##############################
 # RBX State and Mode Dictionaries
 RBX_NAVPOSE = 7 # Byte Mask [GPS, Heading, Orienation]
 RBX_STATES = ["DISARM","ARM"]
@@ -81,7 +82,7 @@ RBX_STATE_FUNCTIONS = ["disarm","arm"]
 RBX_MODE_FUNCTIONS = ["stabilize","land","rtl","loiter","guided","resume"]
 RBX_ACTION_FUNCTIONS = ["takeoff"]
 
-###################################################
+##############################
 # RBX Initialization Values
 GOTO_TRAN_SPEED_RATIO = 0.5
 GOTO_ROT_SPEED_RATIO = 0.5
@@ -91,18 +92,18 @@ GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be go
 CMD_TIMEOUT_SEC = 20 # Any action that changes 
 PRINT_STATUS_1HZ = True # Print current rbx status at 1Hz
 
-
-
-###################################################
+##############################
 # ARDUPILOT Settings
 TAKEOFF_MIN_PITCH_DEG = 10
 TAKEOFF_ALT_M = 10
 
 
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
-###################################################
-# ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+
 NEPI_RBX_NAME = "ardupilot"
 NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_RBX_NAME + "/rbx/"
 NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
@@ -113,7 +114,6 @@ NEPI_RBX_CAPABILITIES_NAVPOSE_TOPIC = NEPI_RBX_NAMESPACE + "navpose_support"
 NEPI_RBX_CAPABILITIES_STATES_TOPIC = NEPI_RBX_NAMESPACE + "state_options"
 NEPI_RBX_CAPABILITIES_MODES_TOPIC = NEPI_RBX_NAMESPACE + "mode_options"
 NEPI_RBX_CAPABILITIES_ACTIONS_TOPIC = NEPI_RBX_NAMESPACE + "actions_options"
-
 # NEPI MAVLINK RBX Driver Status Publish Topics
 NEPI_RBX_STATUS_RATE_HZ = 10
 NEPI_RBX_STATUS_STATE_TOPIC = NEPI_RBX_NAMESPACE + "state"  # Int to Defined Dictionary RBX_STATES
@@ -125,12 +125,10 @@ NEPI_RBX_STATUS_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "goto_goals" # Floats [M
 NEPI_RBX_STATUS_GOTO_ERRORS_TOPIC = NEPI_RBX_NAMESPACE + "goto_errors" # Floats [X_Meters,Y_Meters,Z_Meters,Heading_Degrees,Roll_Degrees,Pitch_Degrees,Yaw_Degrees]
 NEPI_RBX_STATUS_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "cmd_timeout" # Int Seconds  - Any command that changes ready state
 NEPI_RBX_STATUS_CMD_SUCCESS_TOPIC = NEPI_RBX_NAMESPACE + "cmd_success" # Bool - Any command that changes ready state
-
 # NEPI MAVLINK RBX Driver NavPose Publish Topics
 NEPI_RBX_NAVPOSE_GPS_TOPIC = NEPI_RBX_NAMESPACE + "gps_fix"
 NEPI_RBX_NAVPOSE_ODOM_TOPIC = NEPI_RBX_NAMESPACE + "odom"
 NEPI_RBX_NAVPOSE_HEADING_TOPIC = NEPI_RBX_NAMESPACE + "heading"
-
 # NEPI MAVLINK RBX Driver Settings Subscriber Topics
 NEPI_RBX_SET_STATE_TOPIC = NEPI_RBX_NAMESPACE + "set_state" # Int to Defined Dictionary RBX_STATES
 NEPI_RBX_SET_MODE_TOPIC = NEPI_RBX_NAMESPACE + "set_mode"  # Int to Defined Dictionary RBX_MODES
@@ -138,7 +136,6 @@ NEPI_RBX_SET_HOME_CURRENT_TOPIC = NEPI_RBX_NAMESPACE + "set_home_current" # Empl
 NEPI_RBX_SET_GOTO_SPEEDS_TOPIC = NEPI_RBX_NAMESPACE + "set_goto_speeds" # Float [Translation_Ratio,Rotation_Ratio]
 NEPI_RBX_SET_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "set_goto_goals" # Float [Max_Meters,Max_Degrees,Stabilize_Time_Sec]
 NEPI_RBX_SET_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "set_cmd_timeout" # Int Seconds  - Any command that changes ready state
-
 # NEPI MAVLINK RBX Driver Control Subscriber Topics
 NEPI_RBX_GO_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "go_action"  # Int to Defined Dictionary RBX_ACTIONS
 NEPI_RBX_GO_HOME_TOPIC = NEPI_RBX_NAMESPACE + "go_home" # Ignored if any active goto processes
@@ -149,31 +146,28 @@ NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location" # Ignored if
 
 ###################################################
 MAVLINK_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/"
-
 # MAVLINK Subscriber Topics
 MAVLINK_STATE_TOPIC = MAVLINK_NAMESPACE + "state"
 MAVLINK_BATTERY_TOPIC = MAVLINK_NAMESPACE + "battery"
-
 # MAVLINK Required Services
 MAVLINK_SET_HOME_SERVICE = MAVLINK_NAMESPACE + "cmd/set_home"
 MAVLINK_SET_MODE_SERVICE = MAVLINK_NAMESPACE + "set_mode"
 MAVLINK_ARMING_SERVICE = MAVLINK_NAMESPACE + "cmd/arming"
 MAVLINK_TAKEOFF_SERVICE = MAVLINK_NAMESPACE + "cmd/takeoff"
-
 # MAVLINK NavPose Source Topics
 MAVLINK_SOURCE_GPS_TOPIC = MAVLINK_NAMESPACE + "global_position/global"
 MAVLINK_SOURCE_ODOM_TOPIC = MAVLINK_NAMESPACE + "global_position/local"
 MAVLINK_SOURCE_HEADING_TOPIC = MAVLINK_NAMESPACE + "global_position/compass_hdg"
-
 # MAVLINK Setpoint Control Topics
 MAVLINK_SETPOINT_ATTITUDE_TOPIC = MAVLINK_NAMESPACE + "setpoint_raw/attitude"
 MAVLINK_SETPOINT_POSITION_LOCAL_TOPIC = MAVLINK_NAMESPACE + "setpoint_position/local"
 MAVLINK_SETPOINT_LOCATION_GLOBAL_TOPIC = MAVLINK_NAMESPACE + "setpoint_position/global"
 
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 rbx_capabilities_navpose_pub = rospy.Publisher(NEPI_RBX_CAPABILITIES_NAVPOSE_TOPIC, UInt8, queue_size=1)
 rbx_capabilities_states_pub = rospy.Publisher(NEPI_RBX_CAPABILITIES_STATES_TOPIC, String, queue_size=1)
 rbx_capabilities_mode_pub = rospy.Publisher(NEPI_RBX_CAPABILITIES_MODES_TOPIC, String, queue_size=1)
@@ -224,9 +218,9 @@ rbx_status_pub_interval = float(1.0)/float(NEPI_RBX_STATUS_RATE_HZ)
 
 mavlink_state = None
                 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -1557,9 +1551,9 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

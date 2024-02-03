@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+/usr/bin/env python
 #
 # NEPI Dual-Use License
 # Project: nepi_sample_auto_scripts
@@ -24,8 +24,8 @@
 #
 #
 
-
-# Concept NEPI IDX Driver Script for ZED2 Camera.
+# Sample NEPI Driver Script. 
+# NEPI IDX Driver Script for ZED2 Camera Systems
 
 ###################################################
 # NEPI NavPose Axis Info
@@ -65,9 +65,9 @@ from cv_bridge import CvBridge
 
 
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# DRIVER SETTINGS
+#########################################
 
 #Define Sensor Native Parameters
 SENSOR_RES_OPTION_LIST = [0,1,2,3]  # Maps to IDX Res Options 0-3
@@ -87,8 +87,13 @@ IDX_THRESHOLD_RATIO = 0.5
 IDX_MIN_RANGE_RATIO=0.02 
 IDX_MAX_RANGE_RATIO=0.15 
 
-# ROS namespace setup
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+
 NEPI_IDX_SENSOR_NAME = "zed2_stereo_camera"
 NEPI_IDX_SENSOR_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_IDX_SENSOR_NAME
 NEPI_IDX_NAMESPACE = NEPI_IDX_SENSOR_NAMESPACE + "/idx/"
@@ -96,7 +101,6 @@ NEPI_IDX_NAMESPACE = NEPI_IDX_SENSOR_NAMESPACE + "/idx/"
 ZED_BASE_NAMESPACE = NEPI_BASE_NAMESPACE + "zed2/zed_node/"
 # Zed control topics
 ZED_PARAMETER_UPDATES_TOPIC = ZED_BASE_NAMESPACE + "parameter_updates"
-
 # Zed data stream topics
 ZED_COLOR_2D_IMAGE_TOPIC = ZED_BASE_NAMESPACE + "left/image_rect_color"
 ZED_BW_2D_IMAGE_TOPIC = ZED_BASE_NAMESPACE + "left/image_rect_gray"
@@ -106,13 +110,10 @@ ZED_ODOM_TOPIC = ZED_BASE_NAMESPACE + "odom"
 
 ### NEPI IDX NavPose Publish Topic
 NEPI_IDX_NAVPOSE_ODOM_TOPIC = NEPI_IDX_NAMESPACE + "odom"
-
-
 # NEPI IDX capabilities query service
 NEPI_IDX_CAPABILITY_REPORT_SERVICE = NEPI_IDX_NAMESPACE + "capabilities_query"
 NEPI_IDX_CAPABILITY_NAVPOSE_TOPIC = NEPI_IDX_NAMESPACE + "navpose_support"
 NEPI_IDX_CAPABILITY_NAVPOSE = 2 # Bit Mask [GPS,ODOM,HEADING]
-
 # NEPI IDX status and control topics
 NEPI_IDX_STATUS_TOPIC = NEPI_IDX_NAMESPACE + "status"
 NEPI_IDX_SET_BRIGHTNESS_TOPIC = NEPI_IDX_NAMESPACE + "set_brightness"
@@ -121,7 +122,6 @@ NEPI_IDX_SET_FRAMERATE_MODE_TOPIC = NEPI_IDX_NAMESPACE + "set_framerate_mode"
 NEPI_IDX_SET_RESOLUTION_MODE_TOPIC = NEPI_IDX_NAMESPACE + "set_resolution_mode"
 NEPI_IDX_SET_THRESHOLDING_TOPIC = NEPI_IDX_NAMESPACE + "set_thresholding"
 NEPI_IDX_SET_RANGE_WINDOW_TOPIC = NEPI_IDX_NAMESPACE + "set_range_window"
-
 # NEPI IDX data stream topics
 NEPI_IDX_COLOR_2D_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "color_2d_image"
 NEPI_IDX_BW_2D_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "bw_2d_image"
@@ -129,7 +129,6 @@ NEPI_IDX_DEPTH_MAP_TOPIC = NEPI_IDX_NAMESPACE + "depth_map"
 NEPI_IDX_DEPTH_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "depth_image"
 NEPI_IDX_POINTCLOUD_TOPIC = NEPI_IDX_NAMESPACE + "pointcloud"
 NEPI_IDX_POINTCLOUD_IMAGE_TOPIC = NEPI_IDX_NAMESPACE + "pointcloud_image"
-
 # NEPI IDX save data subscriber topics
 SAVE_FOLDER = "/mnt/nepi_storage/data/"
 NEPI_IDX_SAVE_DATA_TOPIC = NEPI_BASE_NAMESPACE + "save_data"
@@ -137,9 +136,9 @@ NEPI_IDX_SAVE_DATA_PREFIX_TOPIC = NEPI_BASE_NAMESPACE + "save_data_prefix"
 NEPI_IDX_SAVE_DATA_RATE_TOPIC = NEPI_BASE_NAMESPACE + "save_data_rate"
 
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
 
 idx_capability_navpose_pub = rospy.Publisher(NEPI_IDX_CAPABILITY_NAVPOSE_TOPIC, UInt8, queue_size=1)
 idx_navpose_odom_pub = rospy.Publisher(NEPI_IDX_NAVPOSE_ODOM_TOPIC, Odometry, queue_size=1)
@@ -152,8 +151,6 @@ idx_depth_map_pub = rospy.Publisher(NEPI_IDX_DEPTH_MAP_TOPIC, Image, queue_size=
 idx_depth_image_pub = rospy.Publisher(NEPI_IDX_DEPTH_IMAGE_TOPIC, Image, queue_size=1)
 idx_pointcloud_pub = rospy.Publisher(NEPI_IDX_POINTCLOUD_TOPIC, PointCloud2, queue_size=1)
 idx_pointcloud_image_pub = rospy.Publisher(NEPI_IDX_POINTCLOUD_IMAGE_TOPIC, Image, queue_size=1)
-
-
 
 #zed_parameter_update_pub = rospy.Publisher(ZED_PARAMETER_UPDATES_TOPIC, Config, queue_size=1)
 zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=30)
@@ -173,9 +170,9 @@ depth_map_msg = None
 depth_image_msg = None
 pointcloud_msg = None
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -554,9 +551,9 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

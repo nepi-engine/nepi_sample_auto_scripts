@@ -24,8 +24,7 @@
 #
 #
 
-# Sample NEPI Automation Script. 
-# Uses onboard ROS python library to
+# Sample NEPI Process Script.
 # 1. Waits for ai detection topic
 # 2. Runs a process that convert zed stereo camera depthmap depth_array and depth_image
 # 3. Runs a process to calculate range and bearing of detected targets
@@ -52,16 +51,18 @@ from std_msgs.msg import UInt8, Empty, String, Bool
 from nepi_ros_interfaces.msg import ClassifierSelection, StringArray, TargetLocalization
 from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
 #Set Runtime User Settings
-
 TARGET_BOX_REDUCTION_PERCENT=50 # Sets the percent of target box around center to use for range calc
 TARGET_DEPTH_METERS=0.3 # Sets the depth filter around mean depth to use for range calc
 TARGET_MIN_VALUES=10 # Sets the minimum number of valid points to consider for a valid range
 
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -81,18 +82,19 @@ BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
 FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "classifier/found_object"
 AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 target_data_pub = rospy.Publisher(TARGET_DATA_OUTPUT_TOPIC, TargetLocalization, queue_size=10)
 target_overlay_pub = rospy.Publisher(TARGET_IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 
 np_depth_array_m=None # will be replaced when depthmap is recieved and converted
 detect_boxes=None
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -303,9 +305,9 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

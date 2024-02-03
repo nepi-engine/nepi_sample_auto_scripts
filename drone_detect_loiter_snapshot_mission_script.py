@@ -24,8 +24,7 @@
 #
 #
 
-# Sample NEPI Automation Script.
-# Uses onboard ROS python and mavros libraries to
+# Sample NEPI Mission Script.
 ### Expects Classifier to be running ###
 # 1) Monitors AI detector output for specfic target class 
 # 3) Changes system to Loiter mode on detection
@@ -57,9 +56,17 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 from nepi_ros_interfaces.msg import TargetLocalization
 from darknet_ros_msgs.msg import BoundingBoxes
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+
+###################################################
+# RBX State and Mode Dictionaries
+RBX_STATES = ["DISARM","ARM"]
+RBX_MODES = ["STABILIZE","LAND","RTL","LOITER","GUIDED","RESUME"]
+RBX_ACTIONS = ["TAKEOFF"]
+
+
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
 ###!!!!!!!! Set Automation action parameters !!!!!!!!
 OBJ_LABEL_OF_INTEREST = "person"
@@ -72,11 +79,10 @@ NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
 
-###################################################
-# RBX State and Mode Dictionaries
-RBX_STATES = ["DISARM","ARM"]
-RBX_MODES = ["STABILIZE","LAND","RTL","LOITER","GUIDED","RESUME"]
-RBX_ACTIONS = ["TAKEOFF"] 
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
 # NEPI MAVLINK RBX Driver Capabilities Publish Topics
 NEPI_RBX_CAPABILITIES_NAVPOSE_TOPIC = NEPI_RBX_NAMESPACE + "navpose_support"
@@ -105,8 +111,6 @@ NEPI_RBX_GOTO_POSE_TOPIC = NEPI_RBX_NAMESPACE + "goto_pose" # Ignored if any act
 NEPI_RBX_GOTO_POSITION_TOPIC = NEPI_RBX_NAMESPACE + "goto_position" # Ignored if any active goto processes
 NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location" # Ignored if any active goto processes
 
-
-
 # AI Detector Subscriber Topics
 AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
 AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
@@ -114,9 +118,10 @@ AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
 # Mission Action Topics
 SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 rbx_set_state_pub = rospy.Publisher(NEPI_RBX_SET_STATE_TOPIC, UInt8, queue_size=1)
 rbx_set_mode_pub = rospy.Publisher(NEPI_RBX_SET_MODE_TOPIC, UInt8, queue_size=1)
 rbx_set_home_current_pub = rospy.Publisher(NEPI_RBX_SET_HOME_CURRENT_TOPIC, Empty, queue_size=1)
@@ -147,9 +152,9 @@ img_height = 0 # Updated on receipt of first image
 reset_delay_timer = 10000
 last_reset_time = time.time()
                
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -670,9 +675,9 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

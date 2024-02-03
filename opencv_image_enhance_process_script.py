@@ -25,8 +25,7 @@
 #
 
 
-# Sample NEPI Automation Script. 
-# Uses onboard ROS python library to
+# Sample NEPI Process Script.
 # 1. run sensor imagery through an image enhancement algorithm and republish to a new topic
 # 2. Run until Stopped
 
@@ -40,28 +39,32 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from std_msgs.msg import UInt8, Empty, String, Bool
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
-## Set Image ROS Topic Name to Use
+## Set ROS Image Topic Name to Use
 IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
-
 ENHANCE_SENSITIVITY_RATIO = 0.5
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
 IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "image_enhanced"
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 enhanced_image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -191,9 +194,9 @@ def startNode():
   # Spin forever (until object is detected)
   rospy.spin()
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

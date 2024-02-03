@@ -24,9 +24,9 @@
 #
 #
 
-# Sample NEPI Automation Script.
-# Uses onboard ROS libraries to
-# 1. Connect NEPI NavPose topics to appropriate navpose topics
+
+# Sample NEPI Config Script.
+# 1. Connects NEPI NavPose topics to appropriate navpose topics
 
 
 import rospy
@@ -39,10 +39,15 @@ from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamp
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
-# ROS namespace setup
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
+
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 NEPI_IDX_NAMESPACE = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/"
 
@@ -52,16 +57,17 @@ NAVPOSE_SOURCE_ORIENTATION_TOPIC = NEPI_IDX_NAMESPACE + "odom"
 ### Setup NEPI NavPose Settings Topic Namespaces
 NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 mavros_global_msg=None
 mavros_heading_msg=None
 mavros_orientation_msg=None
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -133,9 +139,9 @@ def startNode():
   
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

@@ -24,10 +24,9 @@
 #
 #
 
-# Sample NEPI Automation Script. 
-# Uses onboard ROS python library to
+# Sample NEPI Action Script. 
 # 1. Waits for snapshot_event topic message
-# 2. Start saving image data to onboard storage
+# 2. Starts saving image data to onboard storage
 # 3. Delays a specified amount of time, then stops saving
 # 4. Delays next trigger event action for some set delay time
 
@@ -49,9 +48,10 @@ from nepi_ros_interfaces.msg import NavPose
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
 
-###########################################################################
-# SETUP - Edit as Necessary 
-###########################################################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
+
 SAVE_NAVPOSE_DATA_ENABLED = True # True-Save NavPose File  with each image
 
 
@@ -66,7 +66,10 @@ SAVE_FOLDER_NAME = "snapshot_event/" # Use "" to ignore
 SAVE_FILE_PREFIX = "snapshot_event" # Use "" to ignore
 SAVE_IMAGE_TYPE = "jpg"
 
-# NEPI ROS namespace setup
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 ### Snapshot Topic Name
 SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
@@ -74,18 +77,19 @@ SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 save_folder = "/mnt/nepi_storage/data/" + SAVE_FOLDER_NAME
 save_data_min_interval_s = float(1.0)/SAVE_DATA_MAX_RATE_HZ
 save_data_enable = False
 last_save_time_s = None
 image_topic_to_save = None
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -237,9 +241,9 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

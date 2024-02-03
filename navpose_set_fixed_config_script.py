@@ -25,13 +25,12 @@
 #
 
 
-# Sample NEPI Automation Script.
+# Sample NEPI Config Script.
 # If your NEPI system does not have an attached GPS/IMU/Compass or other
 # NavPose source, this script can be set to run at startup setting fixed
 # NavPose values on your system.
-# Uses onboard ROS python library to
-# 1. Set a fixed NavPose Solution (Lat,Long,Alt,Heading,Roll,Pitch,Yaw)
-# 2. Exit after setting
+# 1. Sets a fixed NavPose Solution (Lat,Long,Alt,Heading,Roll,Pitch,Yaw)
+
 
 import rospy
 import math
@@ -42,16 +41,20 @@ from std_msgs.msg import Float64, Empty
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Quaternion, QuaternionStamped
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
 # Set Start Fixed NavPose Values
 #Numurus Office
 START_GEOPOINT = [47.6540828,-122.3187578,0.0] # [Lat, Long, Altitude_AMSL_M]
 START_HEADING_DEG = 88.0 # Global True North, or 0 for Body Relative
 START_ORIENTATION_DEGS = [10.0,20.0,30.0]
-# ROS namespace setup
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
 ###!!!!!!!! Set NavPose initialization values !!!!!!!!
@@ -61,9 +64,14 @@ SET_NAVPOSE_FIXED_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_in
 REINIT_NAVPOSE_SOLUTION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/reinit_solution"
 
 
-#####################################################################################
+#########################################
+# Globals
+#########################################
+
+
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 
 ### System Initialization processes
@@ -138,9 +146,9 @@ def startNode():
   # Spin forever
   rospy.spin()
   
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

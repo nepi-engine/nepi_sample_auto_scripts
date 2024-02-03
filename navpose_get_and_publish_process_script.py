@@ -24,10 +24,9 @@
 #
 #
 
-# Sample NEPI Automation Script.
-# Uses onboard ROS python libraries to
-# 1. call the NEPI ROS's nav_pose_mgr/query_data_products service
-# 2. gets and publishes current navpose solution data at set rate to new topics:
+# Sample NEPI Process Script.
+# 1. Calls the NEPI ROS's nav_pose_mgr/query_data_products service
+# 2. Gets and publishes current navpose solution data at set rate to new topics:
 #  navpose = NEPI NavPose Message
 #  heading_deg = Float64 (heading in degrees)
 #  orientation_ned_degs = [Float64, Float64, Float64] (roll, pitch, yaw in +-180 degrees NED frame)  
@@ -86,12 +85,15 @@ from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamp
 from nepi_ros_interfaces.msg import NavPose
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
 NAVPOSE_PUB_RATE_HZ = 10
 
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -110,10 +112,10 @@ NAVPOSE_PUBLISH_LOCATION_AMSL_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/location_a
 NAVPOSE_PUBLISH_LOCATION_WGS84_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/location_wgs84_geo"
 NAVPOSE_PUBLISH_GEOID_HEIGHT_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/geoid_height_m"
 
-
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 navpose_navpose_pub = rospy.Publisher(NAVPOSE_PUBLISH_NAVPOSE_TOPIC, NavPose, queue_size=1)
 navpose_heading_pub = rospy.Publisher(NAVPOSE_PUBLISH_HEADING_TOPIC, Float64, queue_size=1)
 navpose_orientation_ned_pub = rospy.Publisher(NAVPOSE_PUBLISH_ORIENTATION_NED_TOPIC, Float64MultiArray , queue_size=1)
@@ -126,9 +128,9 @@ navpose_geoid_height_pub = rospy.Publisher(NAVPOSE_PUBLISH_GEOID_HEIGHT_TOPIC, F
 navpose_pub_interval_sec = float(1.0)/NAVPOSE_PUB_RATE_HZ
 
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -278,9 +280,9 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

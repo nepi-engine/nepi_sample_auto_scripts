@@ -24,11 +24,10 @@
 #
 #
 
-# Sample Solution Config Script. 
-# 1. launches scripts from list NEPI ROS service
+# Sample Solution Startup Script. 
+# 1. Launches scripts from list that are not running
 # 2. Waits for shutdown
-# 3. Stops scripts from list
-# 4. Relaunchs any scripts that were running at Start
+# 3. Stops scripts that were launched by this script
 
 import rospy
 import os
@@ -40,9 +39,11 @@ import time
 from std_srvs.srv import Empty, EmptyRequest, Trigger
 from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,LaunchScript, StopScript
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
+
 SCRIPT_LIST = ["ardupilot_rbx_driver_script.py",
                "ardupilot_rbx_navpose_config_script.py",
                "ardupilot_rbx_fake_gps_config_script.py",
@@ -51,6 +52,10 @@ SCRIPT_LIST = ["ardupilot_rbx_driver_script.py",
                "snapshot_event_send_to_cloud_action_script.py",
                "drone_detect_loiter_snapshot_mission_script.py"] #  Script filenames to start/stop
 
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
@@ -61,18 +66,20 @@ AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME = NEPI_BASE_NAMESPACE + "get_running_scrip
 AUTO_LAUNCH_SCRIPT_SERVICE_NAME = NEPI_BASE_NAMESPACE + "launch_script"
 AUTO_STOP_SCRIPT_SERVICE_NAME = NEPI_BASE_NAMESPACE + "stop_script"
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 get_installed_scripts_service = rospy.ServiceProxy(AUTO_GET_INSTALLED_SCRIPTS_SERVICE_NAME, GetScriptsQuery )
 get_running_scripts_service = rospy.ServiceProxy(AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME, GetRunningScriptsQuery )
 launch_script_service = rospy.ServiceProxy(AUTO_LAUNCH_SCRIPT_SERVICE_NAME, LaunchScript)
 stop_script_service = rospy.ServiceProxy(AUTO_STOP_SCRIPT_SERVICE_NAME, StopScript)
 scripts_installed_at_start = None
 scripts_running_at_start = None
-#####################################################################################
+
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -248,9 +255,9 @@ def startNode():
   # Spin forever
   rospy.spin()
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

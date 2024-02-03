@@ -25,8 +25,7 @@
 #
 
 
-# Sample NEPI Automation Script.
-# Uses onboard ROS and MAVROS libraries to
+# Sample NEPI Config Script.
 # 1) Publishes a fake GPS MAVLink Message 
 # Provides two ROS control topics
 # a) goto_geopoint_wgs84 - Simulates move to new geopoint
@@ -71,15 +70,9 @@ from mavros_msgs.srv import CommandHome
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
-###################################################
-# SETUP - Edit as Necessary 
-##########################################
-
-###################################################
-# RBX State and Mode Dictionaries
-RBX_MODE_FUNCTIONS = ["stabilize","land","rtl","loiter","guided","resume"]
-RBX_ACTION_FUNCTIONS = ["takeoff"]
-TAKEOFF_ALT_M = 10
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
 #Startup Location
 # [Lat, Long, Altitude_WGS84]
@@ -96,22 +89,23 @@ MOVE_UPDATE_STEPS = GPS_PUB_RATE_HZ*MOVE_UPDATE_TIME_SEC # Number of moves to re
 
 PRINT_LOCATION_1HZ = False # Print current location at 1Hz
 
-# ROS namespace setup
+
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
 
-
 MAVLINK_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/"
-
 # MAVLINK Fake GPS Publish Topic
 MAVLINK_HILGPS_TOPIC = MAVLINK_NAMESPACE + "hil/gps"
-
 # MAVLINK Fake GPS Control Topic
 MAVLINK_FAKE_GPS_GOTO_GEOPOINT_TOPIC = MAVLINK_NAMESPACE + "fake_gps/goto_geopoint_wgs84"
 MAVLINK_FAKE_GPS_RESET_GEOPOINT_TOPIC = MAVLINK_NAMESPACE + "fake_gps/reset_geopoint_wgs84"
 MAVLINK_FAKE_GPS_RESET_CURRENT_TOPIC = MAVLINK_NAMESPACE + "fake_gps/reset_current"
-
 # MAVLINK Fake GPS RBX Subscriber Topic
 NEPI_RBX_GOTO_POSITION_TOPIC = NEPI_RBX_NAMESPACE + "goto_position"
 NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location"
@@ -120,9 +114,15 @@ NEPI_RBX_SET_MODE_TOPIC = NEPI_RBX_NAMESPACE + "set_mode"  # Int to Defined Dict
 NEPI_RBX_SET_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "set_action"  # Int to Defined Dictionary RBX_MODES
 
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
+# RBX State and Mode Dictionaries
+RBX_MODE_FUNCTIONS = ["stabilize","land","rtl","loiter","guided","resume"]
+RBX_ACTION_FUNCTIONS = ["takeoff"]
+TAKEOFF_ALT_M = 10
+
 mavlink_fake_gps_mavlink_pub = rospy.Publisher(MAVLINK_HILGPS_TOPIC, HilGPS, queue_size=1)
 current_location_wgs84_geo = None
 current_heading_deg = None
@@ -130,9 +130,10 @@ current_home = None
 navpose_update_interval = 0.1
 fake_gps_enabled = True
 gps_publish_interval_sec=1.0/GPS_PUB_RATE_HZ
-#####################################################################################
+
+#########################################
 # Methods
-##########f###########################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -490,9 +491,9 @@ def startNode():
   # Spin forever
   rospy.spin()
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

@@ -24,13 +24,11 @@
 #
 #
 
-# Sample NEPI Automation Script. 
-# Uses onboard ROS python library to
+# Sample NEPI Config Script.
 # 1. Checks if AI input image topic exists
-# 2. Try's to set reslution on camera 
-# 3. Loads selected AI model
-# 4. Starts AI detection process using input image stream
-# 5. Stops AI detection process on shutdown
+# 2. Loads selected AI model
+# 3. Starts AI detection process using input image stream
+# 4. Stops AI detection process on shutdown
 
 import time
 import sys
@@ -40,9 +38,10 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import UInt8, Empty, String, Bool
 from nepi_ros_interfaces.msg import ClassifierSelection, StringArray
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
+
 
 #Set AI Detector Image ROS Topic Name
 IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
@@ -51,20 +50,25 @@ IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
 DETECTION_MODEL = "common_object_detection"
 DETECTION_THRESHOLD = 0.5
 
-# NEPI ROS namespace setup
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
 # AI Detector Publish Topics
 AI_START_TOPIC = NEPI_BASE_NAMESPACE + "start_classifier"
 AI_STOP_TOPIC = NEPI_BASE_NAMESPACE + "stop_classifier"
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
-#####################################################################################
+
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -135,11 +139,9 @@ def startNode():
   rospy.spin()
   
   
-
-
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

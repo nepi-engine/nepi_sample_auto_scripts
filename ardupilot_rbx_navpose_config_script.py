@@ -24,10 +24,9 @@
 #
 #
 
-# Sample NEPI Automation Script.
-# Uses onboard ROS and MAVROS python libraries to
+# Sample NEPI Config Script.
 # 1. Connect NEPI NavPose topics to appropriate mavros topics
-# 2. Set NEPI GPS source time synchronization
+# 2. Sets NEPI GPS source and time synchronization
 
 import rospy
 import time
@@ -39,12 +38,17 @@ from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamp
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
+
 SYNC_NEPI2GPS_CLOCK = True # Set to false to disable GPS clock sync
 
-# ROS namespace setup
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
 
@@ -60,16 +64,17 @@ NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_ori
 NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/enable_gps_clock_sync"
 
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 mavros_global_msg=None
 mavros_heading_msg=None
 mavros_orientation_msg=None
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -164,9 +169,9 @@ def startNode():
   
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

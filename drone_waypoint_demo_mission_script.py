@@ -55,6 +55,7 @@ from geographic_msgs.msg import GeoPoint, GeoPose, GeoPoseStamped
 from mavros_msgs.msg import State, AttitudeTarget
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandTOL, CommandHome
 
+
 ###################################################
 # RBX State and Mode Dictionaries
 RBX_STATES = ["DISARM","ARM"]
@@ -71,30 +72,13 @@ RBX_ACTIONS = ["TAKEOFF"]
 # goto_location is [LAT, LONG, ALT_WGS84, YAW_NED_DEGREES]
 # Altitude is specified as meters above the WGS-84 and converted to AMSL before sending
 # Yaw is specified in NED frame degrees 0-360 or +-180 
-GOTO_LOCATION = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
-GOTO_LOCATION_CORNERS =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999],[47.65397990,-122.31912330, -999, -999]]
+GOTO_LOCATION = [47.6541208,-122.3186620, 20, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
 
-# GoTo Position Local Body Settings
-###################
-# goto_position is [X_BODY_METERS, Y_BODY_METERS, Z_BODY_METERS, YEW_BODY_DEGREES]
-# Local Body Position goto Function use these body relative x,y,z,yaw conventions
-# x+ axis is forward
-# y+ axis is right
-# z+ axis is down
-# Only yaw orientation updated
-# yaw+ clockwise, yaw- counter clockwise from x axis (0 degrees faces x+ and rotates positive using right hand rule around z+ axis down)
-GOTO_POSITION = [10,5,0,0] # [X, Y, Z, YAW] Offset in xyz meters yaw body +- 180 (+Z is Down). Use 0 value for no change
-
-# GoTo Attitude NED Settings
-###################
-# goto_attitudeInp is [ROLL_NED_DEG, PITCH_NED_DEG, YEW_NED_DEGREES]
-GOTO_POSE = [-999,30,-999] # Roll, Pitch, Yaw Degrees: Enter -999 to use current value
 
 #########################################
 # ROS NAMESPACE SETUP
 #########################################
 
-# ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
@@ -134,7 +118,7 @@ AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
 SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
 #########################################
-# Globals
+# Methods
 #########################################
 
 rbx_set_state_pub = rospy.Publisher(NEPI_RBX_SET_STATE_TOPIC, UInt8, queue_size=1)
@@ -162,9 +146,9 @@ rbx_status_cmd_success = None
 snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
 
                
-#########################################
+#####################################################################################
 # Methods
-#########################################
+#####################################################################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -284,8 +268,8 @@ def mission_actions():
   ###########################
   ## Change Vehicle Mode to Guided
   success = True
-##  print("Sending snapshot event trigger")
-##  snapshot()
+  print("Sending snapshot event trigger")
+  snapshot()
   ###########################
   # Stop Your Custom Actions
   ###########################
@@ -601,27 +585,6 @@ def startNode():
   # Send goto Location Command
   print("Starting goto Location Global Process")
   success = goto_rbx_location(GOTO_LOCATION)
-  ##########################################
-  # Send goto Position Command
-  print("Starting goto Position Local Process")
-  success = goto_rbx_position(GOTO_POSITION)
-  #########################################
-  # Send goto Attitude Command
-  print("Sending goto Attitude Control Message")
-  success = goto_rbx_pose(GOTO_POSE)
-  #########################################
-  # Run Mission Actions
-  print("Starting Mission Actions")
-  success = mission_actions()
- #########################################
-  # Send goto Location Loop Command
-  for ind in range(4):
-    # Send goto Location Command
-    print("Starting goto Location Corners Process")
-    success = goto_rbx_location(GOTO_LOCATION_CORNERS[ind])
-    # Run Mission Actions
-    print("Starting Mission Actions")
-    success = mission_actions()
   #########################################
   # End Mission
   #########################################

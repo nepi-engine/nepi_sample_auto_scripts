@@ -25,7 +25,8 @@
 #
 
 
-#Concept PTX NavPose Driver Interface for IQR PanTilt
+# Sample NEPI Driver Script. 
+# NEPI PTX NavPose Driver Interface for IQR PanTilt Systems
 
 ###################################################
 # NEPI NavPose Axis Info
@@ -50,10 +51,9 @@ from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped, QuaternionStamped
 from nepi_ros_interfaces.msg import PanTiltStatus, StringArray
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
-
+#########################################
+# DRIVER SETTINGS
+#########################################
 
 NAVPOSE_UPDATE_RATE_HZ = 10
 # Pan and Tilt setup parameters
@@ -62,12 +62,14 @@ PT_REVERSE_TILT = True # Flip Sensor Feedback Values for NavPose Body Frame
 # Set Start roll pitch yaw body frame values
 START_RPY_DEGS =  [0.0,0.0,0.0]# Roll, Pitch, Yaw in body frame degs
 
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
 
-### ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+
 NEPI_PTX_NAME = "iqr_pan_tilt"
 NEPI_PTX_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_PTX_NAME + "/ptx/"
-
 ### PanTilt Subscribe Topics
 NEPI_PTX_GET_STATUS_TOPIC = NEPI_PTX_NAMESPACE + "status"
 ### PanTilt NavPose Publish Topic
@@ -76,9 +78,10 @@ NEPI_PTX_NAVPOSE_ODOM_TOPIC = NEPI_PTX_NAMESPACE + "odom"
 NEPI_SET_NAVPOSE_SET_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
 
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 navpose_pt_orientation_pub = rospy.Publisher(NEPI_PTX_NAVPOSE_ODOM_TOPIC, Odometry , queue_size=1)
 navpose_update_interval_sec = float(1.0)/NAVPOSE_UPDATE_RATE_HZ
 current_rpy_pt_degs = START_RPY_DEGS
@@ -88,10 +91,10 @@ pt_pitch_now_deg=0
 pt_yaw_now_ratio=0
 pt_pitch_now_ratio=0
 pt_speed_now_ratio=0
-#####################################################################################
-# Methods
-#####################################################################################
 
+#########################################
+# Methods
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -214,9 +217,9 @@ def startNode():
   # Spin forever
   rospy.spin()
   
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()

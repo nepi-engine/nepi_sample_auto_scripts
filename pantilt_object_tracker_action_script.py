@@ -24,13 +24,12 @@
 #
 #
 
-# Sample NEPI Automation Script. 
-# Uses onboard ROS python library to
+ Sample NEPI Action Script. 
 ### Expects Classifier to be running ###
-# 1. Configure and start pan and tilt
-# 2. Set and start pan and tilt search scan
-# 3. Wait for specific objects to be detected and starts tracking largest detection box
-# 4. Return to search/scan mode if no detected objects are being detected
+# 1. Configures and starts pan and tilt
+# 2. Sets and start pan and tilt search scan
+# 3. Waits for specific objects to be detected and starts tracking largest detection box
+# 4. Returns to search/scan mode if no detected objects are being detected
 
 # Requires the following additional scripts are running
 # a)ai_detector_config_script.py
@@ -51,9 +50,9 @@ from nepi_ros_interfaces.msg import PanTiltLimits, PanTiltPosition, PanTiltStatu
 from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 
 
-############################################################################
-# SETUP - User Settings
-############################################################################
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
 
 # Minimum detection box area as a ration of image size
 MIN_DETECT_BOX_AREA_RATIO = 0.15 # Filters background targets.
@@ -73,10 +72,10 @@ PTX_MIN_TRACK_SPEED = 0.05
 PTX_OBJECT_TILT_OFFSET_RATIO = 0.7 # Adjust tilt tracking ratio location within box
 PTX_OBJ_CENTERED_BUFFER_RATIO = 0.3 # Hysteresis band about center of image for tracking purposes
 
-############################################################################
-# SETUP - Env Settings
-############################################################################
-# ROS namespace setup
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 PTX_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/ptx/"
 
@@ -96,9 +95,9 @@ AI_FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "classifier/found_object"
 AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
 
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
 
 send_pt_home_pub = rospy.Publisher(PTX_GOHOME_TOPIC, Empty, queue_size=10)
 set_pt_speed_ratio_pub = rospy.Publisher(PTX_SET_SPEED_RATIO_TOPIC, Float32, queue_size=10)
@@ -128,9 +127,9 @@ pt_pitch_now_ratio=0
 pt_speed_now_ratio=0
 
 
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -378,9 +377,10 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
+
 if __name__ == '__main__':
   startNode()   #initialize system
 

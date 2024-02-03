@@ -24,8 +24,7 @@
 #
 #
 
-# Sample NEPI Automation Script.
-# Uses onboard ROS python and mavros libraries to
+# Sample NEPI Mission Script.
 ### Expects Classifier to be running ###
 # 1) Connects to Target Range and Bearing data Topic
 # 2) Monitors AI detector output for specfic target class 
@@ -61,24 +60,28 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 from nepi_ros_interfaces.msg import TargetLocalization
 from darknet_ros_msgs.msg import BoundingBoxes
 
-#####################################################################################
-# SETUP - Edit as Necessary ##################################
-##########################################
-
-OBJ_LABEL_OF_INTEREST = 'chair'
-TARGET_OFFSET_GOAL_M = 0.5 # How close to set setpoint to target
-RESET_DELAY_S = 1 # Min delay between triggering a new move
-
-# ROS namespace setup
-NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
-NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
-
 ###################################################
 # RBX State and Mode Dictionaries
 RBX_STATES = ["DISARM","ARM"]
 RBX_MODES = ["STABILIZE","LAND","RTL","LOITER","GUIDED","RESUME"]
 RBX_ACTIONS = ["TAKEOFF"] 
+
+#########################################
+# USER SETTINGS - Edit as Necessary 
+#########################################
+
+OBJ_LABEL_OF_INTEREST = 'chair'
+TARGET_OFFSET_GOAL_M = 0.5 # How close to set setpoint to target
+RESET_DELAY_S = 1 # Min delay between triggering a new move
+
+#########################################
+# ROS NAMESPACE SETUP
+#########################################
+
+# ROS namespace setup
+NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
+NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
 
 # NEPI MAVLINK RBX Driver Capabilities Publish Topics
 NEPI_RBX_CAPABILITIES_NAVPOSE_TOPIC = NEPI_RBX_NAMESPACE + "navpose_support"
@@ -113,9 +116,10 @@ TARGET_DATA_INPUT_TOPIC = NEPI_BASE_NAMESPACE + "targeting/targeting_data"
 # Mission Action Topics
 SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
 
-#####################################################################################
+#########################################
 # Globals
-#####################################################################################
+#########################################
+
 rbx_set_state_pub = rospy.Publisher(NEPI_RBX_SET_STATE_TOPIC, UInt8, queue_size=1)
 rbx_set_mode_pub = rospy.Publisher(NEPI_RBX_SET_MODE_TOPIC, UInt8, queue_size=1)
 rbx_set_home_current_pub = rospy.Publisher(NEPI_RBX_SET_HOME_CURRENT_TOPIC, Empty, queue_size=1)
@@ -140,9 +144,9 @@ rbx_status_cmd_success = None
 
 snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
                
-#####################################################################################
+#########################################
 # Methods
-#####################################################################################
+#########################################
 
 ### System Initialization processes
 def initialize_actions():
@@ -636,9 +640,9 @@ def startNode():
   rospy.spin()
 
 
-#####################################################################################
+#########################################
 # Main
-#####################################################################################
+#########################################
 
 if __name__ == '__main__':
   startNode()
