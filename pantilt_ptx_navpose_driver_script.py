@@ -46,6 +46,7 @@ from std_msgs.msg import String, Float64, Float64MultiArray, Empty
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped, QuaternionStamped
+from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 from nepi_ros_interfaces.msg import PanTiltStatus, StringArray
 
 #########################################
@@ -57,7 +58,9 @@ NAVPOSE_UPDATE_RATE_HZ = 10
 PT_REVERSE_PAN = True # Flip Sensor Feedback Values for NavPose Body Frame
 PT_REVERSE_TILT = True # Flip Sensor Feedback Values for NavPose Body Frame
 # Set Start roll pitch yaw body frame values
-START_RPY_DEGS =  [0.0,0.0,0.0]# Roll, Pitch, Yaw in body frame degs
+RPY_OFFSETS_DEGS =  [0.0,0.0,0.0]# Roll, Pitch, Yaw in body frame degs
+
+PTX_HEADING_SOURCE_TOPIC = None # if set to None, uses initial NEPI NavPose heading
 
 #########################################
 # ROS NAMESPACE SETUP
@@ -69,10 +72,12 @@ NEPI_PTX_NAME = "iqr_pan_tilt"
 NEPI_PTX_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_PTX_NAME + "/ptx/"
 ### PanTilt Subscribe Topics
 NEPI_PTX_GET_STATUS_TOPIC = NEPI_PTX_NAMESPACE + "status"
+NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 ### PanTilt NavPose Publish Topic
 NEPI_PTX_NAVPOSE_ODOM_TOPIC = NEPI_PTX_NAMESPACE + "odom"
-### NEPI NavPose Setting Publish Topic
-NEPI_SET_NAVPOSE_SET_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
+NEPI_PTX_NAVPOSE_HEADING_TOPIC = NEPI_PTX_NAMESPACE + "heading"
+
+
 
 
 #########################################
@@ -80,8 +85,11 @@ NEPI_SET_NAVPOSE_SET_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set
 #########################################
 
 navpose_pt_orientation_pub = rospy.Publisher(NEPI_PTX_NAVPOSE_ODOM_TOPIC, Odometry , queue_size=1)
+navpose_pt_heading_pub = rospy.Publisher(NEPI_PTX_NAVPOSE_HEADING_TOPIC, Float64 , queue_size=1)
 navpose_update_interval_sec = float(1.0)/NAVPOSE_UPDATE_RATE_HZ
-current_rpy_pt_degs = START_RPY_DEGS
+current_rpy_pt_degs = RPY_OFFSETS_DEGS
+
+pt_base_heading = 0
 
 pt_yaw_now_deg=0
 pt_pitch_now_deg=0
@@ -95,10 +103,27 @@ pt_speed_now_ratio=0
 
 ### System Initialization processes
 def initialize_actions():
+  global pt_base_heading
   global current_rpy_pt_degs
   global navpose_update_interval_sec
   print("")
   print("Starting Initialization")
+  # Setup Base Input Heading
+  if PTX_HEADING_SOURCE_TOPIC is None:
+    # Get current NEPI NavPose data from NEPI ROS nav_pose_query service call
+    try:
+      get_navpose_service = rospy.ServiceProxy(NAVPOSE_SERVICE_NAME, NavPoseQuery)
+      nav_pose_response = get_navpose_service(NavPoseQueryRequest())
+      #print(nav_pose_response)
+      # Set current navpose
+      current_navpose = nav_pose_response.nav_pose
+      # Set current heading in degrees
+      pt_base_heading = nav_pose_response.nav_pose.heading.heading
+    except:
+      print('Failed to get NEPI NavPose heading')
+  else:
+    # Subscribe to PTX_HEADING_SOURCE_TOPIC for continous base heading update
+    rospy.Subscriber(PTX_HEADING_SOURCE_TOPIC, Flaot64, pt_heading_source_callback)  
   # Start PT Status Callback
   print("Waiting for PTX Status Topic: " + NEPI_PTX_GET_STATUS_TOPIC)
   wait_for_topic(NEPI_PTX_GET_STATUS_TOPIC)
@@ -107,17 +132,26 @@ def initialize_actions():
   ##############################
   # Start our Update NavPose Publisher Topic
   print("Starting NavPose Update Publisher at: " + str(NAVPOSE_UPDATE_RATE_HZ) + " Hz")
-  rospy.Timer(rospy.Duration(navpose_update_interval_sec), ptx_navpose_odom_publish_callback)
+  rospy.Timer(rospy.Duration(navpose_update_interval_sec), ptx_navpose_publish_callback)
   time.sleep(2) # Wait for publiser to start
   print("Initialization Complete")
+
+
+#######################
+# Update base heading callback
+def pt_heading_source_callback(heading_msg):
+    global pt_base_heading
+    pt_base_heading = heading_msg.data
 
 #######################
 # Driver NavPose Publishers Functions
 
 ### Setup a regular background navpose update timer callback
-def ptx_navpose_odom_publish_callback(timer):
+def ptx_navpose_publish_callback(timer):
+  global pt_base_heading
   global current_rpy_pt_degs
   global navpose_pt_orientation_pub
+  global navpose_pt_heading_pub
   # Create Position Data
   new_pos = Point()
   new_pos.x = 0
@@ -140,8 +174,12 @@ def ptx_navpose_odom_publish_callback(timer):
   new_odometry.header.frame_id = 'map'
   new_odometry.child_frame_id = 'nepi_center_frame'
   new_odometry.pose.pose = new_pose
+  # Create NavPose Heading Message
+  new_heading = pt_base_heading + current_rpy_pt_degs[2]
+  
   if not rospy.is_shutdown():
     navpose_pt_orientation_pub.publish(new_odometry)
+    navpose_pt_heading_pub.publish(data=new_heading)
 
 
 ### Simple callback to get pt status info
@@ -154,7 +192,7 @@ def pt_status_callback(PanTiltStatus):
     pt_yaw_now_deg = -pt_yaw_now_deg
   if PT_REVERSE_TILT:
     pt_pitch_now_deg = -pt_pitch_now_deg
-  current_rpy_pt_degs=[START_RPY_DEGS[0],pt_pitch_now_deg,pt_yaw_now_deg]
+  current_rpy_pt_degs=[RPY_OFFSETS_DEGS[0],pt_pitch_now_deg,pt_yaw_now_deg]
 
 #######################
 # Process Functions

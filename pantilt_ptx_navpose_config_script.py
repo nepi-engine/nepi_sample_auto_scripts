@@ -41,21 +41,22 @@ from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 #########################################
 # USER SETTINGS - Edit as Necessary 
 #########################################
-
+CONNECT_PTX_HEADING = True # Set to True to configure Heading to PTX Heading output
 
 #########################################
 # ROS NAMESPACE SETUP
 #########################################
 
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-PTX_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/ptx/"
+NEPI_PTX_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/ptx/"
 
 # NavPose Source Topics
-NAVPOSE_SOURCE_ORIENTATION_TOPIC =PTX_NAMESPACE + "odom"
+NAVPOSE_SOURCE_ORIENTATION_TOPIC = NEPI_PTX_NAMESPACE + "odom"
+NAVPOSE_SOURCE_HEADING_TOPIC = NEPI_PTX_NAMESPACE + "heading"
 
 ### Setup NEPI NavPose Settings Topic Namespaces
 NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
-
+NEPI_SET_NAVPOSE_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_heading_topic"
 #########################################
 # Globals
 #########################################
@@ -72,6 +73,11 @@ mavros_orientation_msg=None
 def initialize_actions():
   print("")
   print("Starting Initialization")
+  print("Waiting for topic: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
+  wait_for_topic(NAVPOSE_SOURCE_ORIENTATION_TOPIC)
+  if CONNECT_PTX_HEADING:
+    print("Waiting for topic: " + NAVPOSE_SOURCE_HEADING_TOPIC)
+    wait_for_topic(NAVPOSE_SOURCE_HEADING_TOPIC)  
   # Start timer callback that sends regular set navepose updates
   print("Starting set navpose topics timer callback")
   rospy.Timer(rospy.Duration(5.0), set_nepi_navpose_topics_callback)
@@ -80,12 +86,15 @@ def initialize_actions():
 ### Callback to set NEPI navpose topics
 def set_nepi_navpose_topics_callback(timer):
   # Update Orientation source
-  print("Waiting for topic: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
-  wait_for_topic(NAVPOSE_SOURCE_ORIENTATION_TOPIC)
   set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
+  if CONNECT_PTX_HEADING:
+    set_heading_pub = rospy.Publisher(NEPI_SET_NAVPOSE_HEADING_TOPIC, String, queue_size=1)
   time.sleep(1) # Wait between creating and using publisher
   set_orientation_pub.publish(NAVPOSE_SOURCE_ORIENTATION_TOPIC)
-  print("Orientation Topic Set to: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
+  print("NavPose Orientation Topic Set to: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
+  if CONNECT_PTX_HEADING:
+    set_heading_pub.publish(NAVPOSE_SOURCE_HEADING_TOPIC)
+    print("NavPose Heading Topic Set to: " + NAVPOSE_SOURCE_HEADING_TOPIC)
 
 #######################
 # Initialization Functions
