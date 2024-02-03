@@ -24,7 +24,7 @@
 #
 #
 
- Sample NEPI Action Script. 
+# Sample NEPI Action Script. 
 ### Expects Classifier to be running ###
 # 1. Configures and starts pan and tilt
 # 2. Sets and start pan and tilt search scan

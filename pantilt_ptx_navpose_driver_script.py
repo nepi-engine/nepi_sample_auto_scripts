@@ -25,9 +25,6 @@
 #
 
 
-# Sample NEPI Driver Script. 
-# NEPI PTX NavPose Driver Interface for IQR PanTilt Systems
-
 ###################################################
 # NEPI NavPose Axis Info
 # x+ axis is forward

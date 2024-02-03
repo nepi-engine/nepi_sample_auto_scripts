@@ -25,7 +25,7 @@
 #
 
 
- Sample NEPI Action Script. 
+# Sample NEPI Action Script. 
 # Uses onboard ROS python library to
 # 1. Confirms IDX driver supported camera topic is publishing
 # 2. Waits for snapshot_event topic message

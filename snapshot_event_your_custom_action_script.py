@@ -24,7 +24,7 @@
 #
 #
 
- Sample NEPI Action Script. 
+# Sample NEPI Action Script. 
 # Uses onboard ROS python library to
 # 1. Waits for snapshot event trigger
 # 2. Runs your custom snapshot event actions
