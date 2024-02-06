@@ -42,7 +42,12 @@ from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 # USER SETTINGS - Edit as Necessary 
 #########################################
 
-SYNC_NEPI2GPS_CLOCK = True # Set to false to disable GPS clock sync
+# Set NEPI NavPose Source Topics Names, or Enter "" to Ignore
+NEPI_NAVPOSE_SOURCE_GPS_TOPIC = "/nepi/s2x/ardupilot/rbx/gps_fix"  # Enter "" to Ignore
+NEPI_NAVPOSE_SOURCE_ODOM_TOPIC = "/nepi/s2x/ardupilot/rbx/odom" # Enter "" to Ignore
+NEPI_NAVPOSE_SOURCE_HEADING_TOPIC = "/nepi/s2x/ardupilot/rbx/heading" # Enter "" to Ignore
+
+SYNC_NEPI_CLOCK = True # Set to false to disable GPS clock sync
 
 
 #########################################
@@ -50,12 +55,6 @@ SYNC_NEPI2GPS_CLOCK = True # Set to false to disable GPS clock sync
 #########################################
 
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
-
-# NEPI RBX Driver NavPose Source Topics
-NEPI_RBX_NAVPOSE_GPS_TOPIC = NEPI_RBX_NAMESPACE + "gps_fix"
-NEPI_RBX_NAVPOSE_ODOM_TOPIC = NEPI_RBX_NAMESPACE + "odom"
-NEPI_RBX_NAVPOSE_HEADING_TOPIC = NEPI_RBX_NAMESPACE + "heading"
 
 ### Setup NEPI NavPose Settings Topic Namespaces
 NEPI_SET_NAVPOSE_GPS_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_gps_fix_topic"
@@ -90,35 +89,38 @@ def initialize_actions():
 ### Callback to set NEPI navpose topics
 def set_nepi_navpose_topics_callback(timer):
   ##############################
-  # Update Global Location source
-  print("Waiting for topic: " +NEPI_RBX_NAVPOSE_GPS_TOPIC)
-  wait_for_topic(NEPI_RBX_NAVPOSE_GPS_TOPIC)
-  set_gps_pub = rospy.Publisher(NEPI_SET_NAVPOSE_GPS_TOPIC, String, queue_size=1)
-  time.sleep(1) # Wait between creating and using publisher
-  set_gps_pub.publish(NEPI_RBX_NAVPOSE_GPS_TOPIC)
-  print("GPS Topic Set to: " + NEPI_RBX_NAVPOSE_GPS_TOPIC)
+  if NEPI_NAVPOSE_SOURCE_GPS_TOPIC != "":
+    # Update Global Location source
+    print("Waiting for topic: " + NEPI_NAVPOSE_SOURCE_GPS_TOPIC)
+    wait_for_topic(NEPI_NAVPOSE_SOURCE_GPS_TOPIC)
+    set_gps_pub = rospy.Publisher(NEPI_SET_NAVPOSE_GPS_TOPIC, String, queue_size=1)
+    time.sleep(1) # Wait between creating and using publisher
+    set_gps_pub.publish(NEPI_NAVPOSE_SOURCE_GPS_TOPIC)
+    print("GPS Topic Set to: " + NEPI_NAVPOSE_SOURCE_GPS_TOPIC)
   ##############################
-  # Update Orientation source
-  print("Waiting for topic: " + NEPI_RBX_NAVPOSE_ODOM_TOPIC)
-  wait_for_topic(NEPI_RBX_NAVPOSE_ODOM_TOPIC)
-  set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
-  time.sleep(1) # Wait between creating and using publisher
-  set_orientation_pub.publish(NEPI_RBX_NAVPOSE_ODOM_TOPIC)
-  print("Orientation Topic Set to: " + NEPI_RBX_NAVPOSE_ODOM_TOPIC)
+  if NEPI_NAVPOSE_SOURCE_ODOM_TOPIC != "":
+    # Update Orientation source
+    print("Waiting for topic: " + NEPI_NAVPOSE_SOURCE_ODOM_TOPIC)
+    wait_for_topic(NEPI_NAVPOSE_SOURCE_ODOM_TOPIC)
+    set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
+    time.sleep(1) # Wait between creating and using publisher
+    set_orientation_pub.publish(NEPI_NAVPOSE_SOURCE_ODOM_TOPIC)
+    print("Orientation Topic Set to: " + NEPI_NAVPOSE_SOURCE_ODOM_TOPIC)
   ##############################
-  # Update Heading source
-  print("Waiting for topic: " + NEPI_RBX_NAVPOSE_HEADING_TOPIC)
-  wait_for_topic(NEPI_RBX_NAVPOSE_HEADING_TOPIC)
-  set_heading_pub = rospy.Publisher(NEPI_SET_NAVPOSE_HEADING_TOPIC, String, queue_size=1)
-  time.sleep(1) # Wait between creating and using publisher
-  set_heading_pub.publish(NEPI_RBX_NAVPOSE_HEADING_TOPIC)
-  print("Heading Topic Set to: " + NEPI_RBX_NAVPOSE_HEADING_TOPIC)
+  if NEPI_NAVPOSE_SOURCE_HEADING_TOPIC != "":
+    # Update Heading source
+    print("Waiting for topic: " + NEPI_NAVPOSE_SOURCE_HEADING_TOPIC)
+    wait_for_topic(NEPI_NAVPOSE_SOURCE_HEADING_TOPIC)
+    set_heading_pub = rospy.Publisher(NEPI_SET_NAVPOSE_HEADING_TOPIC, String, queue_size=1)
+    time.sleep(1) # Wait between creating and using publisher
+    set_heading_pub.publish(NEPI_NAVPOSE_SOURCE_HEADING_TOPIC)
+    print("Heading Topic Set to: " + NEPI_NAVPOSE_SOURCE_HEADING_TOPIC)
   ##############################
   # Sync NEPI clock to GPS timestamp
   set_gps_timesync_pub = rospy.Publisher(NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC, Bool, queue_size=1)
   time.sleep(1) # Wait between creating and using publisher
-  set_gps_timesync_pub.publish(data=SYNC_NEPI2GPS_CLOCK)
-  print("GPS Clock Sync Topic Set to: " + str(SYNC_NEPI2GPS_CLOCK))
+  set_gps_timesync_pub.publish(data=SYNC_NEPI_CLOCK)
+  print("GPS Clock Sync Topic Set to: " + str(SYNC_NEPI_CLOCK))
   print("Setup complete")
 
 #######################
