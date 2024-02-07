@@ -39,7 +39,7 @@ import math
 import tf
 import random
 import sys
-
+import cv2
 
 # try and import geoid height calculation module and databases
 GEOID_DATABASE_FILE='/mnt/nepi_storage/databases/geoids/egm2008-2_5.pgm' # Ignored if PyGeodesy module or Geoids Database is not available
@@ -56,15 +56,14 @@ except rospy.ServiceException as e:
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64, Float64MultiArray
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import NavSatFix, BatteryState
+from sensor_msgs.msg import Image, NavSatFix, BatteryState
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
 from geographic_msgs.msg import GeoPoint, GeoPose, GeoPoseStamped
 from mavros_msgs.msg import State, AttitudeTarget
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandTOL, CommandHome
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 from pygeodesy.ellipsoidalKarney import LatLon
-
-
+from cv_bridge import CvBridge
 
 
 #########################################
@@ -82,6 +81,7 @@ RBX_STATE_FUNCTIONS = ["disarm","arm"]
 RBX_MODE_FUNCTIONS = ["stabilize","land","rtl","loiter","guided","resume"]
 RBX_ACTION_FUNCTIONS = ["takeoff"]
 
+
 ##############################
 # RBX Initialization Values
 GOTO_TRAN_SPEED_RATIO = 0.5
@@ -91,12 +91,12 @@ GOTO_MAX_ERROR_DEG = 2.0 # Goal reached when all rotation move errors are less t
 GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be good before proceeding
 CMD_TIMEOUT_SEC = 20 # Any action that changes 
 PRINT_STATUS_1HZ = True # Print current rbx status at 1Hz
+IMAGE_INPUT_TOPIC_NAME = "color_2d_image" # Partial or full ROS namespace string 
 
 ##############################
 # ARDUPILOT Settings
 TAKEOFF_MIN_PITCH_DEG = 10
 TAKEOFF_ALT_M = 10
-
 
 #########################################
 # ROS NAMESPACE SETUP
@@ -108,13 +108,13 @@ NEPI_RBX_NAME = "ardupilot"
 NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_RBX_NAME + "/rbx/"
 NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
 
-# NEPI MAVLINK RBX Driver Capabilities Publish Topics
+# NEPI RBX Driver Capabilities Publish Topics
 NEPI_RBX_CAPABILITIES_RATE_HZ = 1
 NEPI_RBX_CAPABILITIES_NAVPOSE_TOPIC = NEPI_RBX_NAMESPACE + "navpose_support"
 NEPI_RBX_CAPABILITIES_STATES_TOPIC = NEPI_RBX_NAMESPACE + "state_options"
 NEPI_RBX_CAPABILITIES_MODES_TOPIC = NEPI_RBX_NAMESPACE + "mode_options"
-NEPI_RBX_CAPABILITIES_ACTIONS_TOPIC = NEPI_RBX_NAMESPACE + "actions_options"
-# NEPI MAVLINK RBX Driver Status Publish Topics
+NEPI_RBX_CAPABILITIES_ACTIONS_TOPIC = NEPI_RBX_NAMESPACE + "action_options"
+# NEPI RBX Driver Status Publish Topics
 NEPI_RBX_STATUS_RATE_HZ = 10
 NEPI_RBX_STATUS_STATE_TOPIC = NEPI_RBX_NAMESPACE + "state"  # Int to Defined Dictionary RBX_STATES
 NEPI_RBX_STATUS_MODE_TOPIC = NEPI_RBX_NAMESPACE + "mode" # Int to Defined Dictionary RBX_MODES
@@ -125,18 +125,21 @@ NEPI_RBX_STATUS_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "goto_goals" # Floats [M
 NEPI_RBX_STATUS_GOTO_ERRORS_TOPIC = NEPI_RBX_NAMESPACE + "goto_errors" # Floats [X_Meters,Y_Meters,Z_Meters,Heading_Degrees,Roll_Degrees,Pitch_Degrees,Yaw_Degrees]
 NEPI_RBX_STATUS_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "cmd_timeout" # Int Seconds  - Any command that changes ready state
 NEPI_RBX_STATUS_CMD_SUCCESS_TOPIC = NEPI_RBX_NAMESPACE + "cmd_success" # Bool - Any command that changes ready state
-# NEPI MAVLINK RBX Driver NavPose Publish Topics
+NEPI_RBX_STATUS_IMAGE_SOURCE_TOPIC= NEPI_RBX_NAMESPACE + "status_image_source" # Partial or full ROS namespace string
+NEPI_RBX_STATUS_IMAGE_TOPIC= NEPI_RBX_NAMESPACE + "status_image" # Image 
+# NEPI RBX Driver NavPose Publish Topics
 NEPI_RBX_NAVPOSE_GPS_TOPIC = NEPI_RBX_NAMESPACE + "gps_fix"
 NEPI_RBX_NAVPOSE_ODOM_TOPIC = NEPI_RBX_NAMESPACE + "odom"
 NEPI_RBX_NAVPOSE_HEADING_TOPIC = NEPI_RBX_NAMESPACE + "heading"
-# NEPI MAVLINK RBX Driver Settings Subscriber Topics
+# NEPI RBX Driver Settings Subscriber Topics
 NEPI_RBX_SET_STATE_TOPIC = NEPI_RBX_NAMESPACE + "set_state" # Int to Defined Dictionary RBX_STATES
 NEPI_RBX_SET_MODE_TOPIC = NEPI_RBX_NAMESPACE + "set_mode"  # Int to Defined Dictionary RBX_MODES
 NEPI_RBX_SET_HOME_CURRENT_TOPIC = NEPI_RBX_NAMESPACE + "set_home_current" # Emplty
 NEPI_RBX_SET_GOTO_SPEEDS_TOPIC = NEPI_RBX_NAMESPACE + "set_goto_speeds" # Float [Translation_Ratio,Rotation_Ratio]
 NEPI_RBX_SET_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "set_goto_goals" # Float [Max_Meters,Max_Degrees,Stabilize_Time_Sec]
 NEPI_RBX_SET_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "set_cmd_timeout" # Int Seconds  - Any command that changes ready state
-# NEPI MAVLINK RBX Driver Control Subscriber Topics
+NEPI_RBX_SET_STATUS_IMAGE_TOPIC = NEPI_RBX_NAMESPACE + "set_image_topic" # full ROS namespace 
+# NEPI RBX Driver Control Subscriber Topics
 NEPI_RBX_GO_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "go_action"  # Int to Defined Dictionary RBX_ACTIONS
 NEPI_RBX_GO_HOME_TOPIC = NEPI_RBX_NAMESPACE + "go_home" # Ignored if any active goto processes
 NEPI_RBX_GO_STOP_TOPIC = NEPI_RBX_NAMESPACE + "go_stop" # Aborts any active goto processes
@@ -182,6 +185,8 @@ rbx_status_goto_goals_pub = rospy.Publisher(NEPI_RBX_STATUS_GOTO_GOALS_TOPIC, Fl
 rbx_status_goto_errors_pub = rospy.Publisher(NEPI_RBX_STATUS_GOTO_ERRORS_TOPIC, Float64MultiArray, queue_size=1)
 rbx_status_cmd_timeout_pub = rospy.Publisher(NEPI_RBX_STATUS_CMD_TIMEOUT_TOPIC, UInt32, queue_size=1)
 rbx_status_cmd_success_pub = rospy.Publisher(NEPI_RBX_STATUS_CMD_SUCCESS_TOPIC, Bool, queue_size=1)
+rbx_status_image_source_pub = rospy.Publisher(NEPI_RBX_STATUS_IMAGE_SOURCE_TOPIC, String, queue_size=10)
+rbx_status_image_pub = rospy.Publisher(NEPI_RBX_STATUS_IMAGE_TOPIC, Image, queue_size=10)
 
 rbx_navpose_gps_pub = rospy.Publisher(NEPI_RBX_NAVPOSE_GPS_TOPIC, NavSatFix, queue_size=1)
 rbx_navpose_odom_pub = rospy.Publisher(NEPI_RBX_NAVPOSE_ODOM_TOPIC, Odometry, queue_size=1)
@@ -202,15 +207,23 @@ rbx_mode = None
 rbx_battery = 0
 rbx_ready = True
 rbx_goto_speeds = [GOTO_TRAN_SPEED_RATIO,GOTO_ROT_SPEED_RATIO]
-rbx_goto_goals = [GOTO_MAX_ERROR_M,GOTO_MAX_ERROR_DEG,GOTO_STABILIZED_SEC]
-rbx_goto_errors = [0,0,0,0,0,0]
+rbx_goto_error_goals = [GOTO_MAX_ERROR_M,GOTO_MAX_ERROR_DEG,GOTO_STABILIZED_SEC]
+rbx_goto_errors_current = [0,0,0,0,0,0]
+rbx_goto_errors_last = [0,0,0,0,0,0]
 rbx_cmd_timeout = CMD_TIMEOUT_SEC
-rbx_cmd_success = True
+rbx_cmd_success_current = True
+rbx_cmd_success_last = True
+rbx_status_image_source = IMAGE_INPUT_TOPIC_NAME
+rbx_status_image_source_last = ""
+rbx_status_image_blank = np.zeros((350, 700, 3), dtype = np.uint8) # Empty Black Image
+rbx_status_image_base = rbx_status_image_blank
 
 rbx_state_start = None
 rbx_state_last = None
 rbx_mode_start = None
 rbx_mode_last = None
+rbx_process_current = "None"
+rbx_process_last = "None"
 
 rbx_capabilities_pub_interval = float(1.0)/float(NEPI_RBX_CAPABILITIES_RATE_HZ)
 rbx_status_pub_interval = float(1.0)/float(NEPI_RBX_STATUS_RATE_HZ)
@@ -277,13 +290,20 @@ def initialize_actions():
   rospy.Subscriber(NEPI_RBX_GOTO_POSE_TOPIC, Float64MultiArray, rbx_goto_pose_callback)
   rospy.Subscriber(NEPI_RBX_GOTO_POSITION_TOPIC, Float64MultiArray, rbx_goto_position_callback)
   rospy.Subscriber(NEPI_RBX_GOTO_LOCATION_TOPIC, Float64MultiArray, rbx_goto_location_callback)
-
   # Start Print Callback if Enabled
   if PRINT_STATUS_1HZ:
-    
     rospy.Timer(rospy.Duration(1.0), print_rbx_status_callback)
   #####
   print("Initialization Complete")
+
+
+##############################
+### Status Base Image Source Subscriber
+def update_status_base_image_callback(img_msg):
+  global rbx_status_image_base
+  #Convert image from ros to cv2
+  bridge = CvBridge()
+  rbx_status_image_base = bridge.imgmsg_to_cv2(img_msg, "bgr8")
 
 
 ##############################
@@ -308,10 +328,17 @@ def rbx_status_pub_callback(timer):
   global rbx_battery
   global rbx_ready
   global rbx_goto_speeds
-  global rbx_goto_goals
-  global rbx_goto_errors
+  global rbx_goto_error_goals
+  global rbx_goto_errors_current
+  global rbx_goto_errors_last
   global rbx_cmd_timeout
-  global rbx_cmd_success
+  global rbx_cmd_success_current
+  global rbx_cmd_success_last
+  global rbx_process_current
+  global rbx_process_last
+  global rbx_status_image_source
+  global rbx_status_image_source_last
+  global rbx_status_image_base
   global rbx_status_state_pub
   global rbx_status_mode_pub
   global rbx_status_battery_pub
@@ -321,16 +348,97 @@ def rbx_status_pub_callback(timer):
   global rbx_status_goto_errors_pub
   global rbx_status_cmd_timeout_pub
   global rbx_status_cmd_success_pub
+  global rbx_status_image_source_pub
+  global rbx_status_image_pub
   if not rospy.is_shutdown():
     rbx_status_state_pub.publish(rbx_state)
     rbx_status_mode_pub.publish(rbx_mode)
     rbx_status_battery_pub.publish(rbx_battery)
     rbx_status_ready_pub.publish(rbx_ready)
     rbx_status_goto_speeds_pub.publish(data=rbx_goto_speeds)
-    rbx_status_goto_goals_pub.publish(data=rbx_goto_goals)
-    rbx_status_goto_errors_pub.publish(data=rbx_goto_errors)
+    rbx_status_goto_goals_pub.publish(data=rbx_goto_error_goals)
+    rbx_status_goto_errors_pub.publish(data=rbx_goto_errors_current)
     rbx_status_cmd_timeout_pub.publish(data=rbx_cmd_timeout)
-    rbx_status_cmd_success_pub.publish(data=rbx_cmd_success)
+    rbx_status_cmd_success_pub.publish(data=rbx_cmd_success_last)
+    rbx_status_image_source_pub.publish(data=rbx_status_image_source)
+    ### Update Status Image and Publish
+    rbx_status_image = rbx_status_image_base # Initialize status image
+    box_x = 10
+    box_y = 10
+    box_w = 350
+    box_h = 450
+    # Add status box overlay
+    cv2.rectangle(rbx_status_image, (box_x, box_y), (box_w, box_h), (255, 255, 255), -1)
+    # Create Status Info Text List
+    text_list = ["RBX Status"]
+    if rbx_battery < 0.1:
+      battery_string = "No Reading"
+    else:
+      battery_string = '%.2f' % rbx_battery
+    text_list.append("Battery: " + battery_string)
+    text_list.append("State: " + RBX_STATES[rbx_state])
+    text_list.append("Mode Current: " + RBX_MODES[rbx_mode])
+    text_list.append("Mode Last: " + RBX_MODES[rbx_mode_last])
+    text_list.append("Ready: " + str(rbx_ready))
+    text_list.append("")
+    text_list.append("Current Process: " + rbx_process_current)
+    text_list.append(" X,Y,Z Errors Meters: ")
+    text_list.append(" " + '%.2f' % rbx_goto_errors_current[0] + "," + '%.2f' % rbx_goto_errors_current[1] + "," + '%.2f' % rbx_goto_errors_current[2])
+    text_list.append(" R,P,Y Errors Degrees: ")
+    text_list.append(" " + '%.2f' % rbx_goto_errors_current[3] + "," + '%.2f' % rbx_goto_errors_current[4] + "," + '%.2f' % rbx_goto_errors_current[5])
+    text_list.append("")
+    text_list.append("Last Process: " + rbx_process_last)
+    text_list.append(" Success: " + str(rbx_cmd_success_last))
+    text_list.append(" X,Y,Z Errors Meters: ")
+    text_list.append(" " + '%.2f' % rbx_goto_errors_last[0] + "," + '%.2f' % rbx_goto_errors_last[1] + "," + '%.2f' % rbx_goto_errors_last[2])
+    text_list.append(" R,P,Y Errors Degrees: ")
+    text_list.append(" " + '%.2f' % rbx_goto_errors_last[3] + "," + '%.2f' % rbx_goto_errors_last[4] + "," + '%.2f' % rbx_goto_errors_last[5])
+    text_list.append("")
+    # Overlay Status Text List
+    x=box_x+10 
+    y=box_y+20
+    for text in text_list:
+      status_text_overlay(rbx_status_image,text,x, y)
+      y = y + 20
+    # Create ROS Image message
+    bridge = CvBridge()
+    img_out_msg = bridge.cv2_to_imgmsg(rbx_status_image,"bgr8")#desired_encoding='passthrough')
+    # Publish new image to ros
+    if not rospy.is_shutdown():
+      rbx_status_image_pub.publish(img_out_msg)
+      # You can view the enhanced_2D_image topic at 
+      # //192.168.179.103:9091/ in a connected web browser
+  ### Update image source topic and subscriber if changed from last time.
+  if rbx_status_image_source != rbx_status_image_source_last:
+    #  If currently set, first unregister current image topic
+    if rbx_status_image_source_last != "": 
+      rbx_status_image_pub.unregister()
+      time.sleep(1)
+    # Try to find and subscribe to new image source topic
+    print("Looking for topic: " + rbx_status_image_source)
+    image_topic = find_topic(rbx_status_image_source)
+    if image_topic != "":  # If image topic exists subscribe
+      rospy.Subscriber(image_topic, Image, update_status_base_image_callback, queue_size = 1)
+      rbx_status_image_source_last = rbx_status_image_source
+  if rbx_status_image_source == "":
+    rbx_status_image_base = rbx_status_image_blank # Set to blank image if source topic is cleared.
+    
+### Status Text Overlay Function
+def status_text_overlay(cv_image,status_text,x,y):
+    font                   = cv2.FONT_HERSHEY_SIMPLEX
+    bottomLeftCornerOfText = (x,y)
+    fontScale              = 0.5
+    fontColor              = (0, 0, 0)
+    thickness              = 1
+    lineType               = 1
+    cv2.putText(cv_image,status_text, 
+      bottomLeftCornerOfText, 
+      font, 
+      fontScale,
+      fontColor,
+      thickness,
+      lineType)
+  
 
 
 ### Callback to print the current rbx status at 1Hz
@@ -341,22 +449,43 @@ def print_rbx_status_callback(timer):
   global rbx_battery
   global rbx_ready
   global rbx_goto_speeds
-  global rbx_goto_goals
-  global rbx_goto_errors
+  global rbx_goto_error_goals
+  global rbx_goto_errors_current
+  global rbx_goto_errors_last
   global rbx_cmd_timeout
-  global rbx_cmd_success
+  global rbx_cmd_success_current
+  global rbx_cmd_success_last
+  global rbx_process_current
+  global rbx_process_last
   print("*******************************")
-  print("Current RBX Status")
-  print("State: " + RBX_STATES[rbx_state])
-  print("Mode Current: " + RBX_MODES[rbx_mode])
-  print("Mode Last: " + RBX_MODES[rbx_mode_last])
-  print("Battery: " + str(rbx_battery))
-  print("Ready: " + str(rbx_ready))
-  print("Speeds: " + str(rbx_goto_speeds))
-  print("Goals: " + str(rbx_goto_goals))
-  print("Errors: " + str(rbx_goto_errors))
-  print("Timeout: " + str(rbx_cmd_timeout))
-  print("Success: " + str(rbx_cmd_success))
+  # Create Status Info Text List
+  text_list = ["RBX Status"]
+  if rbx_battery < 0.1:
+    battery_string = "No Reading"
+  else:
+    battery_string = '%.2f' % rbx_battery
+  text_list.append("Battery: " + battery_string)
+  text_list.append("State: " + RBX_STATES[rbx_state])
+  text_list.append("Mode Current: " + RBX_MODES[rbx_mode])
+  text_list.append("Mode Last: " + RBX_MODES[rbx_mode_last])
+  text_list.append("Ready: " + str(rbx_ready))
+  text_list.append("")
+  text_list.append("Current Process: " + rbx_process_current)
+  text_list.append(" X,Y,Z Errors Meters: ")
+  text_list.append(" " + '%.2f' % rbx_goto_errors_current[0] + "," + '%.2f' % rbx_goto_errors_current[1] + "," + '%.2f' % rbx_goto_errors_current[2])
+  text_list.append(" R,P,Y Errors Degrees: ")
+  text_list.append(" " + '%.2f' % rbx_goto_errors_current[3] + "," + '%.2f' % rbx_goto_errors_current[4] + "," + '%.2f' % rbx_goto_errors_current[5])
+  text_list.append("")
+  text_list.append("Last Process: " + rbx_process_last)
+  text_list.append(" Success: " + str(rbx_cmd_success_last))
+  text_list.append(" X,Y,Z Errors Meters: ")
+  text_list.append(" " + '%.2f' % rbx_goto_errors_last[0] + "," + '%.2f' % rbx_goto_errors_last[1] + "," + '%.2f' % rbx_goto_errors_last[2])
+  text_list.append(" R,P,Y Errors Degrees: ")
+  text_list.append(" " + '%.2f' % rbx_goto_errors_last[3] + "," + '%.2f' % rbx_goto_errors_last[4] + "," + '%.2f' % rbx_goto_errors_last[5])
+  text_list.append("")
+  # Print Status Text List
+  for text in text_list:
+    print(text)
 
 ##############################
 # RBX NavPose Topic Publishers
@@ -378,7 +507,7 @@ def rbx_odom_topic_callback(odom_msg):
 
 ### Callback to publish RBX heading topic
 def rbx_heading_topic_callback(heading_msg):
-  global rbx_heading_odom_pub
+  global rbx_navpose_heading_pub
   if not rospy.is_shutdown():
     rbx_navpose_heading_pub.publish(heading_msg)
 
@@ -393,7 +522,7 @@ def rbx_set_state_callback(state_msg):
   print(state_msg)
   state_val = state_msg.data
   rbx_set_state(state_val)
-  
+
 ### Function to set state
 def rbx_set_state(new_state_ind):
   global rbx_state
@@ -420,6 +549,7 @@ def rbx_set_mode_callback(mode_msg):
 def rbx_set_mode(new_mode_ind):
   global rbx_mode
   global rbx_mode_last
+  time.sleep(1)
   if new_mode_ind < 0 or new_mode_ind > (len(RBX_MODE_FUNCTIONS)-1):
     print("No matching rbx mode found")
   else:
@@ -428,7 +558,7 @@ def rbx_set_mode(new_mode_ind):
     print("Setting rbx mode to : " + RBX_MODES[new_mode_ind])
     print("Calling rbx mode function: " + RBX_MODE_FUNCTIONS[new_mode_ind])
     set_mode_function = globals()[RBX_MODE_FUNCTIONS[new_mode_ind]]
-    set_mode_function()
+    success = set_mode_function()
     rbx_mode = new_mode_ind
 
 ### Callback to set home
@@ -453,7 +583,7 @@ def rbx_set_goto_speeds_callback(goto_speeds_msg):
 
 ### Callback to start rbx set goto goals process
 def rbx_set_goto_goals_callback(goto_goals_msg):
-  global rbx_goto_goals
+  global rbx_goto_error_goals
   print("*******************************")
   print("Received set goals message")
   print(goto_goals_msg)
@@ -462,7 +592,7 @@ def rbx_set_goto_goals_callback(goto_goals_msg):
     print("Ignoring this Request")
     print("Messge is wrong length. Should be float list of size 3")
   else:
-    rbx_goto_goals = goto_goals_list
+    rbx_goto_error_goals = goto_goals_list
 
 ### Callback to set cmd timeout
 def rbx_set_cmd_timeout_callback(cmd_timeout_msg):
@@ -480,52 +610,90 @@ def rbx_set_cmd_timeout_callback(cmd_timeout_msg):
 def rbx_go_action_callback(action_msg):
   global rbx_ready
   global rbx_cmd_timeout
-  global rbx_cmd_success
+  global rbx_cmd_success_current
+  global rbx_cmd_success_last
+  global rbx_process_current
+  global rbx_process_last
+  global rbx_goto_errors_current
   print("*******************************")
   print("Received go action message")
   print(action_msg)
-  rbx_cmd_success = False
+  rbx_cmd_success_current = False
+  rbx_goto_errors_current = [0,0,0,0,0,0]
   action_ind = action_msg.data
   if action_ind < 0 or action_ind > (len(RBX_ACTION_FUNCTIONS)-1):
     print("No matching rbx action found")
   else:
+    rbx_process_current = RBX_ACTIONS[action_ind]
     rbx_ready = False
+    print("Starting action: " + rbx_process_current)
     set_action_function = globals()[RBX_ACTION_FUNCTIONS[action_ind]]
-    rbx_cmd_success = set_action_function(rbx_cmd_timeout)
+    rbx_cmd_success_current = set_action_function(rbx_cmd_timeout)
+    print("Finished action: " + rbx_process_current)
     time.sleep(1)
     rbx_ready = True
+  rbx_process_last = rbx_process_current
+  rbx_process_current = "None"
+  rbx_cmd_success_last = rbx_cmd_success_current
 
 ### Callback to start rbx go home
 def rbx_go_home_callback(home_msg):
   global rbx_ready
   global rbx_cmd_timeout
-  global rbx_cmd_success
+  global rbx_cmd_success_current
+  global rbx_cmd_success_last
+  global rbx_process_current
+  global rbx_process_last
+  rbx_process_current = "Go Home"
+  rbx_cmd_success_current = False
+  rbx_ready = False
   print("*******************************")
   print("Received go home message")
   print(home_msg)
   rtl()
-  rbx_cmd_success = True
+  rbx_cmd_success_current = True
   time.sleep(1)
-  rbx_ready = True 
+  rbx_ready = True
+  rbx_process_last = rbx_process_current
+  rbx_process_current = "None"
+  rbx_cmd_success_last = rbx_cmd_success_current
 
 ### Callback to start rbx stop
 def rbx_go_stop_callback(stop_msg):
   global rbx_ready
   global rbx_cmd_timeout
-  global rbx_cmd_success
+  global rbx_cmd_success_current
+  global rbx_cmd_success_last
+  global rbx_process_current
+  global rbx_process_last
+  global rbx_goto_errors_current
+  rbx_process_current = "Stop"
+  rbx_cmd_success_current = False
+  rbx_ready = False
+  rbx_goto_errors_current = [0,0,0,0,0,0]
   print("*******************************")
   print("Received go stop message")
   print(stop_msg)
   loiter()
-  rbx_cmd_success = True
+  rbx_cmd_success_current = True
   time.sleep(1)
-  rbx_ready = True  
+  rbx_ready = True
+  rbx_process_last = rbx_process_current
+  rbx_process_current = "None"
+  rbx_cmd_success_last = rbx_cmd_success_current
 
 ### Callback to start rbx goto pose process
 def rbx_goto_pose_callback(pose_cmd_msg):
   global rbx_ready
   global rbx_cmd_timeout
-  global rbx_cmd_success
+  global rbx_cmd_success_current
+  global rbx_cmd_success_last
+  global rbx_process_current
+  global rbx_process_last
+  global rbx_goto_errors_current
+  rbx_process_current = "GoTo Pose"
+  rbx_cmd_success_current = False
+  rbx_goto_errors_current = [0,0,0,0,0,0]
   print("*******************************")
   print("Recieved GoTo Pose Message")
   print("")
@@ -541,15 +709,25 @@ def rbx_goto_pose_callback(pose_cmd_msg):
       print("Ignoring this Request")
     else:
       rbx_ready = False
-      rbx_cmd_success = setpoint_attitude_ned(setpoint_data,rbx_cmd_timeout)
+      rbx_cmd_success_current = setpoint_attitude_ned(setpoint_data,rbx_cmd_timeout)
       rbx_ready = True
+  rbx_process_last = rbx_process_current
+  rbx_process_current = "None"
+  rbx_cmd_success_last = rbx_cmd_success_current
 
 
 ### Callback to start rbx goto position process
 def rbx_goto_position_callback(position_cmd_msg):
   global rbx_ready
   global rbx_cmd_timeout
-  global rbx_cmd_success
+  global rbx_cmd_success_current
+  global rbx_cmd_success_last
+  global rbx_process_current
+  global rbx_process_last
+  global rbx_goto_errors_current
+  rbx_process_current = "GoTo Position"
+  rbx_cmd_success_current = False
+  rbx_goto_errors_current = [0,0,0,0,0,0]
   print("*******************************")
   print("Recieved GoTo Position Command Message")
   print("")
@@ -565,15 +743,25 @@ def rbx_goto_position_callback(position_cmd_msg):
       print("Ignoring this Request")
     else:
       rbx_ready = False
-      rbx_cmd_success = setpoint_position_local_body(setpoint_data,rbx_cmd_timeout)
+      rbx_cmd_success_current = setpoint_position_local_body(setpoint_data,rbx_cmd_timeout)
       rbx_ready = True
+  rbx_process_last = rbx_process_current
+  rbx_process_current = "None"
+  rbx_cmd_success_last = rbx_cmd_success_current
 
 
 ### Callback to start rbx goto location subscriber
 def rbx_goto_location_callback(location_cmd_msg):
   global rbx_ready
   global rbx_cmd_timeout
-  global rbx_cmd_success
+  global rbx_cmd_success_current
+  global rbx_cmd_success_last
+  global rbx_process_current
+  global rbx_process_last
+  global rbx_goto_errors_current
+  rbx_process_current = "GoTo Location"
+  rbx_cmd_success_current = False
+  rbx_goto_errors_current = [0,0,0,0,0,0]
   print("*******************************")
   print("Recieved GoTo Location Message")
   print("")
@@ -589,8 +777,11 @@ def rbx_goto_location_callback(location_cmd_msg):
       print("Ignoring this Request")
     else:
       rbx_ready = False
-      rbx_cmd_success = setpoint_location_global_wgs84(setpoint_data,rbx_cmd_timeout)
+      rbx_cmd_success_current = setpoint_location_global_wgs84(setpoint_data,rbx_cmd_timeout)
       rbx_ready = True
+  rbx_process_last = rbx_process_current
+  rbx_process_current = "None"
+  rbx_cmd_success_last = rbx_cmd_success_current
 
 
 #######################
@@ -679,10 +870,11 @@ def setpoint_attitude_ned(setpoint_attitude,timeout_sec=CMD_TIMEOUT_SEC):
   global current_orientation_enu_degs
   global current_orientation_ned_degs
   global current_heading_degs
-  global rbx_goto_goals
-  global rbx_goto_errors
+  global rbx_goto_error_goals
+  global rbx_goto_errors_current
+  global rbx_goto_errors_last
   cmd_success = True
-  rbx_goto_errors = [0,0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   print("Starting Setpoint Attitude Create-Send-Check Process")
   ##############################################
   # Capture Current NavPose Data
@@ -779,9 +971,9 @@ def setpoint_attitude_ned(setpoint_attitude,timeout_sec=CMD_TIMEOUT_SEC):
     max_attutude_error_deg = max(abs(attitude_errors_degs))
     # Check for setpoint position local point goal
     if  setpoint_attitude_reached is False:
-      if stabilize_timer > rbx_goto_goals[2]:
+      if stabilize_timer > rbx_goto_error_goals[2]:
         print(stabilize_timer)
-        print(rbx_goto_goals[2])
+        print(rbx_goto_error_goals[2])
         max_attitude_errors = max(attitude_errors) # Get max from error window
         attitude_errors = [max_attutude_error_deg] # reset running list of errors
         # Print some information
@@ -797,7 +989,7 @@ def setpoint_attitude_ned(setpoint_attitude,timeout_sec=CMD_TIMEOUT_SEC):
         print(["%.3f" % attitude_errors_degs[0],"%.3f" % attitude_errors_degs[1],"%.3f" % attitude_errors_degs[2]])
         print("Max Error from Stabilized Check Window Meters")
         print(["%.2f" % max_attitude_errors])
-        if max_attitude_errors < rbx_goto_goals[1]:
+        if max_attitude_errors < rbx_goto_error_goals[1]:
           print('')
           print("Attitude Setpoint Reached")
           setpoint_attitude_reached = True
@@ -806,10 +998,12 @@ def setpoint_attitude_ned(setpoint_attitude,timeout_sec=CMD_TIMEOUT_SEC):
     # Reset print timer if past
     if stabilize_timer > GOTO_STABILIZED_SEC:
       stabilize_timer=0 # Reset print timer
-    rbx_goto_errors = [0,0,0,0,attitude_errors_degs[0],attitude_errors_degs[1],attitude_errors_degs[2]] 
+    rbx_goto_errors_current = [0,0,0,0,attitude_errors_degs[0],attitude_errors_degs[1],attitude_errors_degs[2]] 
   if cmd_success:
     print("************************")
     print("Setpoint Reached")
+  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_last = [0,0,0,0,attitude_errors_degs[0],attitude_errors_degs[1],attitude_errors_degs[2]]
   return cmd_success
   
 
@@ -833,10 +1027,11 @@ def setpoint_position_local_body(setpoint_position,timeout_sec=CMD_TIMEOUT_SEC):
   global current_location_wgs84_geo
   global current_heading_deg
   global setpoint_position_local_pub
-  global rbx_goto_goals
-  global rbx_goto_errors
+  global rbx_goto_error_goals
+  global rbx_goto_errors_current
+  global rbx_goto_errors_last
   cmd_success = True
-  rbx_goto_errors = [0,0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   print('')
   print("Starting Setpoint Position Local Create-Send-Check Process")
   ##############################################
@@ -1020,7 +1215,7 @@ def setpoint_position_local_body(setpoint_position,timeout_sec=CMD_TIMEOUT_SEC):
         print(["%.2f" % point_ned_error_m[0],"%.2f" % point_ned_error_m[1],"%.2f" % point_ned_error_m[2]])
         print("Max Error from Stabilized Check Window Meters")
         print(["%.2f" % max_point_errors])
-        if max_point_errors < rbx_goto_goals[0]:
+        if max_point_errors < rbx_goto_error_goals[0]:
           print('')
           print("Position Setpoint Reached")
           setpoint_position_local_point_reached = True
@@ -1028,7 +1223,7 @@ def setpoint_position_local_body(setpoint_position,timeout_sec=CMD_TIMEOUT_SEC):
         point_errors.append(max_point_ned_error_m) # append last
     # Check for setpoint position yaw point goal
     if  setpoint_position_local_yaw_reached is False:
-      if stabilize_timer > rbx_goto_goals[2]:
+      if stabilize_timer > rbx_goto_error_goals[2]:
         max_yaw_errors = max(yaw_errors) # Get max from error window
         yaw_errors = [max_yaw_ned_error_deg] # reset running list of errors
         # Print some information every second
@@ -1041,19 +1236,21 @@ def setpoint_position_local_body(setpoint_position,timeout_sec=CMD_TIMEOUT_SEC):
         print(max_yaw_ned_error_deg)
         print("Max Error from Stabilized Check Window Meters")
         print(["%.2f" % max_yaw_errors])
-        if max_yaw_errors < rbx_goto_goals[1]:
+        if max_yaw_errors < rbx_goto_error_goals[1]:
           print('')
           print("Yaw Setpoint Reached")
           setpoint_position_local_yaw_reached = True
       else:
         yaw_errors.append(max_yaw_ned_error_deg) # append last
     # Reset print timer if past
-    if stabilize_timer > rbx_goto_goals[2]:
+    if stabilize_timer > rbx_goto_error_goals[2]:
       stabilize_timer=0 # Reset print timer
-    rbx_goto_errors =  [point_ned_error_m[0],point_ned_error_m[1],point_ned_error_m[2],0,0,0,max_yaw_ned_error_deg]
+    rbx_goto_errors_current =  [point_ned_error_m[0],point_ned_error_m[1],point_ned_error_m[2],0,0,0,max_yaw_ned_error_deg]
   if cmd_success:
     print("************************")
     print("Setpoint Reached")
+  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_last =  [point_ned_error_m[0],point_ned_error_m[1],point_ned_error_m[2],0,0,0,max_yaw_ned_error_deg]
   return cmd_success
 
 
@@ -1072,10 +1269,10 @@ def setpoint_location_global_wgs84(setpoint_location,timeout_sec=CMD_TIMEOUT_SEC
   global current_geoid_height_m
   global current_location_wgs84_geo
   global current_heading_deg
-  global rbx_goto_goals
-  global rbx_goto_errors
+  global rbx_goto_error_goals
+  global rbx_goto_errors_current
   cmd_success = True
-  rbx_goto_errors = [0,0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   print('')
   print("Starting Setpoint Location Global Create-Send-Check Process")
   ##############################################
@@ -1212,7 +1409,7 @@ def setpoint_location_global_wgs84(setpoint_location,timeout_sec=CMD_TIMEOUT_SEC
       max_yaw_ned_error_deg = abs(yaw_ned_error_deg)
     # Check for setpoint position global goal
     if  setpoint_location_global_geopoint_reached is False:
-      if stabilize_timer > rbx_goto_goals[2]:
+      if stabilize_timer > rbx_goto_error_goals[2]:
         max_geopoint_errors = max(geopoint_errors) # Get max from error window
         geopoint_errors = [max_geopoint_error_m] # reset running list of errors
         # Print some information every second
@@ -1228,7 +1425,7 @@ def setpoint_location_global_wgs84(setpoint_location,timeout_sec=CMD_TIMEOUT_SEC
         print(["%.2f" % geopoint_errors_m[0],"%.2f" % geopoint_errors_m[1],"%.2f" % geopoint_errors_m[2]])
         print("Max Error from Stabilized Check Window Meters")
         print(["%.2f" % max_geopoint_errors])
-        if max_geopoint_errors < rbx_goto_goals[0]:
+        if max_geopoint_errors < rbx_goto_error_goals[0]:
           print('')
           print("Location Setpoint Reached")
           setpoint_location_global_geopoint_reached = True
@@ -1236,7 +1433,7 @@ def setpoint_location_global_wgs84(setpoint_location,timeout_sec=CMD_TIMEOUT_SEC
         geopoint_errors.append(max_geopoint_error_m) # append last
     # Check for setpoint position yaw goal
     if  setpoint_location_global_yaw_reached is False:
-      if stabilize_timer > rbx_goto_goals[2]:
+      if stabilize_timer > rbx_goto_error_goals[2]:
         max_yaw_errors = max(yaw_errors) # Get max from error window
         yaw_errors = [max_yaw_ned_error_deg] # reset running list of errors
         # Print some information every second
@@ -1249,7 +1446,7 @@ def setpoint_location_global_wgs84(setpoint_location,timeout_sec=CMD_TIMEOUT_SEC
         print(max_yaw_ned_error_deg)
         print("Max Error from Stabilized Check Window Meters")
         print(["%.2f" % max_yaw_errors])
-        if max_yaw_errors < rbx_goto_goals[1]:
+        if max_yaw_errors < rbx_goto_error_goals[1]:
           print('')
           print("Yaw Setpoint Reached")
           setpoint_location_global_yaw_reached = True
@@ -1258,10 +1455,12 @@ def setpoint_location_global_wgs84(setpoint_location,timeout_sec=CMD_TIMEOUT_SEC
     # Reset print timer if past
     if stabilize_timer > 1:
       stabilize_timer=0 # Reset print timer
-    rbx_goto_errors = [geopoint_errors_m[0],geopoint_errors_m[1],geopoint_errors_m[2],0,0,0,max_yaw_ned_error_deg]
+    rbx_goto_errors_current = [geopoint_errors_m[0],geopoint_errors_m[1],geopoint_errors_m[2],0,0,0,max_yaw_ned_error_deg]
   if cmd_success:
     print("************************")
     print("Setpoint Reached")
+  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_last = [geopoint_errors_m[0],geopoint_errors_m[1],geopoint_errors_m[2],0,0,0,max_yaw_ned_error_deg]
   return cmd_success
   
 
@@ -1280,46 +1479,52 @@ def disarm():
 ## Function for sending takeoff command
 def takeoff(timeout_sec):
   global current_location_wgs84_geo
-  global rbx_ready
-  global rbx_goto_goals
-  global rbx_goto_errors
+  global rbx_goto_error_goals
+  global rbx_goto_errors_current
+  global rbx_goto_errors_last
   global rbx_cmd_timeout
   cmd_success = True
-  rbx_goto_errors = [0,0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   start_alt_m = current_location_wgs84_geo[2]
   start_alt_goal = start_alt_m + TAKEOFF_ALT_M
-  print("Sending Takeoff Command to Altitude")
+  print("Sending Takeoff Command to altitude to " + str(TAKEOFF_ALT_M) + " meters")
   takeoff_client = rospy.ServiceProxy(MAVLINK_TAKEOFF_SERVICE, CommandTOL)
-  time.sleep(.1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it
+  time.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it
   takeoff_client(min_pitch=TAKEOFF_MIN_PITCH_DEG,altitude=TAKEOFF_ALT_M)
   print("Waiting for takeoff process to complete")
   print_timer=0
-  max_alt_error_m = TAKEOFF_ALT_M
+  max_alt_error_m = abs(current_location_wgs84_geo[2] - start_alt_goal)
+  print(max_alt_error_m)
   timeout_timer = 0
-  print("Takeoff Errors")
-  while max_alt_error_m > rbx_goto_errors[0] and not rospy.is_shutdown():
+  while max_alt_error_m > rbx_goto_error_goals[0] and not rospy.is_shutdown():
+    time2sleep = 0.2
     if timeout_timer > timeout_sec:
       print("Takeoff action timed out")
       cmd_success = False
       break
-    time2sleep = 0.2
-    print_timer = print_timer+time2sleep
+    else:
+      timeout_timer = timeout_timer+time2sleep
     time.sleep(time2sleep) # update setpoint position at 50 Hz
-    timeout_timer = timeout_timer+time2sleep
+    print_timer = print_timer+time2sleep
     alt_error_m = current_location_wgs84_geo[2] - start_alt_goal
     max_alt_error_m = abs(alt_error_m)
-    rbx_goto_errors = [0,0,alt_error_m,0,0,0,0]
+    rbx_goto_errors_current = [0,0,alt_error_m,0,0,0,0]
     if print_timer > 1:
       print_timer = 0
-      print(rbx_goto_errors)
+      print("Takeoff errors")
+      print(rbx_goto_errors_current)
   if cmd_success:
     print("Takeoff action complete")
+  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_last = [0,0,alt_error_m,0,0,0,0]
   return cmd_success
 
 
 ### Function for switching to STABILIZE mode
 def stabilize():
   set_mavlink_mode('STABILIZE')
+  cmd_success = True
+  return cmd_success
     
 ### Function for switching to LAND mode
 def land():
@@ -1328,18 +1533,29 @@ def land():
   print("Waiting for land process to complete and disarm")
   while rbx_state == 1:
     time.sleep(1)
+  success = True
+  return success
+
 
 ### Function for sending go home command
 def rtl():
   set_mavlink_mode('RTL')
+  success = True
+  return success
+
 
 ### Function for switching to LOITER mode
 def loiter():
   set_mavlink_mode('LOITER')
+  success = True
+  return success
+
 
 ### Function for switching to Guided mode
 def guided():
   set_mavlink_mode('GUIDED')
+  success = True
+  return success
 
 ### Function for switching back to current mission
 def resume():
@@ -1348,6 +1564,9 @@ def resume():
   # Reset mode to last
   print("Switching mavlink mode from " + RBX_MODES[rbx_mode] + " back to " + RBX_MODES[rbx_mode_last])
   rbx_set_mode(rbx_mode_last)
+  success = True
+  return success
+
 
 ### Function for sending set home current
 def sethome_current():
@@ -1356,6 +1575,9 @@ def sethome_current():
   set_home_client = rospy.ServiceProxy(MAVLINK_SET_HOME_SERVICE, CommandHome)
   time.sleep(.1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it
   set_home_client(current_gps=True)
+  success = True
+  return success
+
 
 
 
@@ -1535,7 +1757,7 @@ def wait_for_topic(topic_name):
 ### Cleanup processes on node shutdown
 def cleanup_actions():
   print("Shutting down: Executing script cleanup actions")
-
+  stabilize() # Change mode
   
 ### Script Entrypoint
 def startNode():

@@ -88,7 +88,7 @@ NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + "ardupilot/rbx/"
 NEPI_RBX_CAPABILITIES_NAVPOSE_TOPIC = NEPI_RBX_NAMESPACE + "navpose_support"
 NEPI_RBX_CAPABILITIES_STATES_TOPIC = NEPI_RBX_NAMESPACE + "state_options"
 NEPI_RBX_CAPABILITIES_MODES_TOPIC = NEPI_RBX_NAMESPACE + "mode_options"
-NEPI_RBX_CAPABILITIES_ACTIONS_TOPIC = NEPI_RBX_NAMESPACE + "actions_options"
+NEPI_RBX_CAPABILITIES_ACTIONS_TOPIC = NEPI_RBX_NAMESPACE + "action_options"
 
 # NEPI MAVLINK RBX Driver Status Publish Topic
 NEPI_RBX_STATUS_STATE_TOPIC = NEPI_RBX_NAMESPACE + "state"  # Int to Defined Dictionary RBX_STATES
@@ -511,9 +511,10 @@ def go_rbx_action(action_str):
   if action_ind == -1:
     print("No matching action found")
   else:
+    ready = wait_for_rbx_status_ready()
     rbx_go_action_pub.publish(action_ind)
-    wait_for_rbx_status_busy()
-    wait_for_rbx_status_ready()
+    ready = wait_for_rbx_status_busy()
+    ready = wait_for_rbx_status_ready()
     success = rbx_status_cmd_success
   return success
 
@@ -524,9 +525,10 @@ def go_rbx_home():
   print("*******************************")  
   print("Go Home Request Recieved: ")
   success = False
-  rbx_go_home_pub.publish(action_ind)
-  wait_for_rbx_status_busy()
-  wait_for_rbx_status_ready()
+  ready = wait_for_rbx_status_ready()
+  rbx_go_home_pub.publish()
+  ready = wait_for_rbx_status_busy()
+  ready = wait_for_rbx_status_ready()
   success = rbx_status_cmd_success
   return success
 
@@ -535,54 +537,69 @@ def goto_rbx_location(goto_data):
   global rbx_status_cmd_success
   global rbx_goto_location_pub
   # Send goto Location Command
-  wait_for_rbx_status_ready()
   print("Starting goto Location Global Process")
   goto_location_msg = create_goto_message(goto_data)
+  ready = wait_for_rbx_status_ready()
   rbx_goto_location_pub.publish(goto_location_msg)
-  wait_for_rbx_status_busy()
-  wait_for_rbx_status_ready()
+  ready = wait_for_rbx_status_busy()
+  ready = wait_for_rbx_status_ready()
   return rbx_status_cmd_success
 
 ### Function to call goto Position Body control
 def goto_rbx_position(goto_data):
   global rbx_goto_location_pub
   # Send goto Position Command
-  wait_for_rbx_status_ready()
   print("Starting goto Position Body Process")
   goto_position_msg = create_goto_message(goto_data)
+  ready = wait_for_rbx_status_ready()
   rbx_goto_position_pub.publish(goto_position_msg)
-  wait_for_rbx_status_busy()
-  wait_for_rbx_status_ready()
+  ready = wait_for_rbx_status_busy()
+  ready = wait_for_rbx_status_ready()
+  return rbx_status_cmd_success
 
 ### Function to call goto Attititude NED control
 def goto_rbx_pose(goto_data):
   global rbx_goto_pose_pub
   # Send goto Attitude Command
-  wait_for_rbx_status_ready()
   print("Starting goto Attitude NED Process")
   goto_attitude_msg = create_goto_message(goto_data)
+  ready = wait_for_rbx_status_ready()
   rbx_goto_pose_pub.publish(goto_attitude_msg)
-  wait_for_rbx_status_busy()
-  wait_for_rbx_status_ready()
+  ready = wait_for_rbx_status_busy()
+  ready = wait_for_rbx_status_ready()
+  return rbx_status_cmd_success
   
 ### Function to wait for goto control process to complete
-def wait_for_rbx_status_ready():
+def wait_for_rbx_status_ready( ):
   global rbx_status_ready
-  global rbx_status_goto_errors
-  while rbx_status_ready is not True and not rospy.is_shutdown():
-    print("Waiting for current cmd process to complete")
-    print(rbx_status_ready)
-    print("Current Errors")
-    print(rbx_status_goto_errors)
-    time.sleep(1)
+  print("Waiting for status ready = True")
+  count_goal = 3 # fix for strange ready glitch
+  counter = 0
+  while (counter < count_goal) and (not rospy.is_shutdown()):
+    if rbx_status_ready is True:
+      counter = counter + 1
+      #print("Got status ready = " + str(rbx_status_ready))
+    else:
+      counter = 0
+    time.sleep(.1)
+  print("Got status ready True")
+  return rbx_status_ready
 
 ### Function to wait for goto control process to complete
-def wait_for_rbx_status_busy():
+def wait_for_rbx_status_busy( ):
   global rbx_status_ready
-  while rbx_status_ready is not False and not rospy.is_shutdown():
-    print("Waiting for cmd process to start")
-    print(rbx_status_ready)
-    time.sleep(1)
+  print("Waiting for status ready = False")
+  count_goal = 3 # fix for strange ready glitch
+  counter = 0
+  while (counter < count_goal) and (not rospy.is_shutdown()):
+    if rbx_status_ready is False:
+      counter = counter + 1
+      #print("Got status ready = " + str(rbx_status_ready))
+    else:
+      counter = 0
+    time.sleep(.1)
+  print("Got status ready False")
+  return rbx_status_ready
 
 #######################
 # Mission Action Functions

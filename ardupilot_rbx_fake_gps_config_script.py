@@ -107,11 +107,11 @@ MAVLINK_FAKE_GPS_GOTO_GEOPOINT_TOPIC = MAVLINK_NAMESPACE + "fake_gps/goto_geopoi
 MAVLINK_FAKE_GPS_RESET_GEOPOINT_TOPIC = MAVLINK_NAMESPACE + "fake_gps/reset_geopoint_wgs84"
 MAVLINK_FAKE_GPS_RESET_CURRENT_TOPIC = MAVLINK_NAMESPACE + "fake_gps/reset_current"
 # MAVLINK Fake GPS RBX Subscriber Topic
+NEPI_RBX_SET_MODE_TOPIC = NEPI_RBX_NAMESPACE + "set_mode"  # Int to Defined Dictionary RBX_MODES
 NEPI_RBX_GOTO_POSITION_TOPIC = NEPI_RBX_NAMESPACE + "goto_position"
 NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location"
 NEPI_RBX_SET_HOME_CURRENT_TOPIC = NEPI_RBX_NAMESPACE + "set_home_current"
-NEPI_RBX_SET_MODE_TOPIC = NEPI_RBX_NAMESPACE + "set_mode"  # Int to Defined Dictionary RBX_MODES
-NEPI_RBX_SET_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "set_action"  # Int to Defined Dictionary RBX_MODES
+NEPI_RBX_GO_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "go_action"  # Int to Defined Dictionary RBX_MODES
 
 
 #########################################
@@ -160,7 +160,7 @@ def initialize_actions():
   rospy.Subscriber(NEPI_RBX_GOTO_LOCATION_TOPIC, Float64MultiArray, rbx_goto_location_callback)
   rospy.Subscriber(NEPI_RBX_SET_HOME_CURRENT_TOPIC, Empty, rbx_set_home_current_callback)
   rospy.Subscriber(NEPI_RBX_SET_MODE_TOPIC, UInt8, rbx_set_mode_callback)
-  rospy.Subscriber(NEPI_RBX_SET_ACTION_TOPIC, UInt8, rbx_set_action_callback)
+  rospy.Subscriber(NEPI_RBX_GO_ACTION_TOPIC, UInt8, rbx_go_action_callback)
   
   # Start Print Callback if Enabled
   if PRINT_LOCATION_1HZ:
@@ -377,8 +377,8 @@ def rbx_set_mode_callback(mode_msg):
     set_mode_function()
 
 ### Callback to set mode
-def rbx_set_action_callback(action_msg):
-  print("Recieved Set Action Message")
+def rbx_go_action_callback(action_msg):
+  print("Recieved Go Action Message")
   print(action_msg)
   action_ind = action_msg.data
   if action_ind < 0 or action_ind > (len(RBX_ACTION_FUNCTIONS)-1):
