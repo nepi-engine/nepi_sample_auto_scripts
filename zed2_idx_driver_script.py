@@ -1,4 +1,4 @@
-/usr/bin/env python
+#/usr/bin/env python
 #
 # NEPI Dual-Use License
 # Project: nepi_sample_auto_scripts
