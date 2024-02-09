@@ -47,8 +47,6 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 SCRIPT_LIST = ["ardupilot_rbx_driver_script.py",
                 "ardupilot_rbx_navpose_config_script.py",
                 "ardupilot_rbx_fake_gps_config_script.py",
-                "snapshot_event_send_to_cloud_action_script.py",
-                "snapshot_event_save_to_disk_action_script.py",
                	"drone_waypoint_demo_mission_script.py"] #  Script filenames to start/stop
 
 #########################################
