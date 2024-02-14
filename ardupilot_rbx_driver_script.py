@@ -118,11 +118,15 @@ NEPI_RBX_CAPABILITIES_ACTIONS_TOPIC = NEPI_RBX_NAMESPACE + "action_options"
 NEPI_RBX_STATUS_RATE_HZ = 10
 NEPI_RBX_STATUS_STATE_TOPIC = NEPI_RBX_NAMESPACE + "state"  # Int to Defined Dictionary RBX_STATES
 NEPI_RBX_STATUS_MODE_TOPIC = NEPI_RBX_NAMESPACE + "mode" # Int to Defined Dictionary RBX_MODES
-NEPI_RBX_STATUS_BATTERY_TOPIC = NEPI_RBX_NAMESPACE + "battery" # Float Ratio 0-1
 NEPI_RBX_STATUS_READY_TOPIC = NEPI_RBX_NAMESPACE + "ready" # Bool, True if goto is complete or no active goto process
-NEPI_RBX_STATUS_GOTO_SPEEDS_TOPIC = NEPI_RBX_NAMESPACE + "goto_speeds" # Floats [Translation_Ratio,Rotation_Ratio]
-NEPI_RBX_STATUS_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "goto_goals" # Floats [Max_Meters,Max_Degrees,Stabilize_Time_Sec]
-NEPI_RBX_STATUS_GOTO_ERRORS_TOPIC = NEPI_RBX_NAMESPACE + "goto_errors" # Floats [X_Meters,Y_Meters,Z_Meters,Heading_Degrees,Roll_Degrees,Pitch_Degrees,Yaw_Degrees]
+NEPI_RBX_STATUS_PROCESS_CURRENT_TOPIC = NEPI_RBX_NAMESPACE + "process_current" # String
+NEPI_RBX_STATUS_PROCESS_LAST_TOPIC = NEPI_RBX_NAMESPACE + "process_current" # String
+NEPI_RBX_STATUS_BATTERY_TOPIC = NEPI_RBX_NAMESPACE + "battery" # Float Ratio 0-1
+NEPI_RBX_STATUS_MOVE_SPEED_TOPIC = NEPI_RBX_NAMESPACE + "move_speed" # Float [Translation Speed Ratio]
+NEPI_RBX_STATUS_ROTATE_SPEED_TOPIC = NEPI_RBX_NAMESPACE + "rotate_speed" # Float [Rotation Speed Ratio]
+NEPI_RBX_STATUS_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "error_goals" # Floats [Max_Meters,Max_Degrees,Stabilize_Time_Sec]
+NEPI_RBX_STATUS_GOTO_ERRORS_TOPIC = NEPI_RBX_NAMESPACE + "errors_current" # Floats [X_Meters,Y_Meters,Z_Meters,Heading_Degrees,Roll_Degrees,Pitch_Degrees,Yaw_Degrees]
+NEPI_RBX_STATUS_GOTO_ERRORS_LAST_TOPIC = NEPI_RBX_NAMESPACE + "errors_last" # Floats [X_Meters,Y_Meters,Z_Meters,Heading_Degrees,Roll_Degrees,Pitch_Degrees,Yaw_Degrees]
 NEPI_RBX_STATUS_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "cmd_timeout" # Int Seconds  - Any command that changes ready state
 NEPI_RBX_STATUS_CMD_SUCCESS_TOPIC = NEPI_RBX_NAMESPACE + "cmd_success" # Bool - Any command that changes ready state
 NEPI_RBX_STATUS_IMAGE_SOURCE_TOPIC= NEPI_RBX_NAMESPACE + "status_image_source" # Partial or full ROS namespace string
@@ -135,7 +139,8 @@ NEPI_RBX_NAVPOSE_HEADING_TOPIC = NEPI_RBX_NAMESPACE + "heading"
 NEPI_RBX_SET_STATE_TOPIC = NEPI_RBX_NAMESPACE + "set_state" # Int to Defined Dictionary RBX_STATES
 NEPI_RBX_SET_MODE_TOPIC = NEPI_RBX_NAMESPACE + "set_mode"  # Int to Defined Dictionary RBX_MODES
 NEPI_RBX_SET_HOME_CURRENT_TOPIC = NEPI_RBX_NAMESPACE + "set_home_current" # Emplty
-NEPI_RBX_SET_GOTO_SPEEDS_TOPIC = NEPI_RBX_NAMESPACE + "set_goto_speeds" # Float [Translation_Ratio,Rotation_Ratio]
+NEPI_RBX_SET_MOVE_SPEED_TOPIC = NEPI_RBX_NAMESPACE + "set_move_speed" # Float [Translation Speed Ratio]
+NEPI_RBX_SET_ROTATE_SPEED_TOPIC = NEPI_RBX_NAMESPACE + "set_move_speed" # Float [Translation Speed Ratio]
 NEPI_RBX_SET_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "set_goto_goals" # Float [Max_Meters,Max_Degrees,Stabilize_Time_Sec]
 NEPI_RBX_SET_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "set_cmd_timeout" # Int Seconds  - Any command that changes ready state
 NEPI_RBX_SET_STATUS_IMAGE_TOPIC = NEPI_RBX_NAMESPACE + "set_image_topic" # full ROS namespace 
@@ -178,11 +183,15 @@ rbx_capabilities_actions_pub = rospy.Publisher(NEPI_RBX_CAPABILITIES_ACTIONS_TOP
 
 rbx_status_state_pub = rospy.Publisher(NEPI_RBX_STATUS_STATE_TOPIC, Int8, queue_size=1)
 rbx_status_mode_pub = rospy.Publisher(NEPI_RBX_STATUS_MODE_TOPIC, Int8, queue_size=1)
-rbx_status_battery_pub = rospy.Publisher(NEPI_RBX_STATUS_BATTERY_TOPIC, UInt8, queue_size=1)
 rbx_status_ready_pub = rospy.Publisher(NEPI_RBX_STATUS_READY_TOPIC, Bool, queue_size=1)
-rbx_status_goto_speeds_pub = rospy.Publisher(NEPI_RBX_STATUS_GOTO_SPEEDS_TOPIC, Float64MultiArray, queue_size=1)
+rbx_status_process_current_pub = rospy.Publisher(NEPI_RBX_STATUS_PROCESS_CURRENT_TOPIC, String, queue_size=1)
+rbx_status_process_last_pub = rospy.Publisher(NEPI_RBX_STATUS_PROCESS_LAST_TOPIC, String, queue_size=1)
+rbx_status_battery_pub = rospy.Publisher(NEPI_RBX_STATUS_BATTERY_TOPIC, UInt8, queue_size=1)
+rbx_status_move_speed_pub = rospy.Publisher(NEPI_RBX_STATUS_MOVE_SPEED_TOPIC, Float32, queue_size=1)
+rbx_status_rotate_speed_pub = rospy.Publisher(NEPI_RBX_STATUS_ROTATE_SPEED_TOPIC, Float32, queue_size=1)
 rbx_status_goto_goals_pub = rospy.Publisher(NEPI_RBX_STATUS_GOTO_GOALS_TOPIC, Float64MultiArray, queue_size=1)
 rbx_status_goto_errors_pub = rospy.Publisher(NEPI_RBX_STATUS_GOTO_ERRORS_TOPIC, Float64MultiArray, queue_size=1)
+rbx_status_goto_errors_last_pub = rospy.Publisher(NEPI_RBX_STATUS_GOTO_ERRORS_LAST_TOPIC, Float64MultiArray, queue_size=1)
 rbx_status_cmd_timeout_pub = rospy.Publisher(NEPI_RBX_STATUS_CMD_TIMEOUT_TOPIC, UInt32, queue_size=1)
 rbx_status_cmd_success_pub = rospy.Publisher(NEPI_RBX_STATUS_CMD_SUCCESS_TOPIC, Bool, queue_size=1)
 rbx_status_image_source_pub = rospy.Publisher(NEPI_RBX_STATUS_IMAGE_SOURCE_TOPIC, String, queue_size=10)
@@ -206,7 +215,8 @@ rbx_state = None
 rbx_mode = None
 rbx_battery = 0
 rbx_ready = True
-rbx_goto_speeds = [GOTO_TRAN_SPEED_RATIO,GOTO_ROT_SPEED_RATIO]
+rbx_move_speed = GOTO_TRAN_SPEED_RATIO
+rbx_rotate_speed = GOTO_ROT_SPEED_RATIO
 rbx_goto_error_goals = [GOTO_MAX_ERROR_M,GOTO_MAX_ERROR_DEG,GOTO_STABILIZED_SEC]
 rbx_goto_errors_current = [0,0,0,0,0,0]
 rbx_goto_errors_last = [0,0,0,0,0,0]
@@ -280,7 +290,8 @@ def initialize_actions():
   rospy.Subscriber(NEPI_RBX_SET_STATE_TOPIC, UInt8, rbx_set_state_callback)
   rospy.Subscriber(NEPI_RBX_SET_MODE_TOPIC, UInt8, rbx_set_mode_callback)
   rospy.Subscriber(NEPI_RBX_SET_HOME_CURRENT_TOPIC, Empty, rbx_set_home_current_callback)
-  rospy.Subscriber(NEPI_RBX_SET_GOTO_SPEEDS_TOPIC, Float64MultiArray, rbx_set_goto_speeds_callback)
+  rospy.Subscriber(NEPI_RBX_SET_MOVE_SPEED_TOPIC, Float32, rbx_set_move_speed_callback)
+  rospy.Subscriber(NEPI_RBX_SET_ROTATE_SPEED_TOPIC, Float32, rbx_set_rotate_speed_callback)
   rospy.Subscriber(NEPI_RBX_SET_GOTO_GOALS_TOPIC, Float64MultiArray, rbx_set_goto_goals_callback)
   rospy.Subscriber(NEPI_RBX_SET_CMD_TIMEOUT_TOPIC, UInt32, rbx_set_cmd_timeout_callback)
   ### Start RBX Control Subscribe Topics
@@ -327,7 +338,8 @@ def rbx_status_pub_callback(timer):
   global rbx_mode
   global rbx_battery
   global rbx_ready
-  global rbx_goto_speeds
+  global rbx_move_speed
+  global rbx_rotate_speed
   global rbx_goto_error_goals
   global rbx_goto_errors_current
   global rbx_goto_errors_last
@@ -341,11 +353,15 @@ def rbx_status_pub_callback(timer):
   global rbx_status_image_base
   global rbx_status_state_pub
   global rbx_status_mode_pub
+  global rbx_status_process_current_pub
+  global rbx_status_process_last_pub
   global rbx_status_battery_pub
   global rbx_status_ready_pub
-  global rbx_status_goto_speeds_pub
+  global rbx_status_move_speed_pub
+  global rbx_status_rotate_speed_pub
   global rbx_status_goto_goals_pub
   global rbx_status_goto_errors_pub
+  global rbx_status_goto_errors_last_pub  
   global rbx_status_cmd_timeout_pub
   global rbx_status_cmd_success_pub
   global rbx_status_image_source_pub
@@ -353,11 +369,15 @@ def rbx_status_pub_callback(timer):
   if not rospy.is_shutdown():
     rbx_status_state_pub.publish(rbx_state)
     rbx_status_mode_pub.publish(rbx_mode)
-    rbx_status_battery_pub.publish(rbx_battery)
     rbx_status_ready_pub.publish(rbx_ready)
-    rbx_status_goto_speeds_pub.publish(data=rbx_goto_speeds)
+    rbx_status_process_current_pub.publish(rbx_process_current)
+    rbx_status_process_current_pub.publish(rbx_process_last)
+    rbx_status_battery_pub.publish(rbx_battery)
+    rbx_status_move_speed_pub.publish(data=rbx_move_speed)
+    rbx_status_rotate_speed_pub.publish(data=rbx_rotate_speed)
     rbx_status_goto_goals_pub.publish(data=rbx_goto_error_goals)
     rbx_status_goto_errors_pub.publish(data=rbx_goto_errors_current)
+    rbx_status_goto_errors_last_pub.publish(data=rbx_goto_errors_last)
     rbx_status_cmd_timeout_pub.publish(data=rbx_cmd_timeout)
     rbx_status_cmd_success_pub.publish(data=rbx_cmd_success_last)
     rbx_status_image_source_pub.publish(data=rbx_status_image_source)
@@ -568,18 +588,21 @@ def rbx_set_home_current_callback(set_home_msg):
   print(set_home_msg)
   sethome_current()
   
-### Callback to start rbx set goto speeds process
-def rbx_set_goto_speeds_callback(goto_speeds_msg):
-  global rbx_goto_speeds
+### Callback to start rbx set move speed process
+def rbx_set_move_speed_callback(move_speed_msg):
+  global rbx_move_speed
   print("*******************************")
-  print("Received set speeds message")
-  print(goto_speeds_msg)
-  goto_speeds_list=list(goto_speeds_msg.data)
-  if len(goto_speeds_list) != 2:
-    print("Ignoring this Request")
-    print("Messge is wrong length. Should be float list of size 2")
-  else:    
-    rbx_goto_speeds = goto_speeds_list
+  print("Received set move speed message")
+  print(move_speed_msg)
+  rbx_move_speed = move_speed_msg.data
+
+### Callback to start rbx set rotate speed process
+def rbx_set_rotate_speed_callback(rotate_speed_msg):
+  global rbx_rotate_speed
+  print("*******************************")
+  print("Received set rotate speed message")
+  print(rotate_speed_msg)
+  rbx_rotate_speed = rotate_speed_msg.data
 
 ### Callback to start rbx set goto goals process
 def rbx_set_goto_goals_callback(goto_goals_msg):
