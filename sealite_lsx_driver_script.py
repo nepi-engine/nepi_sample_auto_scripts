@@ -48,7 +48,7 @@ from nepi_ros_interfaces.srv import LSXCapabilitiesQuery, LSXCapabilitiesQueryRe
 
 #Define Discovery Search Parameters
 BAUDRATE_LIST = [9600,19200,57600] # Three supported buad rates
-ADDRESS_LIST = list(range(1,10))  # Should be total range 1-255, but reduced to 1-10 for faster discovery
+ADDRESS_LIST = list(range(1,255))  # Total range 1-255
 
 
 #########################################
@@ -121,7 +121,7 @@ class Sealite_Node(object):
       self.lsx_capabilities_report = LSXCapabilitiesQueryResponse()
       self.lsx_capabilities_report.has_standby_mode = self.HAS_STANDBY_MODE
       self.lsx_capabilities_report.has_intensity_control = self.HAS_INTENSITY_CONTROL
-      #self.lsx_capabilities_report.has_hw_strobe_control = self.HAS_HW_STROBE_CONTROL
+      self.lsx_capabilities_report.has_hw_strobe = self.HAS_HW_STROBE_CONTROL
       self.lsx_capabilities_report.reports_temperature = self.REPORTS_TEMP
       rospy.Service(NEPI_LSX_CAPABILITY_REPORT_SERVICE, LSXCapabilitiesQuery, self.lsx_capabilities_query_callback)
       # Start LSX node control subscribers
@@ -131,7 +131,7 @@ class Sealite_Node(object):
       rospy.Subscriber(NEPI_LSX_SET_STROBE_ENABLE_TOPIC, Bool, self.lsx_set_strobe_enable_callback, queue_size = 1)
       # Initialization Complete
       print("Initialization Complete")
-      rospy.spin()
+      #rospy.spin()
 
   #######################
   ### Class Functions and Callbacks
@@ -186,8 +186,8 @@ class Sealite_Node(object):
     status_msg.sw_version = self.sw_version
     status_msg.standby = self.standby
     status_msg.intensity = self.intensity
-    #status_msg.strobe = self.strobe_enable
-    #status_msg.temp_c = self.temp_c
+    status_msg.strobe_enable = self.strobe_enable
+    status_msg.temp_c = self.temp_c
     if not rospy.is_shutdown():
       self.lxs_status_pub.publish(status_msg)
 
@@ -346,7 +346,7 @@ class Sealite_Node(object):
 #########################################
 
 ### Function to try and connect to device
-def sealite_discover(buad_list,addr_list):
+def sealite_discover(buad_list,addr_list,active_port_list):
   dev_ports=[]
   dev_buads=[]
   dev_addrs=[]
@@ -362,54 +362,57 @@ def sealite_discover(buad_list,addr_list):
   # Checking for devices on available serial ports
   if len(port_list) > 0:
     for port_str in port_list:
-      for buad_int in buad_list:
-        print("#################")
-        print("Connecting to serial port " + port_str + " with buadrate: " + str(buad_int))
-        try:
-          # Try and open serial port
-          print("Opening serial port " + port_str + " with buadrate: " + str(buad_int))
-          serial_port = serial.Serial(port_str,buad_int,timeout = 0.01)
-          for addr in addr_list:
-            addr_str = str(addr)
-            zero_prefix_len = 3-len(addr_str)
-            for z in range(zero_prefix_len):
-              addr_str = ('0' + addr_str)
-            # Create message string
-            ser_msg= ('!' + addr_str + ':INFO?')
-            ser_str = (ser_msg + '\r\n')
-            # Send Serial String
-            #print("")
-            #print("Sending serial message: " + ser_msg)
-            b=bytearray()
-            b.extend(map(ord, ser_str))
-            serial_port.write(b)
-            #print("Waiting for response")
-            time.sleep(.01)
-            bs = serial_port.readline()
-            response = bs.decode()
-            if len(response) > 2:
-              print("Got response: " + response)
-              if response[3] == ',':
-                addr_str = response[0:3]
-                try:
-                  addr_int = int(addr)
-                  print("Found device at address: " + addr_str)
-                  dev_ports.append(port_str)
-                  dev_buads.append(buad_int)
-                  dev_addrs.append(addr_str)
-                  dev_count = dev_count + 1
-                except Exception as a:
-                  print("Returned device message not valid")
-                  print(a)
-          # Close the port afterwards
-          print("Closing serial port " + port_str)
-          serial_port.close()
-        except Exception as e:
-          print("Unable to open serial port " + port_str + " with buadrate: " + str(buad_int))
-          print(e)
-    else:
-      print("No serial ports found")
-  print("Found " + str(dev_count) + " devices")
+      if port_str not in active_port_list:
+        for buad_int in buad_list:
+          print("#################")
+          print("Connecting to serial port " + port_str + " with buadrate: " + str(buad_int))
+          try:
+            # Try and open serial port
+            print("Opening serial port " + port_str + " with buadrate: " + str(buad_int))
+            serial_port = serial.Serial(port_str,buad_int,timeout = 0.005)
+            for addr in addr_list:
+              addr_str = str(addr)
+              zero_prefix_len = 3-len(addr_str)
+              for z in range(zero_prefix_len):
+                addr_str = ('0' + addr_str)
+              # Create message string
+              ser_msg= ('!' + addr_str + ':INFO?')
+              ser_str = (ser_msg + '\r\n')
+              # Send Serial String
+              #print("")
+              #print("Sending serial message: " + ser_msg)
+              b=bytearray()
+              b.extend(map(ord, ser_str))
+              serial_port.write(b)
+              #print("Waiting for response")
+              time.sleep(.005)
+              bs = serial_port.readline()
+              response = bs.decode()
+              if len(response) > 2:
+                print("Got response: " + response)
+                if response[3] == ',':
+                  addr_str = response[0:3]
+                  try:
+                    addr_int = int(addr)
+                    print("Found device at address: " + addr_str)
+                    dev_ports.append(port_str)
+                    dev_buads.append(buad_int)
+                    dev_addrs.append(addr_str)
+                    dev_count = dev_count + 1
+                  except Exception as a:
+                    print("Returned device message not valid")
+                    print(a)
+            # Close the port afterwards
+            print("Closing serial port " + port_str)
+            serial_port.close()
+          except Exception as e:
+            print("Unable to open serial port " + port_str + " with buadrate: " + str(buad_int))
+            print(e)
+      else:
+        print("Serial port allready active")
+  else:
+    print("No serial ports found")
+  print("Found " + str(dev_count) + " new devices")
   for i in range(dev_count):
     print(dev_ports[i] + "  " + str(dev_buads[i]) + " " + dev_addrs[i])
   return dev_ports,dev_buads,dev_addrs
@@ -420,13 +423,19 @@ def sealite_discover(buad_list,addr_list):
 #########################################
 
 if __name__ == '__main__':
-  # Run Discovery Process at Start
-  port_list,buad_list,addr_list = sealite_discover(BAUDRATE_LIST,ADDRESS_LIST)
-  # Try and create a LSX Node for each found device
-  if len(port_list) > 0: 
-    for i, port in enumerate(port_list):
-      exec(f'lsx_node_{i}=Sealite_Node(port_list[i],buad_list[i],addr_list[i])')
-  else:
-    print("No devices found to connect to")
+  active_port_list = []
+  while not rospy.is_shutdown():
+    # Run Discovery Process at Start
+    port_list,buad_list,addr_list = sealite_discover(BAUDRATE_LIST,ADDRESS_LIST,active_port_list)
+    # Try and create a LSX Node for each found device
+    if len(port_list) > 0: 
+      for i, port in enumerate(port_list):
+        if port_list[i] not in active_port_list:
+          exec(f'lsx_node_{i}=Sealite_Node(port_list[i],buad_list[i],addr_list[i])')
+          active_port_list.append(port_list[i])
+    else:
+      print("No devices found to connect to")
+    time.sleep(3)
+  rospy.spin()
 
 
