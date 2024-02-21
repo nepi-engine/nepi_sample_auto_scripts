@@ -44,9 +44,7 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 # USER SETTINGS - Edit as Necessary 
 #########################################
 
-SCRIPT_LIST = ["zed2_idx_driver_script.py",
-               "navpose_set_fixed_config_script.py",
-               "zed2_idx_navpose_config_script.py",
+SCRIPT_LIST = ["navpose_set_fixed_config_script.py",
                "ai_detector_config_script.py",
                "ai_3d_targeting_process_script.py"] #  Script filenames to start/stop
 
