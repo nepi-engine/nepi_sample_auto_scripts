@@ -62,7 +62,7 @@ OBJ_LABEL_OF_INTEREST = "person"
 PTX_REVERSE_PAN = False # Relative to image pixel location reporting
 PTX_REVERSE_TILT = True # Relative to image pixel location reporting
 PTX_SCAN_PAN_LIMITS = 40 # +- Pan Angle Limits
-PTX_SCAN_TILT_RATIO = 0.55 # Tilt Angle During Scanning
+PTX_SCAN_TILT_RATIO = 0.65 # Tilt Angle During Scanning
 
 # Parameters for pan and tilt tracking settings
 PTX_SCAN_CHECK_INTERVAL = 0.25

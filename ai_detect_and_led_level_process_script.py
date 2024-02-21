@@ -26,35 +26,33 @@
 
 # Sample NEPI Process Script. 
 # 1. Waits for ai detection topic
-# 2. Waits for specific object to be detected and centered
-# 3. Publishes a snapshot event trigger out
-# 4. Delays trigger event for some set delay time
+# 2. Adjust LED level based on target location in image
 
 # Requires the following additional scripts are running
 # a)ai_detector_config_script.py
-# This automation script only sends a snapshot event trigger.
-# You will also want one or more snapshot event action scripts running
-# The following automation scripts are snapshot event action scripts you can test
-# a)(Optional)snapshot_event_save_to_disk_action_script.py
-# b)(Optional) snapshot_event_send_to_cloud_action_script.py for cloud portal support
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
 import time
 import sys
-import rospy   
+import rospy
+import statistics
+import numpy as np
 
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty, Float32
 from sensor_msgs.msg import Image
-from darknet_ros_msgs.msg import BoundingBoxes
+from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 
 #########################################
 # USER SETTINGS - Edit as Necessary 
 #########################################
 
 OBJ_LABEL_OF_INTEREST = "person"
-OBJ_CENTERED_BUFFER_RATIO = 0.5 # acceptable band about center of image for saving purposes
-RESET_DELAY_S = 5 # Min delay between triggers
+MAX_LED_LEVEL = 0.1
+WD_TIMEOUT_SEC = 4
+
+#Set LED Control ROS Topic Name (or partial name)
+LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 
 #########################################
 # ROS NAMESPACE SETUP
@@ -66,17 +64,20 @@ NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 # AI Detector Subscriber Topics
 AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
 AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
+AI_FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "classifier/found_object"
 
 # Snapshot Publish Topic
-SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
+
 
 #########################################
 # Globals
 #########################################
 
-snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
+led_intensity_pub = None
 img_width = 0 # Updated on receipt of first image
 img_height = 0 # Updated on receipt of first image
+object_detected = False
+last_intensity = 0
 
 #########################################
 # Methods
@@ -86,8 +87,15 @@ img_height = 0 # Updated on receipt of first image
 def initialize_actions():
   global img_height
   global img_width
+  global led_intensity_pub
   print("")
   print("Starting Initialization Processes")
+  # Wait for topic by name
+  print("Waiting for topic name: " + LED_CONTROL_TOPIC_NAME)
+  led_control_topic=find_topic(LED_CONTROL_TOPIC_NAME)
+  print("Found topic: " + led_control_topic)
+  led_intensity_pub = rospy.Publisher(led_control_topic, Float32, queue_size = 1)
+  # Wait for topic by name
   print("Connecting to NEPI Detector Image Topic")
   print(AI_DETECTION_IMAGE_TOPIC )
   # Wait for topic
@@ -101,6 +109,11 @@ def initialize_actions():
   # Set up object detector subscriber
   print("Starting object detection subscriber: Object of interest = " + OBJ_LABEL_OF_INTEREST + "...")
   rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, object_detected_callback, queue_size = 1)
+  #Set up found object subscriber which monitors all AI outputs
+  print("Starting found object subscriber")
+  rospy.Subscriber(AI_FOUND_OBJECT_TOPIC, ObjectCount, found_object_callback, queue_size = 1)
+  print("Setting up watchdog timer")
+  rospy.Timer(rospy.Duration(1), watchdog_timer_callback)
   print("Initialization Complete")
  
 ### Simple callback to get image height and width
@@ -117,7 +130,12 @@ def image_callback(img_msg):
 def object_detected_callback(bounding_box_msg):
   global img_height
   global img_width
-  global snapshot_trigger_pub
+  global led_intensity_pub
+  global last_intensity
+  global object_detected
+  global wd_timer
+  wd_timer = 0
+  object_detected = False
   # Iterate over all of the objects reported by the detector
   for box in bounding_box_msg.bounding_boxes:
     # Check for the object of interest and take appropriate actions
@@ -131,20 +149,49 @@ def object_detected_callback(bounding_box_msg):
       object_loc_x_ratio = float(object_loc_x_pix) / img_width
       print("Object Detected " + OBJ_LABEL_OF_INTEREST + " with box center (" + str(object_loc_x_ratio) + ", " + str(object_loc_y_ratio) + ")")
       # check if we are AIose enough to center in either dimension to stop motion: Hysteresis band
-      box_abs_error_x_ratio = 1- 2.0 * abs(object_loc_x_ratio - 0.5)
-      box_abs_error_y_ratio = 1- 2.0 * abs(object_loc_y_ratio - 0.5)
+      box_abs_error_x_ratio = 1-2.0 * abs(object_loc_x_ratio - 0.5)
+      box_abs_error_y_ratio = 1-2.0 * abs(object_loc_y_ratio - 0.5)
       print("Object Detection Error Ratios Horz: " "%.2f" % (box_abs_error_x_ratio) + " Vert: " + "%.2f" % (box_abs_error_y_ratio))
-      if (box_abs_error_y_ratio >= OBJ_CENTERED_BUFFER_RATIO ) and \
-         (box_abs_error_x_ratio >= OBJ_CENTERED_BUFFER_RATIO ):
-        print("Detected a " + OBJ_LABEL_OF_INTEREST + " Close to image center")
-        print("Sending snapshot event trigger")
-        snapshot_trigger_pub.publish(Empty())
-        print("Delaying next trigger for " + str(RESET_DELAY_S) + " secs")
-        time.sleep(RESET_DELAY_S)
+      # Sending LED level update
+      error_ratios = [box_abs_error_x_ratio, box_abs_error_y_ratio]
+      mean_error_ratio = statistics.mean(error_ratios)
+      print("Target center ratio: " + "%.2f" % (mean_error_ratio))
+      intensity = MAX_LED_LEVEL *  mean_error_ratio*4
+      avg_inensity = (intensity + last_intensity)/2
+      last_intensity = intensity
+      print("Setting intensity level to: " + "%.2f" % (avg_inensity))
+      object_detected = True
+      if not rospy.is_shutdown():
+        led_intensity_pub.publish(data = avg_inensity)
     else:
-      print("No " + OBJ_LABEL_OF_INTEREST + " type for target data")
-      time.sleep(1)
+      #led_intensity_pub.publish(data = 0.0)
+      #print("No " + OBJ_LABEL_OF_INTEREST + " type for target data")
+      time.sleep(0.01)
+    if object_detected == False and not rospy.is_shutdown():
+      led_intensity_pub.publish(data = 0)
 
+def found_object_callback(found_obj_msg):
+  # Must reset object_detected in the event of no objects to restart scan mode
+  global object_detected
+  global watchdog_timer
+  wd_timer = 0
+  if found_obj_msg.count == 0:
+    print("No objects found")
+    object_detected=False
+    if not rospy.is_shutdown():
+      led_intensity_pub.publish(data = 0)
+
+### Setup a regular background scan process based on timer callback
+def watchdog_timer_callback(timer):
+  # Called periodically no matter what as a Timer object callback
+  global wd_timer
+  print("Watchdog timer: " + str(wd_timer))
+  if wd_timer > WD_TIMEOUT_SEC:
+    print("Past timeout time, turning lights off")
+    if not rospy.is_shutdown():
+      led_intensity_pub.publish(data = 0)
+  else:
+    wd_timer = wd_timer + 1
 
 #######################
 # Initialization Functions
@@ -153,7 +200,9 @@ def object_detected_callback(bounding_box_msg):
 def find_topic(topic_name):
   topic = ""
   topic_list=rospy.get_published_topics(namespace='/')
+  #print(topic_list)
   for topic_entry in topic_list:
+    #print(topic_entry[0])
     if topic_entry[0].find(topic_name) != -1:
       topic = topic_entry[0]
   return topic
@@ -178,7 +227,9 @@ def wait_for_topic(topic_name):
 # StartNode and Cleanup Functions
 
 def cleanup_actions():
+  global led_intensity_pub
   print("Shutting down: Executing script cleanup actions")
+  led_intensity_pub.publish(data = 0)
 
 
 ### Script Entrypoint
