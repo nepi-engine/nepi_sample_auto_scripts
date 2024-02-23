@@ -24,46 +24,47 @@
 #
 #
 
+# Sample NEPI Process Script. 
+# 1. Waits for LED system
+# 2. Steps through LED intensities
 
-# Sample NEPI Config Script.
-# 1. Connects NEPI NavPose topics to appropriate navpose topics
+# Requires the following additional scripts are running
+# a)ai_detector_config_script.py
+# These scripts are available for download at:
+# [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
-
-import rospy
 import time
+import sys
+import rospy
 
-from std_msgs.msg import String, Bool, Float64
-from nav_msgs.msg import Odometry
-from sensor_msgs.msg import NavSatFix
-from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
-from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
+
+from std_msgs.msg import Empty, Float32
 
 #########################################
 # USER SETTINGS - Edit as Necessary 
 #########################################
 
+LED_LEVEL_MAX = 0.3 # 0-1 ratio
+LED_LEVEL_STEP = 0.05 # 0-1 ratio
+LED_STEP_SEC = 1.0
+
+#Set LED Control ROS Topic Name (or partial name)
+LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 
 #########################################
 # ROS NAMESPACE SETUP
 #########################################
 
+# ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
-NEPI_IDX_NAMESPACE = NEPI_BASE_NAMESPACE + "zed2_stereo_camera/idx/"
-
-# NavPose Source Topics
-NAVPOSE_SOURCE_ORIENTATION_TOPIC = NEPI_IDX_NAMESPACE + "odom"
-
-### Setup NEPI NavPose Settings Topic Namespaces
-NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
 
 #########################################
 # Globals
 #########################################
 
-mavros_global_msg=None
-mavros_heading_msg=None
-mavros_orientation_msg=None
+led_intensity_pub = None
+led_last_level = 0
 
 #########################################
 # Methods
@@ -71,24 +72,30 @@ mavros_orientation_msg=None
 
 ### System Initialization processes
 def initialize_actions():
+  global led_intensity_pub
   print("")
-  print("Starting Initialization")
-  # Start timer callback that sends regular set navepose updates
-  print("Starting set navpose topics timer callback")
-  rospy.Timer(rospy.Duration(5.0), set_nepi_navpose_topics_callback)
+  print("Starting Initialization Processes")
+  # Wait for topic by name
+  print("Waiting for topic name: " + LED_CONTROL_TOPIC_NAME)
+  led_control_topic=find_topic(LED_CONTROL_TOPIC_NAME)
+  print("Found topic: " + led_control_topic)
+  led_intensity_pub = rospy.Publisher(led_control_topic, Float32, queue_size = 1)
+  #Start level step loop
+  print("Starting LED level step loop")
+  rospy.Timer(rospy.Duration(LED_STEP_SEC), led_step_callback)
   print("Initialization Complete")
-
-
-### Callback to set NEPI navpose topics
-def set_nepi_navpose_topics_callback(timer):
-  # Update Orientation source
-  print("Waiting for topic: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
-  wait_for_topic(NAVPOSE_SOURCE_ORIENTATION_TOPIC)
-  set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
-  time.sleep(1) # Wait between creating and using publisher
-  set_orientation_pub.publish(NAVPOSE_SOURCE_ORIENTATION_TOPIC)
-  print("Orientation Topic Set to: " + NAVPOSE_SOURCE_ORIENTATION_TOPIC)
-
+ 
+### Setup a regular led adjust process
+def led_step_callback(timer):
+  global led_intensity_pub
+  global led_last_level
+  led_level = led_last_level + LED_LEVEL_STEP
+  if led_level > LED_LEVEL_MAX:
+    led_level = 0.0
+  print("Setting LED level to: " + '%.2f' % led_level)
+  if not rospy.is_shutdown():
+    led_intensity_pub.publish(data = led_level)
+    led_last_level = led_level
 
 #######################
 # Initialization Functions
@@ -97,13 +104,15 @@ def set_nepi_navpose_topics_callback(timer):
 def find_topic(topic_name):
   topic = ""
   topic_list=rospy.get_published_topics(namespace='/')
+  #print(topic_list)
   for topic_entry in topic_list:
+    #print(topic_entry[0])
     if topic_entry[0].find(topic_name) != -1:
       topic = topic_entry[0]
   return topic
 
 ### Function to check for a topic 
-def check_for_topic(topic_name):
+def wait_for_topic(topic_name):
   topic_exists = True
   topic=find_topic(topic_name)
   if topic == "":
@@ -121,22 +130,23 @@ def wait_for_topic(topic_name):
 #######################
 # StartNode and Cleanup Functions
 
-
-### Cleanup processes on node shutdown
 def cleanup_actions():
+  global led_intensity_pub
   print("Shutting down: Executing script cleanup actions")
+  led_intensity_pub.publish(data = 0)
+
 
 ### Script Entrypoint
 def startNode():
-  rospy.loginfo("Starting Zed2 IDX NavPose Config Script")
-  rospy.init_node("zed2_idx_navpose_config_script")
-  # Run initialization processes
+  rospy.loginfo("Starting AI Detect and Snapshot Process Script", disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node
+  rospy.init_node(name="ai_detect_and_snapshot_process_script")
+  # Run Initialization processes
   initialize_actions()
-  # Run cleanup actions on rospy shutdown
+  #Set up Anode shutdown
   rospy.on_shutdown(cleanup_actions)
-  # Spin forever
-  rospy.spin()  
-  
+  # Spin forever (until object is detected)
+  rospy.spin()
 
 
 #########################################

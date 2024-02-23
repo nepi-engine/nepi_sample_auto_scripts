@@ -43,6 +43,7 @@ from std_msgs.msg import Empty, Float32
 from sensor_msgs.msg import Image
 from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 
+
 #########################################
 # USER SETTINGS - Edit as Necessary 
 #########################################
@@ -50,6 +51,7 @@ from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 OBJ_LABEL_OF_INTEREST = "person"
 MAX_LED_LEVEL = 0.1
 WD_TIMEOUT_SEC = 4
+AVG_LENGTH = 5
 
 #Set LED Control ROS Topic Name (or partial name)
 LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
@@ -77,7 +79,9 @@ led_intensity_pub = None
 img_width = 0 # Updated on receipt of first image
 img_height = 0 # Updated on receipt of first image
 object_detected = False
-last_intensity = 0
+intensity_last = 0
+intensity_history = np.zeros(AVG_LENGTH)
+
 
 #########################################
 # Methods
@@ -131,7 +135,8 @@ def object_detected_callback(bounding_box_msg):
   global img_height
   global img_width
   global led_intensity_pub
-  global last_intensity
+  global intensity_last
+  global intensity_history
   global object_detected
   global wd_timer
   wd_timer = 0
@@ -153,12 +158,14 @@ def object_detected_callback(bounding_box_msg):
       box_abs_error_y_ratio = 1-2.0 * abs(object_loc_y_ratio - 0.5)
       print("Object Detection Error Ratios Horz: " "%.2f" % (box_abs_error_x_ratio) + " Vert: " + "%.2f" % (box_abs_error_y_ratio))
       # Sending LED level update
-      error_ratios = [box_abs_error_x_ratio, box_abs_error_y_ratio]
+      error_ratios = [box_abs_error_x_ratio] # ignore vertical
       mean_error_ratio = statistics.mean(error_ratios)
       print("Target center ratio: " + "%.2f" % (mean_error_ratio))
       intensity = MAX_LED_LEVEL *  mean_error_ratio*4
-      avg_inensity = (intensity + last_intensity)/2
-      last_intensity = intensity
+      intensity_last = intensity
+      intensity_history = np.roll(intensity_history,1)
+      intensity_history[0]=intensity
+      avg_inensity = np.mean(intensity_history)
       print("Setting intensity level to: " + "%.2f" % (avg_inensity))
       object_detected = True
       if not rospy.is_shutdown():

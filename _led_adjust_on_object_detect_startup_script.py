@@ -45,7 +45,7 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #########################################
 
 SCRIPT_LIST = ["ai_detector_config_script.py",
-               "ai_detect_and_led_level_process_script.py"] #  Script filenames to start/stop
+               "led_ai_detect_level_adjust_process_script.py"] #  Script filenames to start/stop
 
 #########################################
 # ROS NAMESPACE SETUP
