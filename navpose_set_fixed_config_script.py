@@ -36,6 +36,9 @@ import rospy
 import math
 import tf
 import time
+import sys
+from resources import nepi
+from resources import nepi_navpose
 
 from std_msgs.msg import Float64, Empty
 from sensor_msgs.msg import NavSatFix
@@ -55,100 +58,101 @@ START_ORIENTATION_DEGS = [10.0,20.0,30.0]
 # ROS NAMESPACE SETUP
 #########################################
 
+# ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
-###!!!!!!!! Set NavPose initialization values !!!!!!!!
-SET_NAVPOSE_FIXED_GPS_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_init_gps_fix"
-SET_NAVPOSE_FIXED_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_init_heading"
-SET_NAVPOSE_FIXED_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_init_orientation"
-REINIT_NAVPOSE_SOLUTION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/reinit_solution"
-
-
 #########################################
-# Globals
+# Node Class
 #########################################
 
+class navpose_set_fixed_config(object):
 
-#########################################
-# Methods
-#########################################
+  #######################
+  ### Node Initialization
+  def __init__(self):
+    rospy.loginfo("Starting Initialization Processes")
+    ## Initialize Class Variables
+    ## Define Class Namespaces
+    SET_NAVPOSE_FIXED_GPS_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_init_gps_fix"
+    SET_NAVPOSE_FIXED_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_init_heading"
+    SET_NAVPOSE_FIXED_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_init_orientation"
+    REINIT_NAVPOSE_SOLUTION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/reinit_solution"
+    ## Define Class Services Calls
+    ## Create Class Sevices    
+    ## Create Class Publishers
+    ## Start Class Subscribers
+    ## Start Node Processes
+    # Make sure to use the correct message type: "rostopic info" can help identify it. In this case it is a sensor_msgs/NavSatFix message type
+    gps_pub = rospy.Publisher(SET_NAVPOSE_FIXED_GPS_TOPIC, NavSatFix, queue_size=1)
+    rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
+    lat = START_GEOPOINT[0]
+    long = START_GEOPOINT[1]
+    alt = START_GEOPOINT[2]
+    gps_pub.publish(latitude=lat, longitude=long, altitude=alt) # Keyword args are a nice way to construct messages right in the publish() function
+    heading_pub = rospy.Publisher(SET_NAVPOSE_FIXED_HEADING_TOPIC, Float64, queue_size=1)
+    rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
+    heading = START_HEADING_DEG
+    heading_pub.publish(data=heading)
+    orientation_pub = rospy.Publisher(SET_NAVPOSE_FIXED_ORIENTATION_TOPIC, QuaternionStamped, queue_size=1)
+    rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
+    current_orientation_quat = nepi_navpose.convert_rpy2quat(START_ORIENTATION_DEGS)
+    new_quat = Quaternion()
+    new_quat.x = current_orientation_quat[0]
+    new_quat.y = current_orientation_quat[1]
+    new_quat.z = current_orientation_quat[2]
+    new_quat.w = current_orientation_quat[3]
+    orientation_pub.publish(quaternion=new_quat)
+    # At this point, the "init" fields have been updated, but they haven't yet been applied as the current values for GPS and HEADING, 
+    # so we do that here via the "reinit_solution" topic.
+    rospy.sleep(1) # Give new navpose values time to get captured
+    reinit_pub = rospy.Publisher(REINIT_NAVPOSE_SOLUTION_TOPIC, Empty, queue_size=10)
+    rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
+    reinit_pub.publish() # "Empty" message types don't require a payload
+    ## Initiation Complete
+    rospy.loginfo("Initialization Complete")
 
-
-### System Initialization processes
-def initialize_actions():
-  print("")
-  print("Starting Initialization")
-  # Make sure to use the correct message type: "rostopic info" can help identify it. In this case it is a sensor_msgs/NavSatFix message type
-  gps_pub = rospy.Publisher(SET_NAVPOSE_FIXED_GPS_TOPIC, NavSatFix, queue_size=1)
-  rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
-  lat = START_GEOPOINT[0]
-  long = START_GEOPOINT[1]
-  alt = START_GEOPOINT[2]
-  gps_pub.publish(latitude=lat, longitude=long, altitude=alt) # Keyword args are a nice way to construct messages right in the publish() function
-  heading_pub = rospy.Publisher(SET_NAVPOSE_FIXED_HEADING_TOPIC, Float64, queue_size=1)
-  rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
-  heading = START_HEADING_DEG
-  heading_pub.publish(data=heading)
-  orientation_pub = rospy.Publisher(SET_NAVPOSE_FIXED_ORIENTATION_TOPIC, QuaternionStamped, queue_size=1)
-  rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
-  current_orientation_quat = convert_rpy2quat(START_ORIENTATION_DEGS)
-  new_quat = Quaternion()
-  new_quat.x = current_orientation_quat[0]
-  new_quat.y = current_orientation_quat[1]
-  new_quat.z = current_orientation_quat[2]
-  new_quat.w = current_orientation_quat[3]
-  orientation_pub.publish(quaternion=new_quat)
-  # At this point, the "init" fields have been updated, but they haven't yet been applied as the current values for GPS and HEADING, 
-  # so we do that here via the "reinit_solution" topic.
-  rospy.sleep(1) # Give new navpose values time to get captured
-  reinit_pub = rospy.Publisher(REINIT_NAVPOSE_SOLUTION_TOPIC, Empty, queue_size=10)
-  rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
-  reinit_pub.publish() # "Empty" message types don't require a payload
-  print("Initialization Complete")
-
-#######################
-# Process Functions
-
-### Function to Convert Quaternion Attitude to Roll, Pitch, Yaw Degrees
-def convert_quat2rpy(xyzw_attitude):
-  rpy_attitude_rad = tf.transformations.euler_from_quaternion(xyzw_attitude)
-  rpy_attitude_deg = np.array(rpy_attitude_rad) * 180/math.pi
-  roll_deg = rpy_attitude_deg[0] 
-  pitch_deg = rpy_attitude_deg[1] 
-  yaw_deg = rpy_attitude_deg[2]
-  return rpy_attitude_deg
-
-### Function to Convert Roll, Pitch, Yaw Degrees to Quaternion Attitude
-def convert_rpy2quat(rpy_attitude_deg):
-  roll_deg = rpy_attitude_deg[0] 
-  pitch_deg = rpy_attitude_deg[1] 
-  yaw_deg = rpy_attitude_deg[2]
-  xyzw_attitude = tf.transformations.quaternion_from_euler(math.radians(pitch_deg), math.radians(yaw_deg), math.radians(roll_deg),axes="ryzx")
-  xyzw_norm = (xyzw_attitude[0]*xyzw_attitude[0]) + (xyzw_attitude[1]*xyzw_attitude[1]) + (xyzw_attitude[2]*xyzw_attitude[2]) + (xyzw_attitude[3]*xyzw_attitude[3])
-  print("Norm is " + str(xyzw_norm))
-  return xyzw_attitude
-
-#######################
-# StartNode and Cleanup Functions
-
-### Cleanup processes on node shutdown
-def cleanup_actions():
-  print("Shutting down: Executing script cleanup actions")
-
-### Script Entrypoint
-def startNode():
-  rospy.loginfo("Starting NavPose Set Fixed NavPose Config Script")
-  rospy.init_node("navpose_set_fixed_navpose_config_script")
-  # Run initialization processes
-  initialize_actions()
-  # run cleanup actions on shutdown
-  rospy.on_shutdown(cleanup_actions)
-  # Spin forever
-  rospy.spin()
+  #######################
+  ### Node Methods
   
+
+  #######################
+  # Node Cleanup Function
+  
+  def cleanup_actions(self):
+    rospy.loginfo("Shutting down: Executing script cleanup actions")
+
+
 #########################################
 # Main
 #########################################
-
 if __name__ == '__main__':
-  startNode()
+  current_filename = sys.argv[0].split('/')[-1]
+  current_filename = current_filename.split('.')[0]
+  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node(name=current_filename)
+  #Launch the node
+  node_name = current_filename.rpartition("_")[0]
+  rospy.loginfo("Launching node named: " + node_name)
+  node_class = eval(node_name)
+  node = node_class()
+  #Set up node shutdown
+  rospy.on_shutdown(node.cleanup_actions)
+  # Spin forever (until object is detected)
+  rospy.spin()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

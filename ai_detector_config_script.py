@@ -32,7 +32,8 @@
 
 import time
 import sys
-import rospy   
+import rospy
+from resources import nepi
 
 from sensor_msgs.msg import Image
 from std_msgs.msg import UInt8, Empty, String, Bool
@@ -42,8 +43,7 @@ from nepi_ros_interfaces.msg import ClassifierSelection, StringArray
 # USER SETTINGS - Edit as Necessary 
 #########################################
 
-
-#Set AI Detector Image ROS Topic Name
+#Set AI Detector Image ROS Topic Name or Partial Name
 IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
 
 #Set AI Detector Parameters
@@ -54,95 +54,66 @@ DETECTION_THRESHOLD = 0.5
 # ROS NAMESPACE SETUP
 #########################################
 
+# ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
-# AI Detector Publish Topics
-AI_START_TOPIC = NEPI_BASE_NAMESPACE + "start_classifier"
-AI_STOP_TOPIC = NEPI_BASE_NAMESPACE + "stop_classifier"
-
 #########################################
-# Globals
+# Node Class
 #########################################
 
-stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
+class ai_detector_config(object):
 
-#########################################
-# Methods
-#########################################
+  #######################
+  ### Node Initialization
+  def __init__(self):
+    rospy.loginfo("Starting Initialization Processes")
+    ## Initialize Class Variables
+    ## Define Class Namespaces
+    AI_START_TOPIC = NEPI_BASE_NAMESPACE + "start_classifier"
+    AI_STOP_TOPIC = NEPI_BASE_NAMESPACE + "stop_classifier"
+    ## Create Class Publishers
+    self.start_classifier_pub = rospy.Publisher(AI_START_TOPIC, ClassifierSelection, queue_size=1)
+    self.stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)
+    ## Start Class Subscribers
+    # Wait for image topic to publish
+    rospy.loginfo("Waiting for topic name: " + IMAGE_INPUT_TOPIC_NAME)
+    image_topic=nepi.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
+    rospy.loginfo("Found topic: " + image_topic)
+    self.classifier_selection = ClassifierSelection(img_topic=image_topic, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
+    ## Start Node Processes
+    rospy.loginfo("Starting object detector: " + str(self.start_classifier_pub.name))
+    self.start_classifier_pub.publish(self.classifier_selection)
+    ## Initiation Complete
+    rospy.loginfo("Initialization Complete")
 
-### System Initialization processes
-def initialize_actions():
-  print("")
-  print("Starting Initialization")  
-  # Wait for topic by name
-  print("Waiting for topic name: " + IMAGE_INPUT_TOPIC_NAME)
-  image_topic=wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
-  print("Found topic: " + image_topic)
-  # Classifier initialization, and wait for it to publish
-  start_classifier_pub = rospy.Publisher(AI_START_TOPIC, ClassifierSelection, queue_size=1)
-  classifier_selection = ClassifierSelection(img_topic=image_topic, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
-  time.sleep(1) # Important to sleep between publisher constructor and publish()
-  rospy.loginfo("Starting object detector: " + str(start_classifier_pub.name))
-  start_classifier_pub.publish(classifier_selection)
-  print("Initialization Complete")
-
-#######################
-# Initialization Functions
-
-#######################
-# Initialization Functions
-
-### Function to find a topic
-def find_topic(topic_name):
-  topic = ""
-  topic_list=rospy.get_published_topics(namespace='/')
-  for topic_entry in topic_list:
-    if topic_entry[0].find(topic_name) != -1:
-      topic = topic_entry[0]
-  return topic
-
-### Function to check for a topic 
-def check_for_topic(topic_name):
-  topic_exists = True
-  topic=find_topic(topic_name)
-  if topic == "":
-    topic_exists = False
-  return topic_exists
-
-### Function to wait for a topic
-def wait_for_topic(topic_name):
-  topic = ""
-  while topic == "" and not rospy.is_shutdown():
-    topic=find_topic(topic_name)
-    time.sleep(.1)
-  return topic
-
-#######################
-# StartNode and Cleanup Functions
-
-
-### Cleanup processes on node shutdown
-def cleanup_actions():
-  global stop_classifier_pub
-  print("Shutting down: Executing script cleanup actions")
-  stop_classifier_pub.publish(Empty())
-
-### Script Entrypoint
-def startNode():
-  rospy.loginfo("Starting AI 2D Detector Config Script", disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name="ai_2d_detector_config_auto_script")
-  # Run initialization processes
-  initialize_actions()
-  # run cleanup actions on shutdown
-  rospy.on_shutdown(cleanup_actions)
-  # Spin forever
-  rospy.spin()
+  #######################
+  ### Node Methods
   
+
+  #######################
+  # Node Cleanup Function
   
+  def cleanup_actions(self):
+    rospy.loginfo("Shutting down: Executing script cleanup actions")
+    self.stop_classifier_pub.publish(Empty())
+
+
+
 #########################################
 # Main
 #########################################
-
 if __name__ == '__main__':
-  startNode()
+  current_filename = sys.argv[0].split('/')[-1]
+  current_filename = current_filename.split('.')[0]
+  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node(name=current_filename)
+  #Launch the node
+  node_name = current_filename.rpartition("_")[0]
+  rospy.loginfo("Launching node named: " + node_name)
+  node_class = eval(node_name)
+  node = node_class()
+  #Set up node shutdown
+  rospy.on_shutdown(node.cleanup_actions)
+  # Spin forever (until object is detected)
+  rospy.spin()
 

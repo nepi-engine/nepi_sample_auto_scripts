@@ -24,28 +24,22 @@
 #
 #
 
-# Sample NEPI Action Script. 
-# Uses onboard ROS python library to
-# 1. Waits for snapshot event trigger
-# 2. Runs your custom snapshot event actions
-# 3. Delays next trigger event action for some set delay time
+# Sample NEPI Process Script. 
+# 1) 
 
+# Requires the following additional scripts are running
+# a)
+
+import rospy
 import time
 import sys
-import rospy
-import os
-import numpy as np
 from resources import nepi
 
-from std_msgs.msg import UInt8, Empty, String, Bool
-
+from std_msgs.msg import Empty, Float32
 
 #########################################
 # USER SETTINGS - Edit as Necessary 
 #########################################
-
-###!!!!!!!! Set Automation action parameters !!!!!!!!
-TIGGER_RESET_DELAY_S = 5.0 # Seconds. Delay before starting over search/save process
 
 
 #########################################
@@ -59,7 +53,7 @@ NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 # Node Class
 #########################################
 
-class snapshot_event_your_custom_action(object):
+class name_of_file_without_script(object):
 
   #######################
   ### Node Initialization
@@ -67,14 +61,10 @@ class snapshot_event_your_custom_action(object):
     rospy.loginfo("Starting Initialization Processes")
     ## Initialize Class Variables
     ## Define Class Namespaces
-    SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
     ## Define Class Services Calls
     ## Create Class Sevices    
     ## Create Class Publishers
     ## Start Class Subscribers
-    # Set up snapshot event callback
-    rospy.Subscriber(SNAPSHOT_TOPIC, Empty, self.snapshot_event_callback, queue_size = 1)
-    rospy.loginfo("Subscribed to : " + SNAPSHOT_TOPIC)
     ## Start Node Processes
     ## Initiation Complete
     rospy.loginfo("Initialization Complete")
@@ -82,19 +72,7 @@ class snapshot_event_your_custom_action(object):
   #######################
   ### Node Methods
   
-  # Action upon detection of snapshot event trigger
-  def snapshot_event_callback(self,event):
-    ###########################################################
-    ### ADD YOUR CODE HERE
-    ###########################################################
 
-    ###########################################################
-    ### END OF YOUR CODE
-    ###########################################################
-    rospy.loginfo("Delaying next trigger for " + str(TIGGER_RESET_DELAY_S) + " secs")
-    time.sleep(TIGGER_RESET_DELAY_S)
-    rospy.loginfo("Waiting for next snapshot event trigger")
-  
   #######################
   # Node Cleanup Function
   
@@ -119,6 +97,4 @@ if __name__ == '__main__':
   rospy.on_shutdown(node.cleanup_actions)
   # Spin forever (until object is detected)
   rospy.spin()
-
-
 

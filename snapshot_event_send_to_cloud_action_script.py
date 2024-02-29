@@ -34,7 +34,8 @@
 
 import time
 import sys
-import rospy   
+import rospy
+from resources import nepi
 
 from std_msgs.msg import UInt8, Empty, String, Bool
 from nepi_ros_interfaces.msg import IDXStatus, SaveData, SaveDataRate, StringArray
@@ -47,85 +48,92 @@ from nepi_ros_interfaces.msg import IDXStatus, SaveData, SaveDataRate, StringArr
 #Configure Your Connect Topics to Send in NEPI RUI
 
 ###!!!!!!!! Set Automation action parameters !!!!!!!!
-SEND_RESET_DELAY_S = 30.0 # Seconds. Delay before starting over
-
+TIGGER_RESET_DELAY_S = 30.0 # Seconds. Delay before starting over
 
 #########################################
 # ROS NAMESPACE SETUP
 #########################################
 
+# ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
-# NEPI Link data topics and parameters
-NEPI_LINK_NAMESPACE = NEPI_BASE_NAMESPACE + "nepi_link_ros_bridge/"
-NEPI_LINK_ENABLE_TOPIC = NEPI_LINK_NAMESPACE + "enable"
-NEPI_LINK_SET_DATA_SOURCES_TOPIC = NEPI_LINK_NAMESPACE + "lb/select_data_sources"
-NEPI_LINK_COLLECT_DATA_TOPIC = NEPI_LINK_NAMESPACE + "lb/create_data_set_now"
-NEPI_LINK_CONNECT_TOPIC = NEPI_LINK_NAMESPACE + "connect_now"
-
-### Snapshot Topic Name
-SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
-
 #########################################
-# Globals
+# Node Class
 #########################################
 
-nepi_link_enable_pub = rospy.Publisher(NEPI_LINK_ENABLE_TOPIC, Bool, queue_size=10)
-nepi_link_set_data_sources = rospy.Publisher(NEPI_LINK_SET_DATA_SOURCES_TOPIC, StringArray, queue_size=10)
-nepi_link_collect_data_pub = rospy.Publisher(NEPI_LINK_COLLECT_DATA_TOPIC, Empty, queue_size=10)
-nepi_link_connect_now_pub = rospy.Publisher(NEPI_LINK_CONNECT_TOPIC, Empty, queue_size=10)
+class snapshot_event_send_to_cloud_action(object):
 
-#########################################
-# Methods
-#########################################
+  #######################
+  ### Node Initialization
+  def __init__(self):
+    rospy.loginfo("Starting Initialization Processes")
+    ## Initialize Class Variables
+    NEPI_LINK_NAMESPACE = NEPI_BASE_NAMESPACE + "nepi_link_ros_bridge/"
+    NEPI_LINK_ENABLE_TOPIC = NEPI_LINK_NAMESPACE + "enable"
+    NEPI_LINK_SET_DATA_SOURCES_TOPIC = NEPI_LINK_NAMESPACE + "lb/select_data_sources"
+    NEPI_LINK_COLLECT_DATA_TOPIC = NEPI_LINK_NAMESPACE + "lb/create_data_set_now"
+    NEPI_LINK_CONNECT_TOPIC = NEPI_LINK_NAMESPACE + "connect_now"
+    ## Define Class Namespaces
+    SNAPSHOT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
+    ## Define Class Services Calls
+    ## Create Class Sevices    
+    ## Create Class Publishers
+    self.nepi_link_enable_pub = rospy.Publisher(NEPI_LINK_ENABLE_TOPIC, Bool, queue_size=10)
+    self.nepi_link_set_data_sources = rospy.Publisher(NEPI_LINK_SET_DATA_SOURCES_TOPIC, StringArray, queue_size=10)
+    self.nepi_link_collect_data_pub = rospy.Publisher(NEPI_LINK_COLLECT_DATA_TOPIC, Empty, queue_size=10)
+    self.nepi_link_connect_now_pub = rospy.Publisher(NEPI_LINK_CONNECT_TOPIC, Empty, queue_size=10)
+    ## Start Class Subscribers
+    # Set up snapshot event callback
+    rospy.Subscriber(SNAPSHOT_TOPIC, Empty, self.snapshot_event_callback, queue_size = 1)
+    rospy.loginfo("Subscribed to : " + SNAPSHOT_TOPIC)
+    ## Start Node Processes
+    ## Initiation Complete
+    rospy.loginfo("Initialization Complete")
 
-### System Initialization processes
-def initialize_actions():
-  print("")
-  print("Starting Initialization")
-  # Set up snapshot event callback
-  rospy.Subscriber(SNAPSHOT_TOPIC, Empty, snapshot_event_callback, queue_size = 1)
-  print("Subscribed to: " + SNAPSHOT_TOPIC)
-  print("Initialization Complete")
-  print("Waiting for snapshot event trigger topic to publish on:")
-
-
-# Action upon detection of snapshot event trigger
-def snapshot_event_callback(event):
-  print("Starting data collection for NEPI CONNECT")
-  nepi_link_collect_data_pub.publish()
-  time.sleep(1)
-  print("Kicking off NEPI CONNECT cloud connection")
-  nepi_link_connect_now_pub.publish()
-  time.sleep(1)
-  print("Delaying " + str(SEND_RESET_DELAY_S) + " secs")
-  time.sleep(SEND_RESET_DELAY_S)
-  print("Waiting for next snapshot event trigger")
-
-
-#######################
-# StartNode and Cleanup Functions
-
-### Cleanup processes on node shutdown
-def cleanup_actions():
-  print("Shutting down: Executing script cleanup actions")
-
-### Script Entrypoint
-def startNode():
-  rospy.loginfo("Starting Snapshot Event Send to Cloud Action Script", disable_signals=True)
-  rospy.init_node(name="snapshot_event_send_to_cloud_action_script")
-  # Run Initialization processes
-  initialize_actions()
-  #Set up cleanup on node shutdown
-  rospy.on_shutdown(cleanup_actions)
-  # Spin forever (until object is detected)
-  rospy.spin()
+  #######################
+  ### Node Methods
+  
+  # Action upon detection of snapshot event trigger
+  def snapshot_event_callback(self,event):
+    rospy.loginfo("Starting data collection for NEPI CONNECT")
+    self.nepi_link_collect_data_pub.publish()
+    nepi.sleep(1,10)
+    rospy.loginfo("Kicking off NEPI CONNECT cloud connection")
+    self.nepi_link_connect_now_pub.publish()
+    nepi.sleep(1,10)
+    rospy.loginfo("Waiting for next snapshot event trigger")
+    rospy.loginfo("Delaying next trigger for " + str(TIGGER_RESET_DELAY_S) + " secs")
+    nepi.sleep(TIGGER_RESET_DELAY_S,100)
+    rospy.loginfo("Waiting for next snapshot event trigger")
+  
+  #######################
+  # Node Cleanup Function
+  
+  def cleanup_actions(self):
+    rospy.loginfo("Shutting down: Executing script cleanup actions")
 
 
 #########################################
 # Main
 #########################################
-
 if __name__ == '__main__':
-  startNode()
+  current_filename = sys.argv[0].split('/')[-1]
+  current_filename = current_filename.split('.')[0]
+  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node(name=current_filename)
+  #Launch the node
+  node_name = current_filename.rpartition("_")[0]
+  rospy.loginfo("Launching node named: " + node_name)
+  node_class = eval(node_name)
+  node = node_class()
+  #Set up node shutdown
+  rospy.on_shutdown(node.cleanup_actions)
+  # Spin forever (until object is detected)
+  rospy.spin()
+
+
+
+
+
+
 

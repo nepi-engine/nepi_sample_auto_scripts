@@ -50,8 +50,8 @@
 # b) PyGeodesy  [link text](https://pypi.org/project/PyGeodesy/)
 # Plus at least one geoid file data base from [link text](https://sourceforge.net/projects/geographiclib/files/geoids-distrib/)
 # The following geoid files are Pre installed on NEPI 2.1.1+ in
-# '/mnt/nepi_storage/databases/geoids/egm96-15.pgm'  - Small memory footprint, but less accurate
-# '/mnt/nepi_storage/databases/geoids/egm2008-2_5.pgm'  - Large memory footprint, but less accurate
+# '/mnt/nepi_storage/databases/geoids/egm96-15.pgm'  - Small memory footrospy.loginfo, but less accurate
+# '/mnt/nepi_storage/databases/geoids/egm2008-2_5.pgm'  - Large memory footrospy.loginfo, but less accurate
 # Set the database to use below
 # For NEPI 2.0.# versions, the system will default to the following user entered value for the current Lat Long working location
 # Find the geoid_height value for a Lat Long location at: [link text](https://geodesy.noaa.gov/GEOID/GEOID18/computation.html)
@@ -63,20 +63,8 @@ import math
 import time
 import sys
 import tf
-
-
-# try and import geoid height calculation module and databases
-GEOID_DATABASE_FILE='/mnt/nepi_storage/databases/geoids/egm2008-2_5.pgm' # Ignored if PyGeodesy module or Geoids Database is not available
-FALLBACK_GEOID_HEIGHT_M = 0.0 # Ignored if if PyGeodesy module or Geoids Database are available
-try:
-  import pygeodesy
-  GEOID_DATABASE_FILE=GEOID_DATABASE_FILE
-  print(['Loading Geoids Database from: ' + GEOID_DATABASE_FILE])
-  ginterpolator = pygeodesy.GeoidKarney(GEOID_DATABASE_FILE)
-except rospy.ServiceException as e:
-  print("Geoids database failed to import: %s"%e)
-  def ginterpolator(single_position):
-    return FALLBACK_GEOID_HEIGHT_M
+from resources import nepi
+from resources import nepi_navpose
 
 from std_msgs.msg import Bool, String, Float64, Float64MultiArray
 from nav_msgs.msg import Odometry
@@ -91,6 +79,7 @@ from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
 NAVPOSE_PUB_RATE_HZ = 10
 
+
 #########################################
 # ROS NAMESPACE SETUP
 #########################################
@@ -98,192 +87,124 @@ NAVPOSE_PUB_RATE_HZ = 10
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 
-# NEPI Get NAVPOSE Solution Service Name
-NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
-
-### NavPose Heading, Orientation, Location, and Position Publish Topics
-NAVPOSE_PUBLISH_NAVPOSE_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/navpose"
-NAVPOSE_PUBLISH_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/heading_deg"
-NAVPOSE_PUBLISH_ORIENTATION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/orientation_ned_degs"
-NAVPOSE_PUBLISH_ORIENTATION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/orientation_enu_degs"
-NAVPOSE_PUBLISH_POSITION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/position_ned_m"
-NAVPOSE_PUBLISH_POSITION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/position_enu_m"
-NAVPOSE_PUBLISH_LOCATION_AMSL_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/location_amsl_geo"
-NAVPOSE_PUBLISH_LOCATION_WGS84_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/location_wgs84_geo"
-NAVPOSE_PUBLISH_GEOID_HEIGHT_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/geoid_height_m"
-
 #########################################
-# Globals
+# Node Class
 #########################################
 
-navpose_navpose_pub = rospy.Publisher(NAVPOSE_PUBLISH_NAVPOSE_TOPIC, NavPose, queue_size=1)
-navpose_heading_pub = rospy.Publisher(NAVPOSE_PUBLISH_HEADING_TOPIC, Float64, queue_size=1)
-navpose_orientation_ned_pub = rospy.Publisher(NAVPOSE_PUBLISH_ORIENTATION_NED_TOPIC, Float64MultiArray , queue_size=1)
-navpose_orientation_enu_pub = rospy.Publisher(NAVPOSE_PUBLISH_ORIENTATION_ENU_TOPIC, Float64MultiArray , queue_size=1)
-navpose_position_ned_pub = rospy.Publisher(NAVPOSE_PUBLISH_POSITION_NED_TOPIC, Float64MultiArray , queue_size=1)
-navpose_position_enu_pub = rospy.Publisher(NAVPOSE_PUBLISH_POSITION_ENU_TOPIC, Float64MultiArray , queue_size=1)
-navpose_location_amsl_pub = rospy.Publisher(NAVPOSE_PUBLISH_LOCATION_AMSL_TOPIC, Float64MultiArray , queue_size=1)
-navpose_location_wgs84_pub = rospy.Publisher(NAVPOSE_PUBLISH_LOCATION_WGS84_TOPIC, Float64MultiArray , queue_size=1)
-navpose_geoid_height_pub = rospy.Publisher(NAVPOSE_PUBLISH_GEOID_HEIGHT_TOPIC, Float64, queue_size=1)
-navpose_pub_interval_sec = float(1.0)/NAVPOSE_PUB_RATE_HZ
+class navpose_get_and_publish_process(object):
 
+  #######################
+  ### Node Initialization
+  def __init__(self):
+    rospy.loginfo("Starting Initialization Processes")
+    ## Initialize Class Variables
+    self.navpose_pub_rate_hz = NAVPOSE_PUB_RATE_HZ
+    ## Define Class Namespaces
+    # NavPose Heading, Orientation, Location, and Position Publish Topics
+    NAVPOSE_PUBLISH_NAVPOSE_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/navpose"
+    NAVPOSE_PUBLISH_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/heading_deg"
+    NAVPOSE_PUBLISH_ORIENTATION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/orientation_ned_degs"
+    NAVPOSE_PUBLISH_ORIENTATION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/orientation_enu_degs"
+    NAVPOSE_PUBLISH_POSITION_NED_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/position_ned_m"
+    NAVPOSE_PUBLISH_POSITION_ENU_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/position_enu_m"
+    NAVPOSE_PUBLISH_LOCATION_AMSL_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/location_amsl_geo"
+    NAVPOSE_PUBLISH_LOCATION_WGS84_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/location_wgs84_geo"
+    NAVPOSE_PUBLISH_GEOID_HEIGHT_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose/geoid_height_m"
+    ## Define Class Services Calls
+    self.NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
+    ## Create Class Sevices    
+    ## Create Class Publishers
+    self.navpose_navpose_pub = rospy.Publisher(NAVPOSE_PUBLISH_NAVPOSE_TOPIC, NavPose, queue_size=1)
+    self.navpose_heading_pub = rospy.Publisher(NAVPOSE_PUBLISH_HEADING_TOPIC, Float64, queue_size=1)
+    self.navpose_orientation_ned_pub = rospy.Publisher(NAVPOSE_PUBLISH_ORIENTATION_NED_TOPIC, Float64MultiArray , queue_size=1)
+    self.navpose_orientation_enu_pub = rospy.Publisher(NAVPOSE_PUBLISH_ORIENTATION_ENU_TOPIC, Float64MultiArray , queue_size=1)
+    self.navpose_position_ned_pub = rospy.Publisher(NAVPOSE_PUBLISH_POSITION_NED_TOPIC, Float64MultiArray , queue_size=1)
+    self.navpose_position_enu_pub = rospy.Publisher(NAVPOSE_PUBLISH_POSITION_ENU_TOPIC, Float64MultiArray , queue_size=1)
+    self.navpose_location_amsl_pub = rospy.Publisher(NAVPOSE_PUBLISH_LOCATION_AMSL_TOPIC, Float64MultiArray , queue_size=1)
+    self.navpose_location_wgs84_pub = rospy.Publisher(NAVPOSE_PUBLISH_LOCATION_WGS84_TOPIC, Float64MultiArray , queue_size=1)
+    self.navpose_geoid_height_pub = rospy.Publisher(NAVPOSE_PUBLISH_GEOID_HEIGHT_TOPIC, Float64, queue_size=1)
+    self.navpose_pub_interval_sec = float(1.0)/self.navpose_pub_rate_hz
+    ## Start Class Subscribers
+    ## Start Node Processes
+    rospy.wait_for_service(self.NAVPOSE_SERVICE_NAME)
+    # Start navpose data publishers
+    rospy.Timer(rospy.Duration(self.navpose_pub_interval_sec), self.navpose_get_publish_callback)
+    ## Initiation Complete
+    rospy.loginfo("Initialization Complete")
 
-#########################################
-# Methods
-#########################################
+  #######################
+  ### Node Methods
 
-### System Initialization processes
-def initialize_actions():
-  print("")
-  print("Starting Initialization")
-  print("Waiting for NEPI NavPose service") 
-  rospy.wait_for_service(NAVPOSE_SERVICE_NAME)
-  # Start navpose data publishers
-  rospy.Timer(rospy.Duration(navpose_pub_interval_sec), navpose_get_publish_callback)
-  print("Initialization Complete")
+  ### Setup a regular background navpose get and publish timer callback
+  def navpose_get_publish_callback(self,timer):
+    # Get current NEPI NavPose data from NEPI ROS nav_pose_query service call
+    try:
+      get_navpose_service = rospy.ServiceProxy(self.NAVPOSE_SERVICE_NAME, NavPoseQuery)
+      nav_pose_response = get_navpose_service(NavPoseQueryRequest())
+      #rospy.loginfo(nav_pose_response)
+      # Get current navpose
+      current_navpose = nav_pose_response.nav_pose
+      # Get current heading in degrees
+      current_heading_deg = nepi_navpose.get_navpose_heading_deg(nav_pose_response)
+      # Get current orientation vector (roll, pitch, yaw) in degrees enu frame
+      current_orientation_enu_degs = Float64MultiArray()
+      current_orientation_enu_degs.data = nepi_navpose.get_navpose_orientation_enu_degs(nav_pose_response)
+      # Get current orientation vector (roll, pitch, yaw) in degrees ned frame +-180
+      current_orientation_ned_degs = Float64MultiArray()
+      current_orientation_ned_degs.data = nepi_navpose.get_navpose_orientation_ned_degs(nav_pose_response)
+      # Get current position vector (x, y, z) in meters enu frame
+      current_position_enu_m = Float64MultiArray()
+      current_position_enu_m.data = nepi_navpose.get_navpose_position_enu_m(nav_pose_response)
+      # Get current position vector (x, y, z) in meters ned frame
+      current_position_ned_m = Float64MultiArray()
+      current_position_ned_m.data = nepi_navpose.get_navpose_position_ned_m(nav_pose_response)
+      # Get current location vector (lat, long, alt) in geopoint data with WGS84 height
+      current_location_wgs84_geo = Float64MultiArray()
+      current_location_wgs84_geo.data =  nepi_navpose.get_navpose_location_wgs84_geo(nav_pose_response)  
+      # Get current location vector (lat, long, alt) in geopoint data with AMSL height
+      current_location_amsl_geo = Float64MultiArray()
+      current_location_amsl_geo.data =  nepi_navpose.get_navpose_location_amsl_geo(nav_pose_response)
+      # Get current geoid heihgt
+      current_geoid_height =  nepi_navpose.get_navpose_geoid_height(nav_pose_response)
+      # Publish new current navpose data
+      self.navpose_navpose_pub.publish(current_navpose)
+      self.navpose_heading_pub.publish(current_heading_deg)
+      self.navpose_orientation_ned_pub.publish(current_orientation_ned_degs)
+      self.navpose_orientation_enu_pub.publish(current_orientation_enu_degs)
+      self.navpose_position_ned_pub.publish(current_position_ned_m)
+      self.navpose_position_enu_pub.publish(current_position_enu_m)
+      self.navpose_location_amsl_pub.publish(current_location_amsl_geo)
+      self.navpose_location_wgs84_pub.publish(current_location_wgs84_geo)
+      self.navpose_geoid_height_pub.publish(current_geoid_height)
+    except rospy.ServiceException as e:
+      rospy.loginfo("Service call failed: %s"%e)
+      time.sleep(1)
+      rospy.signal_shutdown("Service call failed")
 
-
-### Setup a regular background navpose get and publish timer callback
-def navpose_get_publish_callback(timer):
-  global navpose_heading_pub 
-  global navpose_heading_pub 
-  global navpose_orientation_ned_pub 
-  global navpose_orientation_enu_pub 
-  global navpose_position_ned_pub 
-  global navpose_position_enu_pub 
-  global navpose_location_amsl_pub
-  global navpose_location_wgs84_pub
-  global navpose_geoid_height_pub
-  # Get current NEPI NavPose data from NEPI ROS nav_pose_query service call
-  try:
-    get_navpose_service = rospy.ServiceProxy(NAVPOSE_SERVICE_NAME, NavPoseQuery)
-    nav_pose_response = get_navpose_service(NavPoseQueryRequest())
-    #print(nav_pose_response)
-    # Set current navpose
-    current_navpose = nav_pose_response.nav_pose
-    
-    # Set current heading in degrees
-    current_heading_deg = nav_pose_response.nav_pose.heading.heading
-
-    # Set current orientation vector (roll, pitch, yaw) in degrees enu frame
-    pose_enu_o = nav_pose_response.nav_pose.odom.pose.pose.orientation
-    xyzw_enu_o = list([pose_enu_o.x,pose_enu_o.y,pose_enu_o.z,pose_enu_o.w])
-    rpy_enu_d = convert_quat2rpy(xyzw_enu_o)
-    current_orientation_enu_degs = Float64MultiArray()
-    current_orientation_enu_degs.data = [rpy_enu_d[0],rpy_enu_d[1],rpy_enu_d[2]]
-
-    # Set current orientation vector (roll, pitch, yaw) in degrees ned frame +-180
-    pose_enu_o = nav_pose_response.nav_pose.odom.pose.pose.orientation
-    xyzw_enu_o = list([pose_enu_o.x,pose_enu_o.y,pose_enu_o.z,pose_enu_o.w])
-    rpy_enu_d = convert_quat2rpy(xyzw_enu_o)
-    yaw_ned_d = convert_yaw_enu2ned(rpy_enu_d[2])
-    rpy_ned_d = [rpy_enu_d[0],rpy_enu_d[1],yaw_ned_d]
-    current_orientation_ned_degs = Float64MultiArray()
-    current_orientation_ned_degs.data = [rpy_ned_d[0],rpy_ned_d[1],rpy_ned_d[2]]
-
-    # Set current position vector (x, y, z) in meters enu frame
-    pose_enu_p = nav_pose_response.nav_pose.odom.pose.pose.position
-    current_position_enu_m = Float64MultiArray()
-    current_position_enu_m.data = [pose_enu_p.x, pose_enu_p.y, pose_enu_p.z]
-
-    # Set current position vector (x, y, z) in meters ned frame
-    pose_enu_p = nav_pose_response.nav_pose.odom.pose.pose.position
-    current_position_ned_m = Float64MultiArray()
-    current_position_ned_m.data = [pose_enu_p.y, pose_enu_p.x, -pose_enu_p.z]
-
-
-    # Set current location vector (lat, long, alt) in geopoint data with WGS84 height
-    fix_wgs84 = nav_pose_response.nav_pose.fix
-    current_location_wgs84_geo = Float64MultiArray()
-    current_location_wgs84_geo.data =  [fix_wgs84.latitude,fix_wgs84.longitude,fix_wgs84.altitude]
-    # Set current geoid heihgt
-    if USE_FALLBACK_GEOID_HEIGHT:
-      geoid_height=FALLBACK_GEOID_HEIGHT_M #### user hard coaded geoid height at current lat long location
-    else:
-      single_position=LatLon(fix_wgs84.latitude,fix_wgs84.longitude)
-      geoid_height = ginterpolator(single_position)
-    current_geoid_height =  geoid_height
-    # Set current location vector (lat, long, alt) in geopoint data with AMSL height
-    fix_wgs84 = nav_pose_response.nav_pose.fix
-    current_location_amsl_geo = Float64MultiArray()
-    current_location_amsl_geo.data =  [fix_wgs84.latitude,fix_wgs84.longitude,(fix_wgs84.altitude + geoid_height)]
-
-    # Publish new current navpose data
-    navpose_navpose_pub.publish(current_navpose)
-    navpose_heading_pub.publish(current_heading_deg)
-    navpose_orientation_ned_pub.publish(current_orientation_ned_degs)
-    navpose_orientation_enu_pub.publish(current_orientation_enu_degs)
-    navpose_position_ned_pub.publish(current_position_ned_m)
-    navpose_position_enu_pub.publish(current_position_enu_m)
-    navpose_location_amsl_pub.publish(current_location_amsl_geo)
-    navpose_location_wgs84_pub.publish(current_location_wgs84_geo)
-    navpose_geoid_height_pub.publish(current_geoid_height)
-  except rospy.ServiceException as e:
-    print("Service call failed: %s"%e)
-    time.sleep(1)
-    rospy.signal_shutdown("Service call failed")
-
-#######################
-# Process Functions
-
-### Function to Convert Quaternion Attitude to Roll, Pitch, Yaw Degrees
-def convert_quat2rpy(xyzw_attitude):
-  rpy_attitude_rad = tf.transformations.euler_from_quaternion(xyzw_attitude)
-  rpy_attitude_deg = np.array(rpy_attitude_rad) * 180/math.pi
-  roll_deg = rpy_attitude_deg[0] 
-  pitch_deg = rpy_attitude_deg[1] 
-  yaw_deg = rpy_attitude_deg[2]
-  return rpy_attitude_deg
-
-### Function to Convert Roll, Pitch, Yaw Degrees to Quaternion Attitude
-def convert_rpy2quat(rpy_attitude_deg):
-  roll_deg = rpy_attitude_deg[0] 
-  pitch_deg = rpy_attitude_deg[1] 
-  yaw_deg = rpy_attitude_deg[2]
-  xyzw_attitude = tf.transformations.quaternion_from_euler(math.radians(roll_deg), math.radians(pitch_deg), math.radians(yaw_deg))
-  return xyzw_attitude
-
-### Function to Convert Yaw NED to Yaw ENU
-def convert_yaw_ned2enu(yaw_ned_deg):
-  yaw_enu_deg = 90-yaw_ned_deg
-  if yaw_enu_deg < -180:
-    yaw_enu_deg = 360 + yaw_enu_deg
-  elif yaw_enu_deg > 180:
-    yaw_enu_deg = yaw_enu_deg - 360
-  return yaw_enu_deg
-
-### Function to Convert Yaw ENU to Yaw NED
-def convert_yaw_enu2ned(yaw_enu_deg):
-  yaw_ned_deg =  90-yaw_enu_deg
-  if yaw_ned_deg < -180:
-    yaw_ned_deg = 360 + yaw_ned_deg
-  elif yaw_ned_deg > 180:
-    yaw_ned_deg = yaw_ned_deg - 360
-  return yaw_ned_deg
-
-#######################
-# StartNode and Cleanup Functions
-
-### Cleanup processes on node shutdown
-def cleanup_actions():
-  print("Shutting down: Executing script cleanup actions")
-
-### Script Entrypoint
-def startNode():
-  rospy.loginfo("Starting NavPose Get and Publish Process Script")
-  rospy.init_node("navpose_get_and_publish_process_script")
-  # Run initialization processes
-  initialize_actions()
-  # run cleanup actions on shutdown
-  rospy.on_shutdown(cleanup_actions)
-  # Spin forever
-  rospy.spin()
+  #######################
+  # Node Cleanup Function
+  
+  def cleanup_actions(self):
+    rospy.loginfo("Shutting down: Executing script cleanup actions")
 
 
 #########################################
 # Main
 #########################################
-
 if __name__ == '__main__':
-  startNode()
+  current_filename = sys.argv[0].split('/')[-1]
+  current_filename = current_filename.split('.')[0]
+  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
+  rospy.init_node(name=current_filename)
+  #Launch the node
+  node_name = current_filename.rpartition("_")[0]
+  rospy.loginfo("Launching node named: " + node_name)
+  node_class = eval(node_name)
+  node = node_class()
+  #Set up node shutdown
+  rospy.on_shutdown(node.cleanup_actions)
+  # Spin forever (until object is detected)
+  rospy.spin()
+
+
 
