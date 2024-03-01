@@ -161,6 +161,24 @@ def convert_yaw_enu2ned(yaw_enu_deg):
     yaw_ned_deg = yaw_ned_deg - 360
   return yaw_ned_deg
 
+### Function to Convert Yaw from Body to NED Frame
+def convert_yaw_body2ned(yaw_body_deg,cur_heading_deg):
+  cur_yaw_ned_deg = cur_heading_deg
+  if cur_yaw_ned_deg > 180: # Convert to +-180
+    cur_yaw_ned_deg = cur_yaw_ned_deg - 360
+  yaw_ned_deg =  cur_yaw_ned_deg + yaw_body_deg
+  return yaw_ned_deg
+
+### Function to Convert Point from Body to NED Frame
+def convert_point_body2ned(setpoint_position,yaw_ned_deg):
+  point_bearing_ned_deg = yaw_ned_deg + math.degrees(math.atan2(setpoint_position[1],setpoint_position[0]))
+  point_bearing_ned_rad = math.radians(point_bearing_ned_deg)
+  xy_body_m = math.sqrt(setpoint_position[0]**2 + setpoint_position[1]**2)
+  x_ned_m = xy_body_m * math.cos(point_bearing_ned_rad)
+  y_ned_m = xy_body_m * math.sin(point_bearing_ned_rad)
+  point_ned_m = [x_ned_m,y_ned_m,setpoint_position[2]]
+  return point_ned_m
+
 ### Function to get new latlong at body relative point
 def get_geopoint_at_body_point(cur_geopoint_geo, cur_bearing_deg, point_body_m):
   # cur_geopoint_geo is list [Lat,Long,Alt] with Alt passed through

@@ -49,11 +49,24 @@ def sleep(sleep_sec,sleep_steps):
     time.sleep(delay_sec)
     delay_timer = delay_timer + delay_sec
 
+
+
 ### Function to get list of active topics
 def get_topic_list():
   topic = ""
   topic_list=rospy.get_published_topics(namespace='/')
   return topic_list
+
+### Function to find a topic from list of strings
+def find_topic_from_string_list(topic_string_list):
+  topic = ""
+  topic_list=rospy.get_published_topics(namespace='/')
+  #rospy.loginfo(topic_list)
+  for topic_entry in topic_list:
+    #rospy.loginfo(topic_entry[0])
+    if all(x in topic_entry[0] for x in topic_string_list):
+      topic = topic_entry[0]
+  return topic
 
 ### Function to find a topic
 def find_topic(topic_name):

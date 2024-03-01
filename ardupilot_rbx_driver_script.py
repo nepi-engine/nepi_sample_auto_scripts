@@ -40,6 +40,8 @@ import tf
 import random
 import sys
 import cv2
+from resources import nepi
+from resources import nepi_navpose
 
 # try and import geoid height calculation module and databases
 GEOID_DATABASE_FILE='/mnt/nepi_storage/databases/geoids/egm2008-2_5.pgm' # Ignored if PyGeodesy module or Geoids Database is not available
@@ -52,7 +54,7 @@ try:
 except rospy.ServiceException as e:
   print("Geoids database failed to import: %s"%e)
   def ginterpolator(single_position):
-    return FALLBACK_GEOID_HEIGHT_M
+    return FALLBACclewarK_GEOID_HEIGHT_M
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64, Float64MultiArray
 from nav_msgs.msg import Odometry
@@ -90,7 +92,7 @@ GOTO_MAX_ERROR_M = 2.0 # Goal reached when all translation move errors are less 
 GOTO_MAX_ERROR_DEG = 2.0 # Goal reached when all rotation move errors are less than this value
 GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be good before proceeding
 CMD_TIMEOUT_SEC = 20 # Any action that changes 
-PRINT_STATUS_1HZ = True # Print current rbx status at 1Hz
+PRINT_STATUS_1HZ = False # Print current rbx status at 1Hz
 IMAGE_INPUT_TOPIC_NAME = "color_2d_image" # Partial or full ROS namespace string 
 
 ##############################
@@ -107,6 +109,13 @@ NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 NEPI_RBX_NAME = "ardupilot"
 NEPI_RBX_NAMESPACE = NEPI_BASE_NAMESPACE + NEPI_RBX_NAME + "/rbx/"
 NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
+
+
+## Define NEPI Namespaces
+NEPI_SET_NAVPOSE_GPS_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_gps_fix_topic"
+NEPI_SET_NAVPOSE_HEADING_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_heading_topic"
+NEPI_SET_NAVPOSE_ORIENTATION_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/set_orientation_topic"
+NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC = NEPI_BASE_NAMESPACE + "nav_pose_mgr/enable_gps_clock_sync"
 
 # NEPI RBX Driver Capabilities Publish Topics
 NEPI_RBX_CAPABILITIES_RATE_HZ = 1
@@ -153,7 +162,11 @@ NEPI_RBX_GOTO_POSITION_TOPIC = NEPI_RBX_NAMESPACE + "goto_position" # Ignored if
 NEPI_RBX_GOTO_LOCATION_TOPIC = NEPI_RBX_NAMESPACE + "goto_location" # Ignored if any active goto processes
 
 ###################################################
-MAVLINK_NAMESPACE = NEPI_BASE_NAMESPACE + "mavlink/"
+# Find Mavlink Topic Name
+topic_strings = ["mavlink","state"]
+topic_name = nepi.find_topic_from_string_list(topic_strings)
+MAVLINK_NAMESPACE = (topic_name.rpartition('/')[0] + '/')
+rospy.loginfo("Found mavlink namespace: " + MAVLINK_NAMESPACE)
 # MAVLINK Subscriber Topics
 MAVLINK_STATE_TOPIC = MAVLINK_NAMESPACE + "state"
 MAVLINK_BATTERY_TOPIC = MAVLINK_NAMESPACE + "battery"
@@ -201,6 +214,12 @@ rbx_navpose_gps_pub = rospy.Publisher(NEPI_RBX_NAVPOSE_GPS_TOPIC, NavSatFix, que
 rbx_navpose_odom_pub = rospy.Publisher(NEPI_RBX_NAVPOSE_ODOM_TOPIC, Odometry, queue_size=1)
 rbx_navpose_heading_pub = rospy.Publisher(NEPI_RBX_NAVPOSE_HEADING_TOPIC, Float64, queue_size=1)
 
+## Define NEPI Services Calls
+set_gps_pub = rospy.Publisher(NEPI_SET_NAVPOSE_GPS_TOPIC, String, queue_size=1)
+set_orientation_pub = rospy.Publisher(NEPI_SET_NAVPOSE_ORIENTATION_TOPIC, String, queue_size=1)
+set_heading_pub = rospy.Publisher(NEPI_SET_NAVPOSE_HEADING_TOPIC, String, queue_size=1)
+set_gps_timesync_pub = rospy.Publisher(NEPI_ENABLE_NAVPOSE_GPS_CLOCK_SYNC_TOPIC, Bool, queue_size=1)
+
 update_navpose_interval = 0.1 # 10 Hz
 current_heading_deg = None
 current_orientation_enu_degs = None
@@ -235,10 +254,6 @@ rbx_mode_last = None
 rbx_process_current = "None"
 rbx_process_last = "None"
 
-rbx_capabilities_pub_interval = float(1.0)/float(NEPI_RBX_CAPABILITIES_RATE_HZ)
-rbx_status_pub_interval = float(1.0)/float(NEPI_RBX_STATUS_RATE_HZ)
-
-
 mavlink_state = None
                 
 #########################################
@@ -257,18 +272,18 @@ def initialize_actions():
   print("*******************************")  
   print("Starting Initialization Process")
   # Wait for MAVLink State topic to publish then subscribe
-  print("Waiting for topic: " + MAVLINK_STATE_TOPIC)
+  rospy.loginfo("Waiting for topic: " + MAVLINK_STATE_TOPIC)
   wait_for_topic(MAVLINK_STATE_TOPIC)
-  print("Starting state scubscriber callback")
+  rospy.loginfo("Starting state scubscriber callback")
   rospy.Subscriber(MAVLINK_STATE_TOPIC, State, get_state_callback)
   while rbx_state is None and not rospy.is_shutdown():
-    print("Waiting for rbx state status to set")
+    rospy.loginfo("Waiting for rbx state status to set")
     time.sleep(0.1)
   while rbx_mode is None and not rospy.is_shutdown():
     print("Waiting for rbx mode status to set")
     time.sleep(0.1)
-  print("Starting State: " + RBX_STATES[rbx_state])
-  print("Starting Mode: " + RBX_MODES[rbx_mode])
+  rospy.loginfo("Starting State: " + RBX_STATES[rbx_state])
+  rospy.loginfo("Starting Mode: " + RBX_MODES[rbx_mode])
   rbx_state_start = rbx_state
   rbx_mode_start = rbx_mode
   rbx_state_last = rbx_state
@@ -278,11 +293,14 @@ def initialize_actions():
   # Start NavPose Data Updater
   rospy.Timer(rospy.Duration(update_navpose_interval), update_current_navpose_callback)
   ##############################
-  print("Starting RBX driver publisher and subscriber topics")
+  rospy.loginfo("Starting RBX driver publisher and subscriber topics")
   # Start RBX Capabilities and Status Publishers
+  rbx_capabilities_pub_interval = float(1.0)/float(NEPI_RBX_CAPABILITIES_RATE_HZ)
+  rbx_status_pub_interval = float(1.0)/float(NEPI_RBX_STATUS_RATE_HZ)
   rospy.Timer(rospy.Duration(rbx_capabilities_pub_interval), rbx_capabilities_pub_callback)
   rospy.Timer(rospy.Duration(rbx_status_pub_interval), rbx_status_pub_callback)
   ### Start RBX NavPose Publishers
+  rospy.loginfo("Subscribing to GPS topic: " + MAVLINK_SOURCE_GPS_TOPIC)
   rospy.Subscriber(MAVLINK_SOURCE_GPS_TOPIC, NavSatFix, rbx_gps_topic_callback)
   rospy.Subscriber(MAVLINK_SOURCE_ODOM_TOPIC, Odometry, rbx_odom_topic_callback)
   rospy.Subscriber(MAVLINK_SOURCE_HEADING_TOPIC, Float64, rbx_heading_topic_callback)
@@ -304,6 +322,19 @@ def initialize_actions():
   # Start Print Callback if Enabled
   if PRINT_STATUS_1HZ:
     rospy.Timer(rospy.Duration(1.0), print_rbx_status_callback)
+  # Configure NEPI NavPose solution
+  # Set GPS Topic
+  set_gps_pub.publish(NEPI_RBX_NAVPOSE_GPS_TOPIC)
+  rospy.loginfo("GPS Topic Set to: " + NEPI_RBX_NAVPOSE_GPS_TOPIC)
+  # Set Orientation Topic
+  set_orientation_pub.publish(NEPI_RBX_NAVPOSE_ODOM_TOPIC)
+  rospy.loginfo("Orientation Topic Set to: " + NEPI_RBX_NAVPOSE_ODOM_TOPIC)
+  # Set Heading Topic
+  set_heading_pub.publish(NEPI_RBX_NAVPOSE_HEADING_TOPIC)
+  rospy.loginfo("Heading Topic Set to: " + NEPI_RBX_NAVPOSE_HEADING_TOPIC)
+  # Sync NEPI clock to GPS timestamp
+  set_gps_timesync_pub.publish(data=True)
+
   #####
   print("Initialization Complete")
 
@@ -405,14 +436,14 @@ def rbx_status_pub_callback(timer):
     text_list.append(" X,Y,Z Errors Meters: ")
     text_list.append(" " + '%.2f' % rbx_goto_errors_current[0] + "," + '%.2f' % rbx_goto_errors_current[1] + "," + '%.2f' % rbx_goto_errors_current[2])
     text_list.append(" R,P,Y Errors Degrees: ")
-    text_list.append(" " + '%.2f' % rbx_goto_errors_current[3] + "," + '%.2f' % rbx_goto_errors_current[4] + "," + '%.2f' % rbx_goto_errors_current[5])
+    text_list.append(" " + '%.2f' % rbx_goto_errors_current[6] + "," + '%.2f' % rbx_goto_errors_current[5] + "," + '%.2f' % rbx_goto_errors_current[6])
     text_list.append("")
     text_list.append("Last Process: " + rbx_process_last)
     text_list.append(" Success: " + str(rbx_cmd_success_last))
     text_list.append(" X,Y,Z Errors Meters: ")
     text_list.append(" " + '%.2f' % rbx_goto_errors_last[0] + "," + '%.2f' % rbx_goto_errors_last[1] + "," + '%.2f' % rbx_goto_errors_last[2])
     text_list.append(" R,P,Y Errors Degrees: ")
-    text_list.append(" " + '%.2f' % rbx_goto_errors_last[3] + "," + '%.2f' % rbx_goto_errors_last[4] + "," + '%.2f' % rbx_goto_errors_last[5])
+    text_list.append(" " + '%.2f' % rbx_goto_errors_last[4] + "," + '%.2f' % rbx_goto_errors_last[5] + "," + '%.2f' % rbx_goto_errors_last[6])
     text_list.append("")
     # Overlay Status Text List
     x=box_x+10 
@@ -1785,7 +1816,7 @@ def cleanup_actions():
 ### Script Entrypoint
 def startNode():
   rospy.loginfo("Starting Ardupilot RBX Driver Script")
-  rospy.init_node
+  #rospy.init_node()
   rospy.init_node(name= NEPI_RBX_NAME)
   #initialize system including pan scan process
   initialize_actions()

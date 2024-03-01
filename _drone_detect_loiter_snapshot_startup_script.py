@@ -43,7 +43,6 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #########################################
 
 SCRIPT_LIST = ["ardupilot_rbx_driver_script.py",
-               "ardupilot_rbx_navpose_config_script.py",
                "ardupilot_rbx_fake_gps_process_script.py",
                "ai_detector_config_script.py",
                "snapshot_event_save_to_disk_action_script.py",
