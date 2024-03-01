@@ -237,8 +237,8 @@ rbx_ready = True
 rbx_move_speed = GOTO_TRAN_SPEED_RATIO
 rbx_rotate_speed = GOTO_ROT_SPEED_RATIO
 rbx_goto_error_goals = [GOTO_MAX_ERROR_M,GOTO_MAX_ERROR_DEG,GOTO_STABILIZED_SEC]
-rbx_goto_errors_current = [0,0,0,0,0,0]
-rbx_goto_errors_last = [0,0,0,0,0,0]
+rbx_goto_errors_current = [0,0,0,0,0,0,0]
+rbx_goto_errors_last = [0,0,0,0,0,0,0]
 rbx_cmd_timeout = CMD_TIMEOUT_SEC
 rbx_cmd_success_current = True
 rbx_cmd_success_last = True
@@ -436,7 +436,7 @@ def rbx_status_pub_callback(timer):
     text_list.append(" X,Y,Z Errors Meters: ")
     text_list.append(" " + '%.2f' % rbx_goto_errors_current[0] + "," + '%.2f' % rbx_goto_errors_current[1] + "," + '%.2f' % rbx_goto_errors_current[2])
     text_list.append(" R,P,Y Errors Degrees: ")
-    text_list.append(" " + '%.2f' % rbx_goto_errors_current[6] + "," + '%.2f' % rbx_goto_errors_current[5] + "," + '%.2f' % rbx_goto_errors_current[6])
+    text_list.append(" " + '%.2f' % rbx_goto_errors_current[4] + "," + '%.2f' % rbx_goto_errors_current[5] + "," + '%.2f' % rbx_goto_errors_current[6])
     text_list.append("")
     text_list.append("Last Process: " + rbx_process_last)
     text_list.append(" Success: " + str(rbx_cmd_success_last))
@@ -525,14 +525,14 @@ def print_rbx_status_callback(timer):
   text_list.append(" X,Y,Z Errors Meters: ")
   text_list.append(" " + '%.2f' % rbx_goto_errors_current[0] + "," + '%.2f' % rbx_goto_errors_current[1] + "," + '%.2f' % rbx_goto_errors_current[2])
   text_list.append(" R,P,Y Errors Degrees: ")
-  text_list.append(" " + '%.2f' % rbx_goto_errors_current[3] + "," + '%.2f' % rbx_goto_errors_current[4] + "," + '%.2f' % rbx_goto_errors_current[5])
+  text_list.append(" " + '%.2f' % rbx_goto_errors_current[4] + "," + '%.2f' % rbx_goto_errors_current[5] + "," + '%.2f' % rbx_goto_errors_current[6])
   text_list.append("")
   text_list.append("Last Process: " + rbx_process_last)
   text_list.append(" Success: " + str(rbx_cmd_success_last))
   text_list.append(" X,Y,Z Errors Meters: ")
   text_list.append(" " + '%.2f' % rbx_goto_errors_last[0] + "," + '%.2f' % rbx_goto_errors_last[1] + "," + '%.2f' % rbx_goto_errors_last[2])
   text_list.append(" R,P,Y Errors Degrees: ")
-  text_list.append(" " + '%.2f' % rbx_goto_errors_last[3] + "," + '%.2f' % rbx_goto_errors_last[4] + "," + '%.2f' % rbx_goto_errors_last[5])
+  text_list.append(" " + '%.2f' % rbx_goto_errors_last[4] + "," + '%.2f' % rbx_goto_errors_last[5] + "," + '%.2f' % rbx_goto_errors_last[6])
   text_list.append("")
   # Print Status Text List
   for text in text_list:
@@ -673,7 +673,7 @@ def rbx_go_action_callback(action_msg):
   print("Received go action message")
   print(action_msg)
   rbx_cmd_success_current = False
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   action_ind = action_msg.data
   if action_ind < 0 or action_ind > (len(RBX_ACTION_FUNCTIONS)-1):
     print("No matching rbx action found")
@@ -724,7 +724,7 @@ def rbx_go_stop_callback(stop_msg):
   rbx_process_current = "Stop"
   rbx_cmd_success_current = False
   rbx_ready = False
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   print("*******************************")
   print("Received go stop message")
   print(stop_msg)
@@ -747,7 +747,7 @@ def rbx_goto_pose_callback(pose_cmd_msg):
   global rbx_goto_errors_current
   rbx_process_current = "GoTo Pose"
   rbx_cmd_success_current = False
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   print("*******************************")
   print("Recieved GoTo Pose Message")
   print("")
@@ -781,7 +781,7 @@ def rbx_goto_position_callback(position_cmd_msg):
   global rbx_goto_errors_current
   rbx_process_current = "GoTo Position"
   rbx_cmd_success_current = False
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   print("*******************************")
   print("Recieved GoTo Position Command Message")
   print("")
@@ -815,7 +815,7 @@ def rbx_goto_location_callback(location_cmd_msg):
   global rbx_goto_errors_current
   rbx_process_current = "GoTo Location"
   rbx_cmd_success_current = False
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   print("*******************************")
   print("Recieved GoTo Location Message")
   print("")
@@ -1056,7 +1056,7 @@ def setpoint_attitude_ned(setpoint_attitude,timeout_sec=CMD_TIMEOUT_SEC):
   if cmd_success:
     print("************************")
     print("Setpoint Reached")
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   rbx_goto_errors_last = [0,0,0,0,attitude_errors_degs[0],attitude_errors_degs[1],attitude_errors_degs[2]]
   return cmd_success
   
@@ -1303,7 +1303,7 @@ def setpoint_position_local_body(setpoint_position,timeout_sec=CMD_TIMEOUT_SEC):
   if cmd_success:
     print("************************")
     print("Setpoint Reached")
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   rbx_goto_errors_last =  [point_ned_error_m[0],point_ned_error_m[1],point_ned_error_m[2],0,0,0,max_yaw_ned_error_deg]
   return cmd_success
 
@@ -1513,7 +1513,7 @@ def setpoint_location_global_wgs84(setpoint_location,timeout_sec=CMD_TIMEOUT_SEC
   if cmd_success:
     print("************************")
     print("Setpoint Reached")
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   rbx_goto_errors_last = [geopoint_errors_m[0],geopoint_errors_m[1],geopoint_errors_m[2],0,0,0,max_yaw_ned_error_deg]
   return cmd_success
   
@@ -1569,7 +1569,7 @@ def takeoff(timeout_sec):
       print(rbx_goto_errors_current)
   if cmd_success:
     print("Takeoff action complete")
-  rbx_goto_errors_current = [0,0,0,0,0,0]
+  rbx_goto_errors_current = [0,0,0,0,0,0,0]
   rbx_goto_errors_last = [0,0,alt_error_m,0,0,0,0]
   return cmd_success
 
