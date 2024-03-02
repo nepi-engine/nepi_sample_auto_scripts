@@ -189,9 +189,13 @@ class pantilt_object_tracker_action(object):
     self.status = PanTiltStatus
 
     self.total_tilt_degs = self.status.pitch_max_softstop_deg - self.status.pitch_min_softstop_deg
-    self.current_tilt_ratio = 0.5 + self.status.pitch_now_deg / (self.total_tilt_degs)
+    tilt_ratio = 0.5 + self.status.pitch_now_deg / (self.total_tilt_degs)
+    if self.status.reverse_pitch_control:
+      self.current_tilt_ratio = 1 - tilt_ratio
     self.total_pan_degs = self.status.yaw_max_softstop_deg - self.status.yaw_min_softstop_deg
-    self.current_pan_ratio = 0.5 + self.status.yaw_now_deg / (self.total_pan_degs)
+    pan_ratio = 0.5 + self.status.yaw_now_deg / (self.total_pan_degs)
+    if self.status.reverse_yaw_control:
+      self.current_pan_ratio = 1 - pan_ratio
     
   ### Setup a regular background scan process based on timer callback
   def pt_scan_timer_callback(self,timer):
@@ -200,18 +204,25 @@ class pantilt_object_tracker_action(object):
       #print("No Targets Found, Entering Scan Mode")
       if self.status.yaw_now_deg > PTX_SCAN_PAN_LIMIT_DEG:
         print("Soft Pan Limit Reached, Reversing Scan Direction")
-        self.pan_scan_direction = -1
+        if self.status.reverse_yaw_control == False:
+          self.pan_scan_direction = -1
+        else:
+          self.pan_scan_direction = 1
       elif self.status.yaw_now_deg < (-1 * PTX_SCAN_PAN_LIMIT_DEG):
         print("Soft Pan Limit Reached, Reversing Scan Direction")
-        self.pan_scan_direction = 1
+        if self.status.reverse_yaw_control == False:
+          self.pan_scan_direction = 1
+        else:
+          self.pan_scan_direction = -1
       pan_ratio = (self.pan_scan_direction + 1) /2
-      tilt_offset_ratio =  PTX_SCAN_TILT_RATIO 
+
+      tilt_offset_ratio =  PTX_SCAN_TILT_RATIO
       if self.status.reverse_pitch_control == False:
         tilt_offset_ratio = - tilt_offset_ratio
       tilt_ratio = 0.5 + tilt_offset_ratio
       speed_ratio = PTX_SCAN_SPEED_RATIO
-      print("Current pan_scan_to_deg: " + "%.2f" % (pan_ratio))
-      print("Current tilt_scan_to_deg: " + "%.2f" % (tilt_ratio))
+      print("Current pan_scan_to_dir: " + "%.2f" % (pan_ratio))
+      print("Current tilt_scan_to_dir: " + "%.2f" % (tilt_ratio))
       self.set_pt_speed_ratio_pub.publish(speed_ratio)
       self.set_pt_pan_ratio_pub.publish(pan_ratio)
       self.set_pt_tilt_ratio_pub.publish(tilt_ratio)
@@ -239,11 +250,11 @@ class pantilt_object_tracker_action(object):
       # Calculate the box center in image ratio terms
       object_loc_y_pix = box_of_interest.ymin + ((box_of_interest.ymax - box_of_interest.ymin)  / 2) 
       object_loc_x_pix = box_of_interest.xmin + ((box_of_interest.xmax - box_of_interest.xmin)  / 2)
-      object_loc_y_ratio = float(object_loc_y_pix) / self.img_height 
+      object_loc_y_ratio = float(object_loc_y_pix) / self.img_height - PTX_OBJECT_TILT_OFFSET_RATIO
       object_loc_x_ratio = float(object_loc_x_pix) / self.img_width
       object_error_y_ratio = (object_loc_y_ratio - 0.5)  
       object_error_x_ratio = (object_loc_x_ratio - 0.5) 
-      print("Object Detection Center Error Ratios  x: " + "%.2f" % (object_error_x_ratio) + " y: " + "%.2f" % (object_error_y_ratio))
+      #print("Object Detection Center Error Ratios  x: " + "%.2f" % (object_error_x_ratio) + " y: " + "%.2f" % (object_error_y_ratio))
       # Call the tracking algorithm
       self.pt_track_box(object_error_x_ratio, object_error_y_ratio)
     else:
@@ -260,108 +271,67 @@ class pantilt_object_tracker_action(object):
   def pt_track_box(self,object_error_x_ratio, object_error_y_ratio):
     #print("Entering Track Callback, Object Detection Value: " + str(self.object_detected)) 
     if self.object_detected:
-      print("Target Found, Entering Track Mode")
+      #print("Target Found, Entering Track Mode")
       # Simple bang/bang positional control with hysteresis band and error-proportional speed control
       # First check if we are close enough to center in either dimension to stop motion: Hysteresis band
-      object_error_y_ratio = object_error_y_ratio - PTX_OBJECT_TILT_OFFSET_RATIO
       # Adjust the vertical box error to better center on target
       print("Object Detection Error Ratios pan: " + "%.2f" % (object_error_x_ratio) + " tilt: " + "%.2f" % (object_error_y_ratio))
       if (abs(object_error_y_ratio) <= PTX_OBJ_CENTERED_BUFFER_RATIO ) and \
          (abs(object_error_x_ratio) <= PTX_OBJ_CENTERED_BUFFER_RATIO ):
-        print("Object is centered in frame: Stopping any p/t motion") 
+        #print("Object is centered in frame: Stopping any p/t motion") 
         self.pt_stop_motion_pub.publish()
       else:
-        print("Object not centered in frame")
+        #print("Object not centered in frame")
         # Now set the speed proportional to average error
         speed_control_value = PTX_MIN_TRACK_SPEED_RATIO + \
-                              (PTX_MAX_TRACK_SPEED_RATIO-PTX_MIN_TRACK_SPEED_RATIO) * object_error_x_ratio
+                              (PTX_MAX_TRACK_SPEED_RATIO-PTX_MIN_TRACK_SPEED_RATIO) * max(object_error_x_ratio,object_error_y_ratio)
         #print("Current track speed ratio: " + "%.2f" % (speed_control_value))
         self.set_pt_speed_ratio_pub.publish(speed_control_value)
         # Per-axis adjustment
         self.move_pan_rel_ratio(object_error_x_ratio)
         self.move_tilt_rel_ratio(object_error_y_ratio)
+        # set next scan in direction of last detection
+        if self.status.reverse_yaw_control == False:
+          self.pan_scan_direction = - np.sign(object_error_x_ratio)
+        else:
+          self.pan_scan_direction = np.sign(object_error_x_ratio)
+        print("X Error: " + "%.2f" % (object_error_x_ratio))
+        print("New Scan Dir: " + str(self.pan_scan_direction))
 
 
 
   def move_pan_rel_ratio(self,pan_rel_ratio):
-    if self.status.reverse_pitch_control == False:
-      pan_rel_ratio = - pan_rel_ratio
-    print("Current tilt ratio: " + "%.2f" % (self.current_pan_ratio))
-    pan_ratio = self.current_pan_ratio + pan_rel_ratio
+    print(self.current_pan_ratio)
+    print(pan_rel_ratio)
+    if self.status.reverse_yaw_control == False:
+      pan_ratio = self.current_pan_ratio - pan_rel_ratio
+    else:
+      pan_ratio = self.current_pan_ratio + pan_rel_ratio
+    print(pan_ratio)
     if pan_ratio < 0.0:
       pan_ratio = 0
     elif pan_ratio > 1.0:
-      pan_ration = 1
+      pan_ratio = 1
     if not rospy.is_shutdown():
-      print("Current pan_scan_to_ratio: " + "%.2f" % (pan_ratio))
+      print("Current pan_to_ratio: " + "%.2f" % (pan_ratio))
       self.set_pt_pan_ratio_pub.publish(pan_ratio)
 
   def move_tilt_rel_ratio(self,tilt_rel_ratio):
+    print(self.current_tilt_ratio)
+    print(tilt_rel_ratio)
     if self.status.reverse_pitch_control == True:
-      tilt_rel_ratio = - tilt_rel_ratio
-    print("Current tilt ratio: " + "%.2f" % (self.current_tilt_ratio))
-    tilt_ratio = self.current_tilt_ratio + tilt_rel_ratio
+      tilt_ratio = self.current_tilt_ratio - tilt_rel_ratio
+    else:
+      tilt_ratio = self.current_tilt_ratio + tilt_rel_ratio
+    print(tilt_ratio)
     if tilt_ratio < 0:
       tilt_ratio = 0
     elif tilt_ratio > 1:
-      tilt_ration = 1
+      tilt_ratio = 1
     if not rospy.is_shutdown():
-      print("Current tilt_scan_to_ratio: " + "%.2f" % (tilt_ratio))
+      print("Current tilt_to_ratio: " + "%.2f" % (tilt_ratio))
       self.set_pt_tilt_ratio_pub.publish(tilt_ratio)
 
-  def move_pan_direction(self,pan_direction):
-    pan_ratio = pan_direction
-    if self.status.reverse_yaw_control == False:
-      pan_ratio = - pan_ratio
-    if pan_ratio < 0:
-      pan_ratio = 0
-    if not rospy.is_shutdown():
-      print("Current pan_scan_to_ratio: " + "%.2f" % (pan_ratio))
-      self.set_pt_pan_ratio_pub.publish(pan_ratio)
-
-  def move_tilt_direction(self,tilt_direction):
-    tilt_ratio = tilt_direction
-    if self.status.reverse_pitch_control == True:
-      tilt_ratio = - tilt_ratio
-    if tilt_ratio < 0:
-      tilt_ratio = 0
-    if not rospy.is_shutdown():
-      print("Current tilt_scan_to_ratio: " + "%.2f" % (tilt_ratio))
-      self.set_pt_tilt_ratio_pub.publish(tilt_ratio)
-
-  def goto_abs_position_deg(self,pan_abs_deg,tilt_abs_deg,speed_ratio):
-    if self.status.reverse_yaw_control == False:
-      pan_abs_deg = - pan_abs_deg
-    if pan_abs_deg > self.status.yaw_max_softstop_deg:
-      pan_abs_deg = self.status.yaw_max_softstop_deg
-    elif pan_abs_deg < self.status.yaw_min_softstop_deg:
-      pan_abs_deg = self.status.yaw_min_softstop_deg
-    pan_ratio = 0.5 + pan_abs_deg / (self.total_pan_degs)
-    if self.status.reverse_pitch_control == True:
-      tilt_abs_deg = - tilt_abs_deg
-    if tilt_abs_deg > self.status.pitch_max_softstop_deg:
-      tilt_abs_deg = self.status.pitch_max_softstop_deg
-    elif tilt_abs_deg < self.status.pitch_min_softstop_deg:
-      tilt_abs_deg = self.status.pitch_min_softstop_deg
-    tilt_ratio = 0.5 + tilt_abs_deg / (self.total_tilt_degs)
-    print("Current abs pan_scan_to_ratio: " + "%.2f" % (pan_ratio))
-    print("Current abs tilt_scan_to_ratio: " + "%.2f" % (tilt_ratio))
-    if not rospy.is_shutdown():
-      self.set_pt_speed_ratio_pub.publish(speed_ratio)
-      self.set_pt_pan_ratio_pub.publish(pan_ratio)
-      self.set_pt_tilt_ratio_pub.publish(tilt_ratio)
-
-  def goto_rel_position_deg(self,pan_rel_deg,tilt_rel_deg,speed_ratio):
-      if self.status.reverse_yaw_control == False:
-        pan_abs_deg = self.status.yaw_now_deg - pan_rel_deg
-      else:
-        pan_abs_deg = self.status.yaw_now_deg + pan_rel_deg
-      if self.status.reverse_pitch_control == False:
-        tilt_abs_deg = self.status.pitch_now_deg - tilt_rel_deg
-      else:
-        tilt_abs_deg = self.status.pitch_now_deg + tilt_rel_deg
-      self.goto_abs_position_deg(pan_abs_deg,tilt_abs_deg,speed_ratio)
-      goto_abs_position_deg(self,pan_abs_deg,tilt_abs_deg,speed_ratio)
 
   #######################
   # Node Cleanup Function
