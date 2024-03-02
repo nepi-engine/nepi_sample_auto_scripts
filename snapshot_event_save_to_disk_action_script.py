@@ -120,7 +120,7 @@ class snapshot_event_save_to_disk_action(object):
     if not save_folder_exists:
       rospy.loginfo("Creating save folder")
       access = 0o755
-      os.makedirs(save_folder,access)
+      os.makedirs(self.save_folder,access)
     else:
       rospy.loginfo("Save folder exists")
     ## Initiation Complete
