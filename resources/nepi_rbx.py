@@ -157,6 +157,7 @@ def set_rbx_state(self,state_str):
     if self.rbx_status.state == new_state_ind:
       success = True
   print("Current rbx state is " + self.rbx_cap_states[self.rbx_status.state])
+  time.sleep(2)
   return success
   
 ### Function to set rbx mode
@@ -183,6 +184,7 @@ def set_rbx_mode(self,mode_str):
     if self.rbx_status.mode == new_mode_ind:
       success = True
   print("Current rbx mode is " + self.rbx_cap_modes[self.rbx_status.mode])
+  time.sleep(1)
   return success
 
 ### Function to set home current

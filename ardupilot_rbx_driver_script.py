@@ -79,6 +79,8 @@ IMAGE_INPUT_TOPIC_NAME = "color_2d_image" # Partial or full ROS namespace string
 TAKEOFF_MIN_PITCH_DEG = 10
 TAKEOFF_ALT_M = 1
 
+STATUS_UPDATE_RATE_HZ = 20
+
 #########################################
 # ROS NAMESPACE SETUP
 #########################################
@@ -139,8 +141,7 @@ class ardupilot_rbx_driver(object):
     self.rbx_state_last = None
     self.rbx_mode_start = None
     self.rbx_mode_last = None
-    NEPI_RBX_STATUS_RATE_HZ = 10
-    self.rbx_status_pub_interval = float(1.0)/float(NEPI_RBX_STATUS_RATE_HZ)
+    self.rbx_status_pub_interval = float(1)/float(STATUS_UPDATE_RATE_HZ)
     self.rbx_status_image_blank = np.zeros((350, 700, 3), dtype = np.uint8) # Empty Black Image
     self.rbx_status_image_base = self.rbx_status_image_blank
     self.rbx_status_image_source_last = ""
@@ -174,16 +175,25 @@ class ardupilot_rbx_driver(object):
     error_bounds.max_rotation_error_deg = GOTO_MAX_ERROR_DEG
     error_bounds.max_stabilize_time_s = GOTO_STABILIZED_SEC
     self.rbx_status.error_bounds = error_bounds
-    self.zero_errors = RBXGotoErrors()
-    self.zero_errors.x_m = 0
-    self.zero_errors.y_m = 0
-    self.zero_errors.z_m = 0
-    self.zero_errors.heading_deg = 0
-    self.zero_errors.roll_deg = 0
-    self.zero_errors.pitch_deg = 0
-    self.zero_errors.yaw_deg = 0
-    self.rbx_status.errors_current = self.zero_errors
-    self.rbx_status.errors_prev = self.zero_errors
+    
+    self.rbx_status.errors_current = RBXGotoErrors()
+    self.rbx_status.errors_current.x_m = 0
+    self.rbx_status.errors_current.y_m = 0
+    self.rbx_status.errors_current.z_m = 0
+    self.rbx_status.errors_current.heading_deg = 0
+    self.rbx_status.errors_current.roll_deg = 0
+    self.rbx_status.errors_current.pitch_deg = 0
+    self.rbx_status.errors_current.yaw_deg = 0
+
+    self.rbx_status.errors_prev = RBXGotoErrors()
+    self.rbx_status.errors_prev.x_m = 0
+    self.rbx_status.errors_prev.y_m = 0
+    self.rbx_status.errors_prev.z_m = 0
+    self.rbx_status.errors_prev.heading_deg = 0
+    self.rbx_status.errors_prev.roll_deg = 0
+    self.rbx_status.errors_prev.pitch_deg = 0
+    self.rbx_status.errors_prev.yaw_deg = 0
+    
     self.rbx_status.cmd_timeout = CMD_TIMEOUT_SEC
     self.rbx_status.cmd_success = False
     self.rbx_status.status_image_source = IMAGE_INPUT_TOPIC_NAME
@@ -202,7 +212,7 @@ class ardupilot_rbx_driver(object):
     NEPI_RBX_CAPABILITIES_NAVPOSE_TOPIC = NEPI_RBX_NAMESPACE + "navpose_query"
     # NEPI RBX Driver Status Publish Topics
     NEPI_RBX_STATUS_TOPIC = NEPI_RBX_NAMESPACE + "status" 
-    NEPI_RBX_STATUS_IMAGE_TOPIC= NEPI_RBX_NAMESPACE + "status_image" # Image with status info overlay
+    NEPI_RBX_STATUS_IMAGE_TOPIC= NEPI_RBX_NAMESPACE + "rbx_status_image" # Image with status info overlay
     NEPI_RBX_GET_TAKEOFF_M_TOPIC = NEPI_RBX_NAMESPACE + "get_takeoff_m"  # Float meters takeoff height
     # NEPI RBX Driver NavPose Publish Topics
     NEPI_RBX_NAVPOSE_GPS_TOPIC = NEPI_RBX_NAMESPACE + "gps_fix"
@@ -338,6 +348,7 @@ class ardupilot_rbx_driver(object):
     rospy.loginfo("Setup complete")
     ## Initiation Complete
     rospy.loginfo("Initialization Complete")
+    self.rbx_status.ready = True
 
   #######################
   ### Node Methods
@@ -483,16 +494,20 @@ class ardupilot_rbx_driver(object):
     if new_state_ind < 0 or new_state_ind > (len(self.RBX_STATE_FUNCTIONS)-1):
       rospy.loginfo("No matching rbx state found")
     else:
+      self.update_current_errors( [0,0,0,0,0,0,0] )
       self.rbx_status.process_current = self.RBX_STATES[new_state_ind]
       self.rbx_state_last = self.rbx_status.state
       rospy.loginfo("Waiting for rbx state " + self.RBX_STATES[new_state_ind] + " to set")
       rospy.loginfo("Current rbx state is " + self.RBX_STATES[self.rbx_status.state])
       set_state_function = globals()[self.RBX_STATE_FUNCTIONS[new_state_ind]]
       success = set_state_function(self)
+      self.update_prev_errors( [0,0,0,0,0,0,0] )
       self.rbx_status.process_last = self.RBX_STATES[new_state_ind]
       self.rbx_status.process_current = "None"
+      time.sleep(1)
       if success:
         self.rbx_status.state = new_state_ind
+ 
 
   ### Callback to set mode
   def rbx_set_mode_callback(self,mode_msg):
@@ -508,6 +523,7 @@ class ardupilot_rbx_driver(object):
     if new_mode_ind < 0 or new_mode_ind > (len(self.RBX_MODE_FUNCTIONS)-1):
       rospy.loginfo("No matching rbx mode found")
     else:
+      self.update_current_errors( [0,0,0,0,0,0,0] )
       self.rbx_status.process_current = self.RBX_MODES[new_mode_ind]
       if self.RBX_MODES[new_mode_ind] != "RESUME":
         self.rbx_mode_last = self.rbx_status.mode # Don't update last on resume
@@ -515,8 +531,11 @@ class ardupilot_rbx_driver(object):
       rospy.loginfo("Calling rbx mode function: " + self.RBX_MODE_FUNCTIONS[new_mode_ind])
       set_mode_function = globals()[self.RBX_MODE_FUNCTIONS[new_mode_ind]]
       success = set_mode_function(self)
+      self.update_prev_errors( [0,0,0,0,0,0,0] )
       self.rbx_status.process_last = self.RBX_MODES[new_mode_ind]
       self.rbx_status.process_current = "None"
+      self.rbx_status.process_current = "None"
+      time.sleep(1)
       if success:
         self.rbx_status.mode = new_mode_ind
 
@@ -571,44 +590,24 @@ class ardupilot_rbx_driver(object):
   ##############################
   # RBX Control Topic Callbacks
 
-  ### Callback to execute action
-  def rbx_go_action_callback(self,action_msg):
-    rospy.loginfo("*******************************")
-    rospy.loginfo("Received go action message")
-    rospy.loginfo(action_msg)
-    self.rbx_cmd_success_current = False
-    self.update_current_errors( [0,0,0,0,0,0,0] )
-    action_ind = action_msg.data
-    if action_ind < 0 or action_ind > (len(self.RBX_ACTION_FUNCTIONS)-1):
-      rospy.loginfo("No matching rbx action found")
-    else:
-      self.rbx_status.process_current = self.RBX_ACTIONS[action_ind]
-      self.rbx_status.ready = False
-      rospy.loginfo("Starting action: " + self.rbx_status.process_current)
-      set_action_function = globals()[self.RBX_ACTION_FUNCTIONS[action_ind]]
-      self.rbx_cmd_success_current = set_action_function(self,self.rbx_status.cmd_timeout)
-      rospy.loginfo("Finished action: " + self.rbx_status.process_current)
-      time.sleep(1)
-      self.rbx_status.ready = True
-      self.rbx_status.process_last = self.RBX_ACTIONS[action_ind]
-      self.rbx_status.process_current = "None"
-    self.rbx_status.cmd_success = self.rbx_cmd_success_current
 
   ### Callback to start rbx go home
   def rbx_go_home_callback(self,home_msg):
     self.rbx_status.process_current = "Go Home"
     self.rbx_cmd_success_current = False
     self.rbx_status.ready = False
+    self.update_current_errors( [0,0,0,0,0,0,0] )
     rospy.loginfo("*******************************")
     rospy.loginfo("Received go home message")
     rospy.loginfo(home_msg)
     self.rtl()
     self.rbx_cmd_success_current = True
     time.sleep(1)
-    self.rbx_status.ready = True
-    self.rbx_status.process_last = self.rbx_status.process_current
+    self.rbx_status.process_last = "Go Home"
     self.rbx_status.process_current = "None"
     self.rbx_status.cmd_success = self.rbx_cmd_success_current
+    time.sleep(1)
+    self.rbx_status.ready = True
 
   ### Callback to start rbx stop
   def rbx_go_stop_callback(self,stop_msg):
@@ -622,16 +621,42 @@ class ardupilot_rbx_driver(object):
     self.loiter()
     self.rbx_cmd_success_current = True
     time.sleep(1)
-    self.rbx_status.ready = True
-    self.rbx_status.process_last = self.rbx_status.process_current
+    self.rbx_status.process_last = "Stop"
     self.rbx_status.process_current = "None"
     self.rbx_status.cmd_success = self.rbx_cmd_success_current
+    time.sleep(1)
+    self.rbx_status.ready = True
+
+  ### Callback to execute action
+  def rbx_go_action_callback(self,action_msg):
+    rospy.loginfo("*******************************")
+    rospy.loginfo("Received go action message")
+    rospy.loginfo(action_msg)
+    action_ind = action_msg.data
+    if action_ind < 0 or action_ind > (len(self.RBX_ACTION_FUNCTIONS)-1):
+      rospy.loginfo("No matching rbx action found")
+    else:
+      if self.rbx_status.ready is False:
+        rospy.loginfo("Another GoTo Command Process is Active")
+        rospy.loginfo("Ignoring this Request")
+      else:
+        self.rbx_status.process_current = self.RBX_ACTIONS[action_ind]
+        self.rbx_status.ready = False
+        self.rbx_cmd_success_current = False
+        self.update_current_errors( [0,0,0,0,0,0,0] )
+        rospy.loginfo("Starting action: " + self.rbx_status.process_current)
+        time.sleep(1)
+        set_action_function = globals()[self.RBX_ACTION_FUNCTIONS[action_ind]]
+        self.rbx_cmd_success_current = set_action_function(self,self.rbx_status.cmd_timeout)
+        rospy.loginfo("Finished action: " + self.rbx_status.process_current)
+        self.rbx_status.process_last = self.RBX_ACTIONS[action_ind]
+        self.rbx_status.process_current = "None"
+        self.rbx_status.cmd_success = self.rbx_cmd_success_current
+        time.sleep(1)
+        self.rbx_status.ready = True
 
   ### Callback to start rbx goto pose process
   def rbx_goto_pose_callback(self,pose_cmd_msg):
-    self.rbx_status.process_current = "GoTo Pose"
-    self.rbx_cmd_success_current = False
-    self.update_current_errors( [0,0,0,0,0,0,0] )
     rospy.loginfo("*******************************")
     rospy.loginfo("Recieved GoTo Pose Message")
     rospy.loginfo("")
@@ -646,19 +671,22 @@ class ardupilot_rbx_driver(object):
         rospy.loginfo("Another GoTo Command Process is Active")
         rospy.loginfo("Ignoring this Request")
       else:
+        self.rbx_status.process_current = "GoTo Pose"
         self.rbx_status.ready = False
+        self.rbx_cmd_success_current = False
+        self.update_current_errors( [0,0,0,0,0,0,0] )
+        time.sleep(1)
         self.rbx_cmd_success_current = self.setpoint_attitude_ned(setpoint_data,self.rbx_status.cmd_timeout)
+        self.rbx_status.process_last = "GoTo Pose"
+        self.rbx_status.process_current = "None"
+        self.rbx_status.cmd_success = self.rbx_cmd_success_current
+        time.sleep(1)
         self.rbx_status.ready = True
-    self.rbx_status.process_last = self.rbx_status.process_current
-    self.rbx_status.process_current = "None"
-    self.rbx_status.cmd_success = self.rbx_cmd_success_current
+
 
 
   ### Callback to start rbx goto position process
   def rbx_goto_position_callback(self,position_cmd_msg):
-    self.rbx_status.process_current = "GoTo Position"
-    self.rbx_cmd_success_current = False
-    self.update_current_errors( [0,0,0,0,0,0,0] )
     rospy.loginfo("*******************************")
     rospy.loginfo("Recieved GoTo Position Command Message")
     rospy.loginfo("")
@@ -673,19 +701,21 @@ class ardupilot_rbx_driver(object):
         rospy.loginfo("Another GoTo Command Process is Active")
         rospy.loginfo("Ignoring this Request")
       else:
+        self.rbx_status.process_current = "GoTo Position"
+        self.rbx_status.ready = False
+        self.rbx_cmd_success_current = False
+        self.update_current_errors( [0,0,0,0,0,0,0] )
+        time.sleep(1)
         self.rbx_status.ready = False
         self.rbx_cmd_success_current = self.setpoint_position_local_body(setpoint_data,self.rbx_status.cmd_timeout)
+        self.rbx_status.process_last = "GoTo Position"
+        self.rbx_status.process_current = "None"
+        self.rbx_status.cmd_success = self.rbx_cmd_success_current
+        time.sleep(1)
         self.rbx_status.ready = True
-    self.rbx_status.process_last = self.rbx_status.process_current
-    self.rbx_status.process_current = "None"
-    self.rbx_status.cmd_success = self.rbx_cmd_success_current
-
 
   ### Callback to start rbx goto location subscriber
   def rbx_goto_location_callback(self,location_cmd_msg):
-    self.rbx_status.process_current = "GoTo Location"
-    self.rbx_cmd_success_current = False
-    self.update_current_errors( [0,0,0,0,0,0,0] )
     rospy.loginfo("*******************************")
     rospy.loginfo("Recieved GoTo Location Message")
     rospy.loginfo("")
@@ -700,12 +730,16 @@ class ardupilot_rbx_driver(object):
         rospy.loginfo("Another GoTo Command Process is Active")
         rospy.loginfo("Ignoring this Request")
       else:
+        self.rbx_status.process_current = "GoTo Location"
         self.rbx_status.ready = False
+        self.rbx_cmd_success_current = False
+        self.update_current_errors( [0,0,0,0,0,0,0] )
         self.rbx_cmd_success_current = self.setpoint_location_global_wgs84(setpoint_data,self.rbx_status.cmd_timeout)
+        self.rbx_status.process_last = "GoTo Location"
+        self.rbx_status.process_current = "None"
+        self.rbx_status.cmd_success = self.rbx_cmd_success_current
+        time.sleep(1)
         self.rbx_status.ready = True
-    self.rbx_status.process_last = self.rbx_status.process_current
-    self.rbx_status.process_current = "None"
-    self.rbx_status.cmd_success = self.rbx_cmd_success_current
 
 
   #######################
@@ -740,7 +774,6 @@ class ardupilot_rbx_driver(object):
     arm_cmd.value = arm_value
     rospy.loginfo("Updating armed")
     rospy.loginfo(arm_value)
-    self.rbx_status.ready = False
     time.sleep(1) # Give time for other process to see busy
     while self.mavlink_state.armed != arm_value and not rospy.is_shutdown():
       time.sleep(.25)
@@ -748,7 +781,6 @@ class ardupilot_rbx_driver(object):
       rospy.loginfo("Waiting for armed value to set")
       rospy.loginfo("Set Value: " + str(arm_value))
       rospy.loginfo("Cur Value: " + str(self.mavlink_state.armed))
-    self.rbx_status.ready = True
 
   ### Function to set mavlink mode
   def set_mavlink_mode(self,mode_new):
@@ -756,7 +788,6 @@ class ardupilot_rbx_driver(object):
     new_mode.custom_mode = mode_new
     rospy.loginfo("Updating mode")
     rospy.loginfo(mode_new)
-    self.rbx_status.ready = False
     time.sleep(1) # Give time for other process to see busy
     while self.mavlink_state.mode != mode_new and not rospy.is_shutdown():
       time.sleep(.25)
@@ -764,9 +795,6 @@ class ardupilot_rbx_driver(object):
       rospy.loginfo("Waiting for mode to set")
       rospy.loginfo("Set Value: " + mode_new)
       rospy.loginfo("Cur Value: " + str(self.mavlink_state.mode))
-    self.rbx_status.ready = True
-
-
 
 
 
@@ -1481,6 +1509,7 @@ class ardupilot_rbx_driver(object):
   ### Function for switching to LAND mode
   global land
   def land(self):
+    self.set_mavlink_mode('LAND')
     rospy.loginfo("Waiting for land process to complete and disarm")
     while self.rbx_status.state == 1:
       nepi.sleep(1,10)
