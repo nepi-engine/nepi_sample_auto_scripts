@@ -34,10 +34,6 @@ import sys
 import time
 from resources import nepi
 
-from std_srvs.srv import Empty, EmptyRequest, Trigger
-from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,LaunchScript, StopScript
-
-
 #########################################
 # USER SETTINGS - Edit as Necessary 
 #########################################
@@ -63,7 +59,7 @@ class ai_3d_targeting_startup(object):
   ### Node Initialization
   def __init__(self):
     rospy.loginfo("Starting Initialization Processes")
-    nepi.startup_script_initialize(self)
+    nepi.startup_script_initialize(self,NEPI_BASE_NAMESPACE)
     rospy.loginfo("Initialization Complete")
     # Launch scripts from list
     nepi.launch_scripts(SCRIPT_LIST,self.launch_script_service,self.get_installed_scripts_service, \

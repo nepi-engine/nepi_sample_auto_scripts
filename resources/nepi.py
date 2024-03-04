@@ -36,7 +36,8 @@ import sys
 
 
 from std_msgs.msg import Empty, Float32
-
+from std_srvs.srv import Empty, EmptyRequest, Trigger
+from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,LaunchScript, StopScript
 
 
 #######################
@@ -126,7 +127,7 @@ def wait_for_topic(topic_name):
 #######################
 ### Script Utility Functions
 
-def startup_script_initialize(self):
+def startup_script_initialize(self,NEPI_BASE_NAMESPACE):
   ## Initialize Class Variables
   self.scripts_installed_at_start = None
   self.scripts_running_at_start = None
@@ -150,7 +151,7 @@ def startup_script_initialize(self):
   rospy.loginfo("Getting list of installed scripts")
   rospy.loginfo(["Calling service name: " + AUTO_GET_INSTALLED_SCRIPTS_SERVICE_NAME])
   while self.scripts_installed_at_start == None and not rospy.is_shutdown():
-      self.scripts_installed_at_start = nepi.get_installed_scripts(self.get_installed_scripts_service)
+      self.scripts_installed_at_start = get_installed_scripts(self.get_installed_scripts_service)
       if self.scripts_installed_at_start == None:
         rospy.loginfo("Service call failed, waiting 1 second then retrying")
         time.sleep(1)
@@ -161,7 +162,7 @@ def startup_script_initialize(self):
   rospy.loginfo("Getting list of running scripts at start")
   rospy.loginfo(["Calling service name: " + AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME])
   while self.scripts_running_at_start == None and not rospy.is_shutdown():
-      self.scripts_running_at_start = nepi.get_running_scripts(self.get_running_scripts_service)
+      self.scripts_running_at_start = get_running_scripts(self.get_running_scripts_service)
       if self.scripts_running_at_start == None:
         rospy.loginfo("Service call failed, waiting 1 second then retrying")
         time.sleep(1)
