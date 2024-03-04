@@ -43,6 +43,7 @@ from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,Laun
 #########################################
 
 SCRIPT_LIST = ["ardupilot_rbx_driver_script.py",
+                "ardupilot_rbx_navpose_config_script.py",
                 "ardupilot_rbx_fake_gps_process_script.py",
                	"drone_waypoint_demo_mission_script.py"] #  Script filenames to start/stop
 
@@ -63,46 +64,7 @@ class drone_waypoint_demo_startup(object):
   ### Node Initialization
   def __init__(self):
     rospy.loginfo("Starting Initialization Processes")
-    ## Initialize Class Variables
-    self.scripts_installed_at_start = None
-    self.scripts_running_at_start = None
-    ## Define Class Namespaces
-    AUTO_GET_INSTALLED_SCRIPTS_SERVICE_NAME = NEPI_BASE_NAMESPACE + "get_scripts"
-    AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME = NEPI_BASE_NAMESPACE + "get_running_scripts"
-    AUTO_LAUNCH_SCRIPT_SERVICE_NAME = NEPI_BASE_NAMESPACE + "launch_script"
-    AUTO_STOP_SCRIPT_SERVICE_NAME = NEPI_BASE_NAMESPACE + "stop_script"
-    ## Create Class Service Calls
-    self.get_installed_scripts_service = rospy.ServiceProxy(AUTO_GET_INSTALLED_SCRIPTS_SERVICE_NAME, GetScriptsQuery )
-    self.get_running_scripts_service = rospy.ServiceProxy(AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME, GetRunningScriptsQuery )
-    self.launch_script_service = rospy.ServiceProxy(AUTO_LAUNCH_SCRIPT_SERVICE_NAME, LaunchScript)
-    self.stop_script_service = rospy.ServiceProxy(AUTO_STOP_SCRIPT_SERVICE_NAME, StopScript)
-    ## Create Class Publishers
-    ## Start Class Subscribers
-    ## Start Node Processes
-    rospy.loginfo("")
-    rospy.loginfo("***********************")
-    rospy.loginfo("Starting Initialization")
-    ### Get list of installed scripts
-    rospy.loginfo("Getting list of installed scripts")
-    rospy.loginfo(["Calling service name: " + AUTO_GET_INSTALLED_SCRIPTS_SERVICE_NAME])
-    while self.scripts_installed_at_start == None and not rospy.is_shutdown():
-        self.scripts_installed_at_start = nepi.get_installed_scripts(self.get_installed_scripts_service)
-        if self.scripts_installed_at_start == None:
-          rospy.loginfo("Service call failed, waiting 1 second then retrying")
-          time.sleep(1)
-    #rospy.loginfo("Scripts installed at start:")
-    #rospy.loginfo(self.scripts_installed_at_start)
-    ### Get list of running scripts
-    rospy.loginfo("")
-    rospy.loginfo("Getting list of running scripts at start")
-    rospy.loginfo(["Calling service name: " + AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME])
-    while self.scripts_running_at_start == None and not rospy.is_shutdown():
-        self.scripts_running_at_start = nepi.get_running_scripts(self.get_running_scripts_service)
-        if self.scripts_running_at_start == None:
-          rospy.loginfo("Service call failed, waiting 1 second then retrying")
-          time.sleep(1)
-    #rospy.loginfo("Scripts running at start:")
-    #rospy.loginfo(self.scripts_running_at_start)
+    nepi.startup_script_initialize(self)
     rospy.loginfo("Initialization Complete")
     # Launch scripts from list
     nepi.launch_scripts(SCRIPT_LIST,self.launch_script_service,self.get_installed_scripts_service, \

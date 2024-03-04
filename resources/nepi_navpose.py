@@ -38,6 +38,7 @@ import tf
 import random
 from pygeodesy.ellipsoidalKarney import LatLon
 
+
 # try and import geoid height calculation module and databases
 GEOID_DATABASE_FILE='/mnt/nepi_storage/databases/geoids/egm2008-2_5.pgm' # Ignored if PyGeodesy module or Geoids Database is not available
 FALLBACK_GEOID_HEIGHT_M = 0.0 # Ignored if if PyGeodesy module or Geoids Database are available
@@ -53,6 +54,7 @@ except rospy.ServiceException as e:
 
 from std_msgs.msg import Bool, String, Float64, Float64MultiArray
 from nav_msgs.msg import Odometry
+from geographic_msgs.msg import GeoPoint
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
 from nepi_ros_interfaces.msg import NavPose
@@ -215,15 +217,20 @@ def distance_geopoints(geopoint1,geopoint2):
   lon1 = math.radians(geopoint1[1])
   lon2 = math.radians(geopoint2[1])
   # Haversine formula 
-  dlon = lon2 - lon1 
-  dlat = lat2 - lat1
+  dlon = (lon2 - lon1)
+  dlat = (lat2 - lat1)
   a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-  c = 2 * math.asin(math.sqrt(a)) 
+  c = 2 * math.asin(math.sqrt(a))
+
   # Radius of earth in kilometers. Use 3956 for miles
   r = 6371
-  xy_m=c*r/1000
+  xy_m=c*r*1000
   alt_m = abs(geopoint1[2]-geopoint2[2])
-  distance_m = math.sqrt(alt_m**2 + xy_m**2) 
+  distance_m = math.sqrt(alt_m**2 + xy_m**2)
+  #rospy.loginfo("Moving : " + "%.2f" % (xy_m) + " meters in xy plane")
+  #rospy.loginfo("Moving : " + "%.2f" % (alt_m) + " meters in z axis")
+  #rospy.loginfo("Moving : " + "%.2f" % (distance_m) + " total meters")
+ 
   # calculate the result
   return(distance_m)
 

@@ -60,6 +60,23 @@ TAKEOFF_EXTRA_WAIT_TIME = 2
 # Altitude is specified as meters above the WGS-84 and converted to AMSL before sending
 # Yaw is specified in NED frame degrees 0-360 or +-180 
 GOTO_LOCATION = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
+GOTO_LOCATION_CORNERS =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999],[47.65397990,-122.31912330, -999, -999]]
+
+# GoTo Position Local Body Settings
+###################
+# goto_position is [X_BODY_METERS, Y_BODY_METERS, Z_BODY_METERS, YEW_BODY_DEGREES]
+# Local Body Position goto Function use these body relative x,y,z,yaw conventions
+# x+ axis is forward
+# y+ axis is right
+# z+ axis is down
+# Only yaw orientation updated
+# yaw+ clockwise, yaw- counter clockwise from x axis (0 degrees faces x+ and rotates positive using right hand rule around z+ axis down)
+GOTO_POSITION = [10,5,0,0] # [X, Y, Z, YAW] Offset in xyz meters yaw body +- 180 (+Z is Down). Use 0 value for no change
+
+# GoTo Attitude NED Settings
+###################
+# goto_attitudeInp is [ROLL_NED_DEG, PITCH_NED_DEG, YEW_NED_DEGREES]
+GOTO_POSE = [-999,30,-999] # Roll, Pitch, Yaw Degrees: Enter -999 to use current value
 
 #########################################
 # ROS NAMESPACE SETUP
@@ -72,7 +89,7 @@ NEPI_BASE_NAMESPACE = "/nepi/s2x/"
 # Node Class
 #########################################
 
-class drone_waypoint_demo_mission(object):
+class drone_inspection_demo_mission(object):
 
   # RBX State and Mode Dictionaries
   RBX_STATES = ["DISARM","ARM"]
@@ -124,7 +141,31 @@ class drone_waypoint_demo_mission(object):
     # Start Your Custom Process
     ###########################
     success = True
+    ##########################################
+    # Send goto Position Command
+    print("Starting goto Position Local Process")
+    success = nepi_rbx.goto_rbx_position(self,GOTO_POSITION)
+    #########################################
+    # Send goto Location Command
+    print("Starting goto Location Global Process")
     success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION)
+    #########################################
+    # Send goto Attitude Command
+    print("Sending goto Attitude Control Message")
+    success = nepi_rbx.goto_rbx_pose(self,GOTO_POSE)
+    #########################################
+    # Run Mission Actions
+    print("Starting Mission Actions")
+    success = self.mission_actions()
+   #########################################
+    # Send goto Location Loop Command
+    for ind in range(4):
+      # Send goto Location Command
+      print("Starting goto Location Corners Process")
+      success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION_CORNERS[ind])
+      # Run Mission Actions
+      print("Starting Mission Actions")
+      success = self.mission_actions()
     ###########################
     # Stop Your Custom Process
     ###########################
@@ -174,8 +215,7 @@ class drone_waypoint_demo_mission(object):
 
   ### Function to send snapshot event trigger and wait for completion
   def snapshot(self):
-    global snapshot_trigger_pub
-    snapshot_trigger_pub.publish(Empty())
+    self.snapshot_trigger_pub.publish(Empty())
     print("Snapshot trigger sent")
 
   #######################

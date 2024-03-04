@@ -30,6 +30,7 @@
   
 
 import rospy
+import rosnode
 import time
 import sys
 
@@ -51,27 +52,53 @@ def sleep(sleep_sec,sleep_steps):
 
 
 
+### Function to get list of active nodes
+def get_node_list():
+  node = ""
+  node_list=rosnode.get_node_names()
+  return node_list
+
+### Function to find a node
+def find_node(node_name):
+  node = ""
+  node_list=get_node_list()
+  #rospy.loginfo(node_list)
+  for node_entry in node_list:
+    #rospy.loginfo(node_entry[0])
+    if node_entry.find(node_name) != -1:
+      node = node_entry
+  return node
+
+### Function to check for a node 
+def check_for_node(node_name):
+  node_exists = True
+  node=find_node(node_name)
+  if node == "":
+    node_exists = False
+  return node_exists
+
+### Function to wait for a node
+def wait_for_node(node_name):
+  node = ""
+  while node == "" and not rospy.is_shutdown():
+    node=find_node(node_name)
+    time.sleep(.1)
+  return node
+
+
+
+
+
 ### Function to get list of active topics
 def get_topic_list():
   topic = ""
   topic_list=rospy.get_published_topics(namespace='/')
   return topic_list
 
-### Function to find a topic from list of strings
-def find_topic_from_string_list(topic_string_list):
-  topic = ""
-  topic_list=rospy.get_published_topics(namespace='/')
-  #rospy.loginfo(topic_list)
-  for topic_entry in topic_list:
-    #rospy.loginfo(topic_entry[0])
-    if all(x in topic_entry[0] for x in topic_string_list):
-      topic = topic_entry[0]
-  return topic
-
 ### Function to find a topic
 def find_topic(topic_name):
   topic = ""
-  topic_list=rospy.get_published_topics(namespace='/')
+  topic_list=get_topic_list()
   #rospy.loginfo(topic_list)
   for topic_entry in topic_list:
     #rospy.loginfo(topic_entry[0])
@@ -98,6 +125,50 @@ def wait_for_topic(topic_name):
 
 #######################
 ### Script Utility Functions
+
+def startup_script_initialize(self):
+  ## Initialize Class Variables
+  self.scripts_installed_at_start = None
+  self.scripts_running_at_start = None
+  ## Define Class Namespaces
+  AUTO_GET_INSTALLED_SCRIPTS_SERVICE_NAME = NEPI_BASE_NAMESPACE + "get_scripts"
+  AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME = NEPI_BASE_NAMESPACE + "get_running_scripts"
+  AUTO_LAUNCH_SCRIPT_SERVICE_NAME = NEPI_BASE_NAMESPACE + "launch_script"
+  AUTO_STOP_SCRIPT_SERVICE_NAME = NEPI_BASE_NAMESPACE + "stop_script"
+  ## Create Class Service Calls
+  self.get_installed_scripts_service = rospy.ServiceProxy(AUTO_GET_INSTALLED_SCRIPTS_SERVICE_NAME, GetScriptsQuery )
+  self.get_running_scripts_service = rospy.ServiceProxy(AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME, GetRunningScriptsQuery )
+  self.launch_script_service = rospy.ServiceProxy(AUTO_LAUNCH_SCRIPT_SERVICE_NAME, LaunchScript)
+  self.stop_script_service = rospy.ServiceProxy(AUTO_STOP_SCRIPT_SERVICE_NAME, StopScript)
+  ## Create Class Publishers
+  ## Start Class Subscribers
+  ## Start Node Processes
+  rospy.loginfo("")
+  rospy.loginfo("***********************")
+  rospy.loginfo("Starting Initialization")
+  ### Get list of installed scripts
+  rospy.loginfo("Getting list of installed scripts")
+  rospy.loginfo(["Calling service name: " + AUTO_GET_INSTALLED_SCRIPTS_SERVICE_NAME])
+  while self.scripts_installed_at_start == None and not rospy.is_shutdown():
+      self.scripts_installed_at_start = nepi.get_installed_scripts(self.get_installed_scripts_service)
+      if self.scripts_installed_at_start == None:
+        rospy.loginfo("Service call failed, waiting 1 second then retrying")
+        time.sleep(1)
+  #rospy.loginfo("Scripts installed at start:")
+  #rospy.loginfo(self.scripts_installed_at_start)
+  ### Get list of running scripts
+  rospy.loginfo("")
+  rospy.loginfo("Getting list of running scripts at start")
+  rospy.loginfo(["Calling service name: " + AUTO_GET_RUNNING_SCRIPTS_SERVICE_NAME])
+  while self.scripts_running_at_start == None and not rospy.is_shutdown():
+      self.scripts_running_at_start = nepi.get_running_scripts(self.get_running_scripts_service)
+      if self.scripts_running_at_start == None:
+        rospy.loginfo("Service call failed, waiting 1 second then retrying")
+        time.sleep(1)
+  #rospy.loginfo("Scripts running at start:")
+  #rospy.loginfo(self.scripts_running_at_start)
+
+
 
 ### Function to get list of installed scripts
 def get_installed_scripts(get_installed_scripts_service):

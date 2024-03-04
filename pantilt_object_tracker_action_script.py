@@ -67,7 +67,7 @@ PTX_SCAN_CHECK_INTERVAL = 0.25
 
 # Pan and Tilt tracking settings
 PTX_MAX_TRACK_SPEED_RATIO = 1.0
-PTX_MIN_TRACK_SPEED_RATIO = 0.1
+PTX_MIN_TRACK_SPEED_RATIO = 0.05
 PTX_OBJECT_TILT_OFFSET_RATIO = 0.15 # Adjust tilt center to lower or raise the calculated object center
 PTX_OBJ_CENTERED_BUFFER_RATIO = 0.15 # Hysteresis band about center of image for tracking purposes
 
@@ -284,7 +284,7 @@ class pantilt_object_tracker_action(object):
         #print("Object not centered in frame")
         # Now set the speed proportional to average error
         speed_control_value = PTX_MIN_TRACK_SPEED_RATIO + \
-                              (PTX_MAX_TRACK_SPEED_RATIO-PTX_MIN_TRACK_SPEED_RATIO) * max(abs(object_error_x_ratio),abs(object_error_y_ratio))
+                              (PTX_MAX_TRACK_SPEED_RATIO-PTX_MIN_TRACK_SPEED_RATIO) * max(object_error_x_ratio,object_error_y_ratio)
         #print("Current track speed ratio: " + "%.2f" % (speed_control_value))
         self.set_pt_speed_ratio_pub.publish(speed_control_value)
         # Per-axis adjustment
@@ -295,13 +295,12 @@ class pantilt_object_tracker_action(object):
           self.pan_scan_direction = - np.sign(object_error_x_ratio)
         else:
           self.pan_scan_direction = np.sign(object_error_x_ratio)
-        #print("X Error: " + "%.2f" % (object_error_x_ratio))
-        #print("New Scan Dir: " + str(self.pan_scan_direction))
+        print("X Error: " + "%.2f" % (object_error_x_ratio))
+        print("New Scan Dir: " + str(self.pan_scan_direction))
 
 
 
   def move_pan_rel_ratio(self,pan_rel_ratio):
-    print("Pan Track Info")
     print(self.current_pan_ratio)
     print(pan_rel_ratio)
     if self.status.reverse_yaw_control == False:
@@ -318,14 +317,13 @@ class pantilt_object_tracker_action(object):
       self.set_pt_pan_ratio_pub.publish(pan_ratio)
 
   def move_tilt_rel_ratio(self,tilt_rel_ratio):
-    #print("Tilt Track Info")
-    #print(self.current_tilt_ratio)
-    #print(tilt_rel_ratio)
+    print(self.current_tilt_ratio)
+    print(tilt_rel_ratio)
     if self.status.reverse_pitch_control == True:
       tilt_ratio = self.current_tilt_ratio - tilt_rel_ratio
     else:
       tilt_ratio = self.current_tilt_ratio + tilt_rel_ratio
-    #print(tilt_ratio)
+    print(tilt_ratio)
     if tilt_ratio < 0:
       tilt_ratio = 0
     elif tilt_ratio > 1:

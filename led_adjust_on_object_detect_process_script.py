@@ -52,7 +52,7 @@ from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 OBJECT_LABEL_OF_INTEREST = "person"
 LED_LEVEL_MAX = 0.3
 WD_TIMEOUT_SEC = 4
-AVG_LENGTH = 2
+AVG_LENGTH = 5
 
 #Set LED Control ROS Topic Name (or partial name)
 LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
@@ -160,7 +160,7 @@ class led_adjust_on_object_detect_process(object):
         center_ratios = [1-box_abs_error_x_ratio] # ignore vertical
         mean_center_ratio = statistics.mean(center_ratios)
         print("Target center ratio: " + "%.2f" % (mean_center_ratio))
-        intensity = self.led_level_max *  mean_center_ratio**4
+        intensity = self.led_level_max *  mean_center_ratio**2
         self.intensity_history = np.roll(self.intensity_history,1)
         self.intensity_history[0]=intensity
         avg_intensity = np.mean(self.intensity_history)
