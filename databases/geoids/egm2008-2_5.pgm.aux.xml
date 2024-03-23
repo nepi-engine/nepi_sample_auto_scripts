@@ -1,0 +1,18 @@
+<PAMDataset>
+  <SRS>GEOGCS[&quot;WGS 84&quot;,DATUM[&quot;WGS_1984&quot;,SPHEROID[&quot;WGS 84&quot;,6378137,298.257223563,AUTHORITY[&quot;EPSG&quot;,&quot;7030&quot;]],AUTHORITY[&quot;EPSG&quot;,&quot;6326&quot;]],PRIMEM[&quot;Greenwich&quot;,0],UNIT[&quot;degree&quot;,0.017453292519943295769],AUTHORITY[&quot;EPSG&quot;,&quot;4326&quot;]]</SRS>
+  <GeoTransform>-0.02083333333333333,0.04166666666666666,0,90.02083333333333333,0,-0.04166666666666666</GeoTransform>
+  <Metadata>
+    <MDI key="Description">WGS84 EGM2008, 2.5-minute grid</MDI>
+    <MDI key="URL">http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008</MDI>
+    <MDI key="DateTime">2009-08-31 06:54:07</MDI>
+    <MDI key="MaxBilinearError">0.135</MDI>
+    <MDI key="RMSBilinearError">0.003</MDI>
+    <MDI key="MaxCubicError">0.031</MDI>
+    <MDI key="RMSCubicError">0.001</MDI>
+    <MDI key="Offset">-108</MDI>
+    <MDI key="Scale">0.003</MDI>
+    <MDI key="AREA_OR_POINT">Point</MDI>
+    <MDI key="Vertical_Datum">WGS84</MDI>
+    <MDI key="Tie_Point_Location">pixel_corner</MDI>
+  </Metadata>
+</PAMDataset>

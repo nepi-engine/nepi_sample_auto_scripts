@@ -1,28 +1,13 @@
 #!/usr/bin/env python
 #
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
+# Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
 #
-# This license applies to any user of NEPI Engine software
+# This file is part of nepi-engine
+# (see https://github.com/nepi-engine).
 #
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
+
 
 # NEPI utility script includes
 # 1) RBX Initialization Process
@@ -78,6 +63,9 @@ def rbx_initialize(self, NEPI_BASE_NAMESPACE):
   NEPI_RBX_SET_MODE_TOPIC = NEPI_RBX_NAMESPACE + "set_mode"  # Int to Defined Dictionary RBX_MODES
   NEPI_RBX_SET_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "set_cmd_timeout" # Int Seconds  - Any command that changes ready state
   NEPI_RBX_SET_HOME_CURRENT_TOPIC = NEPI_RBX_NAMESPACE + "set_home_current" # Empty
+  NEPI_RBX_SET_STATUS_IMAGE_TOPIC = NEPI_RBX_NAMESPACE + "set_image_topic" # full or partial ROS namespace
+  NEPI_RBX_SET_PROCESS_NAME_TOPIC = NEPI_RBX_NAMESPACE + "set_process_name"  # string name of current process
+
   NEPI_RBX_SET_TAKEOFF_M_TOPIC = NEPI_RBX_NAMESPACE + "set_takeoff_m"  # Float meters takeoff height
   # NEPI RBX Driver Control Topics
   NEPI_RBX_GO_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "go_action"  # Int to Defined Dictionary RBX_ACTIONS
@@ -94,7 +82,7 @@ def rbx_initialize(self, NEPI_BASE_NAMESPACE):
   self.rbx_cap_states = rbx_caps.state_options
   self.rbx_cap_modes = rbx_caps.mode_options
   self.rbx_cap_actions = rbx_caps.action_options
-  # Print some results
+  # rospy.loginfo some results
   rospy.loginfo("RBX State Options: ")
   for state in self.rbx_cap_states:
      rospy.loginfo(" - " + state)
@@ -110,6 +98,8 @@ def rbx_initialize(self, NEPI_BASE_NAMESPACE):
   self.rbx_set_mode_pub = rospy.Publisher(NEPI_RBX_SET_MODE_TOPIC, UInt8, queue_size=1)
   self.rbx_set_cmd_timeout_pub = rospy.Publisher(NEPI_RBX_SET_CMD_TIMEOUT_TOPIC, UInt32, queue_size=1)
   self.rbx_set_home_current_pub = rospy.Publisher(NEPI_RBX_SET_HOME_CURRENT_TOPIC, Empty, queue_size=1)
+  self.rbx_set_image_topic_pub = rospy.Publisher(NEPI_RBX_SET_STATUS_IMAGE_TOPIC, String, queue_size=1)
+  self.rbx_set_process_name_pub = rospy.Publisher(NEPI_RBX_SET_PROCESS_NAME_TOPIC, String, queue_size=1)
   self.rbx_set_takeoff_alt_m_pub = rospy.Publisher(NEPI_RBX_SET_TAKEOFF_M_TOPIC, Float32, queue_size=1)
 
   self.rbx_go_action_pub = rospy.Publisher(NEPI_RBX_GO_ACTION_TOPIC, UInt8, queue_size=1)
@@ -125,7 +115,7 @@ def rbx_initialize(self, NEPI_BASE_NAMESPACE):
   rospy.loginfo("Starting state scubscriber callback")
   rospy.Subscriber(NEPI_RBX_STATUS_TOPIC, RBXStatus, self.rbx_status_callback, queue_size=None)
   while self.rbx_status is None and not rospy.is_shutdown():
-    print("Waiting for current state to publish")
+    rospy.loginfo("Waiting for current state to publish")
     time.sleep(0.1)
   rospy.loginfo(self.rbx_status)
   rospy.loginfo("RBX initialize process complete")
@@ -135,62 +125,91 @@ def rbx_initialize(self, NEPI_BASE_NAMESPACE):
 
 ### Function to set rbx state
 def set_rbx_state(self,state_str):
-  print("*******************************")  
-  print("Set State Request Recieved: " + state_str)
+  rospy.loginfo("*******************************")  
+  rospy.loginfo("Set State Request Recieved: " + state_str)
   success = False
   new_state_ind = -1
   for ind, state in enumerate(self.rbx_cap_states):
     if state == state_str:
       new_state_ind = ind
   if new_state_ind == -1:
-    print("No matching state found")
+    rospy.loginfo("No matching state found")
   else:
-    print("Setting state to: " + state_str)
+    rospy.loginfo("Setting state to: " + state_str)
     self.rbx_set_state_pub.publish(new_state_ind)
     timeout_timer = 0
     sleep_time_sec = 1
     while self.rbx_status.state != new_state_ind and timeout_timer < self.NEPI_RBX_SET_TIMEOUT_SEC and not rospy.is_shutdown():
-      print("Waiting for rbx state " + self.rbx_cap_states[new_state_ind] + " to set")
-      print("Current rbx state is " + self.rbx_cap_states[self.rbx_status.state])
+      rospy.loginfo("Waiting for rbx state " + self.rbx_cap_states[new_state_ind] + " to set")
+      rospy.loginfo("Current rbx state is " + self.rbx_cap_states[self.rbx_status.state])
       time.sleep(sleep_time_sec)
       timeout_timer = timeout_timer + sleep_time_sec
     if self.rbx_status.state == new_state_ind:
       success = True
-  print("Current rbx state is " + self.rbx_cap_states[self.rbx_status.state])
+  rospy.loginfo("Current rbx state is " + self.rbx_cap_states[self.rbx_status.state])
   time.sleep(2)
   return success
   
 ### Function to set rbx mode
 def set_rbx_mode(self,mode_str):
-  print("*******************************")  
-  print("Set Mode Request Recieved: " + mode_str)
+  rospy.loginfo("*******************************")  
+  rospy.loginfo("Set Mode Request Recieved: " + mode_str)
   success = False
   new_mode_ind = -1
   for ind, mode in enumerate(self.rbx_cap_modes):
     if mode == mode_str:
       new_mode_ind = ind
   if new_mode_ind == -1:
-    print("No matching mode found")
+    rospy.loginfo("No matching mode found")
   else:
-    print("Setting mode to: " + mode_str)
+    rospy.loginfo("Setting mode to: " + mode_str)
     self.rbx_set_mode_pub.publish(new_mode_ind)
     timeout_timer = 0
     sleep_time_sec = 1
     while self.rbx_status.mode != new_mode_ind and timeout_timer < self.NEPI_RBX_SET_TIMEOUT_SEC and not rospy.is_shutdown():
-      print("Waiting for rbx mode " + self.rbx_cap_modes[new_mode_ind] + " to set")
-      print("Current rbx mode is " + self.rbx_cap_modes[self.rbx_status.mode])
+      rospy.loginfo("Waiting for rbx mode " + self.rbx_cap_modes[new_mode_ind] + " to set")
+      rospy.loginfo("Current rbx mode is " + self.rbx_cap_modes[self.rbx_status.mode])
       time.sleep(sleep_time_sec)
       timeout_timer = timeout_timer + sleep_time_sec
     if self.rbx_status.mode == new_mode_ind:
       success = True
-  print("Current rbx mode is " + self.rbx_cap_modes[self.rbx_status.mode])
+  rospy.loginfo("Current rbx mode is " + self.rbx_cap_modes[self.rbx_status.mode])
   time.sleep(1)
   return success
 
 ### Function to set home current
 def set_rbx_set_home_current(self):
-  print("*******************************")  
-  print("Set Home Current Request Recieved: ")
+  rospy.loginfo("*******************************")  
+  rospy.loginfo("Set Home Current Request Recieved: ")
+  success = False
+  self.rbx_set_home_current_pub.publish(Empty())
+  success = True
+  return success
+
+### Function to set image topic name
+def set_rbx_image_topic(self,image_topic):
+  rospy.loginfo("*******************************")  
+  rospy.loginfo("Set Image Topic Request Recieved: ")
+  rospy.loginfo(image_topic)
+  success = False
+  self.rbx_set_image_topic_pub.publish(image_topic)
+  success = True
+  return success
+
+### Function to set image topic name
+def set_rbx_process_name(self,process_name):
+  rospy.loginfo("*******************************")  
+  rospy.loginfo("Set Process Name Request Recieved: ")
+  rospy.loginfo(process_name)
+  success = False
+  self.rbx_set_process_name_pub.publish(process_name)
+  success = True
+  return success
+
+### Function to set home current
+def set_rbx_set_home_current(self):
+  rospy.loginfo("*******************************")  
+  rospy.loginfo("Set Home Current Request Recieved: ")
   success = False
   self.rbx_set_home_current_pub.publish(Empty())
   success = True
@@ -201,19 +220,19 @@ def set_rbx_set_home_current(self):
 
 ### Function to send rbx action control
 def go_rbx_action(self,action_str):
-  print("*******************************")  
-  print("Goto Action Request Recieved: " + action_str)
+  rospy.loginfo("*******************************")  
+  rospy.loginfo("Goto Action Request Recieved: " + action_str)
   success = False
   action_ind = -1
   for ind, action in enumerate(self.rbx_cap_actions):
     if action == action_str:
       action_ind = ind
   if action_ind == -1:
-    print("No matching action found")
+    rospy.loginfo("No matching action found")
   else:
-    print("Waiting for ready state for takeoff")
+    rospy.loginfo("Waiting for ready state for takeoff")
     ready = wait_for_rbx_status_ready(self)
-    print("Sending takeoff command")
+    rospy.loginfo("Sending takeoff command")
     self.rbx_go_action_pub.publish(action_ind)
     ready = wait_for_rbx_status_busy(self)
     ready = wait_for_rbx_status_ready(self)
@@ -222,8 +241,8 @@ def go_rbx_action(self,action_str):
 
 ### Function to send rbx home control
 def go_rbx_home(self):
-  print("*******************************")  
-  print("Go Home Request Recieved: ")
+  rospy.loginfo("*******************************")  
+  rospy.loginfo("Go Home Request Recieved: ")
   success = False
   ready = wait_for_rbx_status_ready(self)
   self.rbx_go_home_pub.publish(action_ind)
@@ -236,7 +255,7 @@ def go_rbx_home(self):
 def goto_rbx_location(self,goto_data):
   # Send goto Location Command
   ready = wait_for_rbx_status_ready(self)
-  print("Starting goto Location Global Process")
+  rospy.loginfo("Starting goto Location Global Process")
   goto_location_msg = create_goto_message(goto_data)
   self.rbx_goto_location_pub.publish(goto_location_msg)
   ready = wait_for_rbx_status_busy(self)
@@ -247,7 +266,7 @@ def goto_rbx_location(self,goto_data):
 def goto_rbx_position(self,goto_data):
   # Send goto Position Command
   ready = wait_for_rbx_status_ready(self)
-  print("Starting goto Position Body Process")
+  rospy.loginfo("Starting goto Position Body Process")
   goto_position_msg = create_goto_message(goto_data)
   self.rbx_goto_position_pub.publish(goto_position_msg)
   ready = wait_for_rbx_status_busy(self)
@@ -258,7 +277,7 @@ def goto_rbx_position(self,goto_data):
 def goto_rbx_pose(self,goto_data):
   # Send goto Attitude Command
   ready = wait_for_rbx_status_ready(self)
-  print("Starting goto Attitude NED Process")
+  rospy.loginfo("Starting goto Attitude NED Process")
   goto_attitude_msg = create_goto_message(goto_data)
   self.rbx_goto_pose_pub.publish(goto_attitude_msg)
   ready = wait_for_rbx_status_busy(self)
@@ -267,32 +286,32 @@ def goto_rbx_pose(self,goto_data):
   
 ### Function to wait for goto control process to complete
 def wait_for_rbx_status_ready(self):
-  print("Waiting for status ready = True")
+  rospy.loginfo("Waiting for status ready = True")
   count_goal = 3 # fix for strange ready glitch
   counter = 0
   while (counter < count_goal) and (not rospy.is_shutdown()):
     if self.rbx_status.ready is True:
       counter = counter + 1
-      print("Got status ready = " + str(self.rbx_status.ready))
+      rospy.loginfo("Got status ready = " + str(self.rbx_status.ready))
     else:
       counter = 0
     time.sleep(.1)
-  print("Got status ready True")
+  rospy.loginfo("Got status ready True")
   return self.rbx_status.ready
 
 ### Function to wait for goto control process to complete
 def wait_for_rbx_status_busy(self):
-  print("Waiting for status ready = False")
+  rospy.loginfo("Waiting for status ready = False")
   count_goal = 3 # fix for strange ready glitch
   counter = 0
   while (counter < count_goal) and (not rospy.is_shutdown()):
     if self.rbx_status.ready is False:
       counter = counter + 1
-      print("Got status ready = " + str(self.rbx_status.ready))
+      rospy.loginfo("Got status ready = " + str(self.rbx_status.ready))
     else:
       counter = 0
     time.sleep(.1)
-  print("Got status ready False")
+  rospy.loginfo("Got status ready False")
   return self.rbx_status.ready
 
 
@@ -302,16 +321,16 @@ def wait_for_rbx_status_busy(self):
 
 ### Function for creating goto messages
 def create_goto_message(goto):
-  print(goto)
+  rospy.loginfo(goto)
   goto_msg = Float64MultiArray()
   goto_data=[]
   for ind in range(len(goto)):
     goto_data.append(float(goto[ind]))
-  print(goto_data)
+  rospy.loginfo(goto_data)
   goto_msg.data = goto_data
-  print("")
-  print("goto Message Created")
-  print(goto_msg)
+  rospy.loginfo("")
+  rospy.loginfo("goto Message Created")
+  rospy.loginfo(goto_msg)
   return goto_msg
 
 

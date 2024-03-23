@@ -1,27 +1,11 @@
 #!/usr/bin/env python
 #
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
+# Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
 #
-# This license applies to any user of NEPI Engine software
+# This file is part of nepi-engine
+# (see https://github.com/nepi-engine).
 #
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
 # Sample NEPI Driver Script. 
@@ -29,9 +13,6 @@
 
 ### Set the namespace before importing rospy
 import os
-os.environ["ROS_NAMESPACE"] = "/nepi/s2x"
-
-
 import rospy
 import time
 import numpy as np
@@ -56,6 +37,10 @@ from cv_bridge import CvBridge
 from nepi_ros_interfaces.msg import RBXStatus, AxisControls, RBXErrorBounds, RBXGotoErrors
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest, RBXCapabilitiesQuery, RBXCapabilitiesQueryResponse, \
      NavPoseCapabilitiesQuery, NavPoseCapabilitiesQueryResponse
+
+# ROS namespace setup
+ROS_NAMESPACE = nepi.get_base_namespace()
+os.environ["ROS_NAMESPACE"] = ROS_NAMESPACE[0:-1]
 
 
 #########################################
@@ -86,7 +71,8 @@ STATUS_UPDATE_RATE_HZ = 20
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+
 # RBX node name
 NEPI_RBX_NODENAME = "ardupilot"
 
@@ -226,7 +212,8 @@ class ardupilot_rbx_driver(object):
     NEPI_RBX_SET_ROTATE_SPEED_TOPIC = NEPI_RBX_NAMESPACE + "set_move_speed" # Float [Translation Speed Ratio]
     NEPI_RBX_SET_GOTO_GOALS_TOPIC = NEPI_RBX_NAMESPACE + "set_goto_goals" # Float [Max_Meters,Max_Degrees,Stabilize_Time_Sec]
     NEPI_RBX_SET_CMD_TIMEOUT_TOPIC = NEPI_RBX_NAMESPACE + "set_cmd_timeout" # Int Seconds  - Any command that changes ready state
-    NEPI_RBX_SET_STATUS_IMAGE_TOPIC = NEPI_RBX_NAMESPACE + "set_image_topic" # full ROS namespace
+    NEPI_RBX_SET_STATUS_IMAGE_TOPIC = NEPI_RBX_NAMESPACE + "set_image_topic" # full or partial ROS namespace
+    NEPI_RBX_SET_PROCESS_NAME_TOPIC = NEPI_RBX_NAMESPACE + "set_process_name"  # string name of current process
     NEPI_RBX_SET_TAKEOFF_M_TOPIC = NEPI_RBX_NAMESPACE + "set_takeoff_m"  # Float meters takeoff height
     # NEPI RBX Driver Control Subscriber Topics
     NEPI_RBX_GO_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "go_action"  # Int to Defined Dictionary self.RBX_ACTIONS
@@ -320,7 +307,12 @@ class ardupilot_rbx_driver(object):
     rospy.Subscriber(NEPI_RBX_SET_ROTATE_SPEED_TOPIC, Float32, self.rbx_set_rotate_speed_callback)
     rospy.Subscriber(NEPI_RBX_SET_GOTO_GOALS_TOPIC, Float64MultiArray, self.rbx_set_goto_goals_callback)
     rospy.Subscriber(NEPI_RBX_SET_CMD_TIMEOUT_TOPIC, UInt32, self.rbx_set_cmd_timeout_callback)
+    
+    rospy.Subscriber(NEPI_RBX_SET_STATUS_IMAGE_TOPIC, String, self.rbx_set_status_image_topic_callback)
+    rospy.Subscriber(NEPI_RBX_SET_PROCESS_NAME_TOPIC, String, self.rbx_set_process_name_callback)
+    
     rospy.Subscriber(NEPI_RBX_SET_TAKEOFF_M_TOPIC, Float32, self.rbx_set_takeoff_m_callback)
+
     ### Start RBX Control Subscribe Topics
     rospy.Subscriber(NEPI_RBX_GO_ACTION_TOPIC, UInt8, self.rbx_go_action_callback)
     rospy.Subscriber(NEPI_RBX_GO_HOME_TOPIC, Empty, self.rbx_go_home_callback)
@@ -534,7 +526,6 @@ class ardupilot_rbx_driver(object):
       self.update_prev_errors( [0,0,0,0,0,0,0] )
       self.rbx_status.process_last = self.RBX_MODES[new_mode_ind]
       self.rbx_status.process_current = "None"
-      self.rbx_status.process_current = "None"
       time.sleep(1)
       if success:
         self.rbx_status.mode = new_mode_ind
@@ -578,6 +569,21 @@ class ardupilot_rbx_driver(object):
     rospy.loginfo("Received set timeout message")
     rospy.loginfo(cmd_timeout_msg)
     self.rbx_status.cmd_timeout=cmd_timeout_msg.data
+
+  ### Callback to image topic source
+  def rbx_set_status_image_topic_callback(self,set_image_topic_msg):
+    rospy.loginfo("*******************************")
+    rospy.loginfo("Received set image topic message")
+    rospy.loginfo(set_image_topic_msg)
+    self.rbx_status.status_image_source = (set_image_topic_msg.data)
+
+  ### Callback to set current process name
+  def rbx_set_process_name_callback(self,set_process_name_msg):
+    rospy.loginfo("*******************************")
+    rospy.loginfo("Received set process name message")
+    rospy.loginfo(set_process_name_msg)
+    self.rbx_status.process_current = (set_process_name_msg.data)
+    
 
   ### Callback to set height goal on takeoff action
   def rbx_set_takeoff_m_callback(self,takeoff_m_msg):

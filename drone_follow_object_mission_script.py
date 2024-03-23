@@ -1,27 +1,11 @@
 #!/usr/bin/env python
 #
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
+# Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
 #
-# This license applies to any user of NEPI Engine software
+# This file is part of nepi-engine
+# (see https://github.com/nepi-engine).
 #
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
 # Sample NEPI Mission Script.
@@ -59,10 +43,10 @@ from nepi_ros_interfaces.msg import TargetLocalization
 
 ###!!!!!!!! Set Automation action parameters !!!!!!!!
 OBJ_LABEL_OF_INTEREST = "person"
-TARGET_OFFSET_GOAL_M = 0.5 # How close to set setpoint to target
+TARGET_OFFSET_GOAL_M = 0.1 # How close to set setpoint to target
 
-SNAPSHOT_TIME_S = 10 # Time to wait after detection and trigger sent
-TRIGGER_RESET_DELAY_S = 3 # Min delay between triggers
+SNAPSHOT_TIME_S = 0 # Time to wait after detection and trigger sent
+TRIGGER_RESET_DELAY_S = 1 # Min delay between triggers
 
 
 #########################################
@@ -70,7 +54,7 @@ TRIGGER_RESET_DELAY_S = 3 # Min delay between triggers
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
 
 #########################################
 # Node Class
@@ -96,15 +80,15 @@ class drone_follow_object_mission(object):
     ai_targeting_topic_name = nepi.wait_for_topic(AI_TARGETING_TOPIC)
     rospy.loginfo("Starting move to object callback")
     rospy.Subscriber(ai_targeting_topic_name, TargetLocalization, self.move_to_object_callback, queue_size = 1)
-
-    # Mission Action Topics (If Required)
-    SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_event"
-    self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
     # Setup snapshot processes
     self.reset_delay_timer = 10000
     self.last_reset_time = time.time()
     self.rbx_set_cmd_timeout_pub.publish(5)
     ## Initiation Complete
+    # Switch to Guided Mode and Send GoTo Position Command
+    rospy.loginfo("Switching to Guided mode")
+    nepi_rbx.set_rbx_mode(self,"GUIDED") # Change mode to Guided
+    time.sleep(2)
     rospy.loginfo("Initialization Complete")
     rospy.loginfo("Waiting for AI Object Detection")    
 
@@ -118,8 +102,10 @@ class drone_follow_object_mission(object):
     ###########################
     success = True
     #########################################
-    rospy.loginfo("Sending snapshot event trigger")
+    ## Send Snapshot Trigger
+    success = nepi_rbx.set_rbx_process_name(self,"SNAPSHOT EVENT")
     self.snapshot()
+    rospy.loginfo("Sending snapshot event trigger")
     rospy.loginfo("Waiting for " + str(SNAPSHOT_TIME_S) + " secs after trigger")
     nepi.sleep(SNAPSHOT_TIME_S,100)
     ###########################
@@ -165,10 +151,10 @@ class drone_follow_object_mission(object):
         sp_yaw_d = target_yaw_d
         setpoint_position_body_m = [sp_x_m,sp_y_m,sp_z_m,sp_yaw_d]
         ##########################################
-        # Switch to Guided Mode and Send GoTo Position Command
-        rospy.loginfo("Switching to Guided mode")
-        nepi_rbx.set_rbx_mode(self,"GUIDED") # Change mode to Guided
-        time.sleep(2)
+##        # Switch to Guided Mode and Send GoTo Position Command
+##        rospy.loginfo("Switching to Guided mode")
+##        nepi_rbx.set_rbx_mode(self,"GUIDED") # Change mode to Guided
+##        time.sleep(2)
         # Send goto command and wait for completion
         rospy.loginfo("Sending setpoint position body command")
         rospy.loginfo(setpoint_position_body_m)
@@ -178,8 +164,8 @@ class drone_follow_object_mission(object):
         #rospy.loginfo("Starting Mission Actions")
         #success = self.mission_actions()
         ##########################################
-        rospy.loginfo("Switching back to original mode")
-        nepi_rbx.set_rbx_mode(self,"RESUME")
+##        rospy.loginfo("Switching back to original mode")
+##        nepi_rbx.set_rbx_mode(self,"RESUME")
         rospy.loginfo("Delaying next trigger for " + str(TRIGGER_RESET_DELAY_S) + " secs")
         nepi.sleep(TRIGGER_RESET_DELAY_S,100)
         rospy.loginfo("Waiting for next " + OBJ_LABEL_OF_INTEREST + " detection")

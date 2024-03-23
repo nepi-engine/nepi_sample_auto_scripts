@@ -1,28 +1,13 @@
 #!/usr/bin/env python
 #
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
+# Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
 #
-# This license applies to any user of NEPI Engine software
+# This file is part of nepi-engine
+# (see https://github.com/nepi-engine).
 #
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
-#
+
 
 # NEPI utility script includes
 # 1) Topic Utility Functions
@@ -39,20 +24,9 @@ from std_msgs.msg import Empty, Float32
 from std_srvs.srv import Empty, EmptyRequest, Trigger
 from nepi_ros_interfaces.srv import GetScriptsQuery,GetRunningScriptsQuery ,LaunchScript, StopScript
 
-
 #######################
-### Topic Utility Functions
-
-### Sleep process that breaks sleep into smaller times for better shutdown
-def sleep(sleep_sec,sleep_steps):
-  delay_timer = 0
-  delay_sec = sleep_sec/sleep_steps
-  while delay_timer < sleep_sec and not rospy.is_shutdown():
-    time.sleep(delay_sec)
-    delay_timer = delay_timer + delay_sec
-
-
-
+### Node Utility Functions
+### Function to get list of active topics
 ### Function to get list of active nodes
 def get_node_list():
   node = ""
@@ -68,6 +42,7 @@ def find_node(node_name):
     #rospy.loginfo(node_entry[0])
     if node_entry.find(node_name) != -1:
       node = node_entry
+      break
   return node
 
 ### Function to check for a node 
@@ -86,7 +61,23 @@ def wait_for_node(node_name):
     time.sleep(.1)
   return node
 
+def get_base_namespace():
+  nepi_node=find_node('nepi')
+  nepi_names = nepi_node.split('/')
+  base_namespace = ('/' + nepi_names[1] + '/' + nepi_names[2] + '/')
+  return base_namespace
+  
 
+#######################
+### Topic Utility Functions
+
+### Sleep process that breaks sleep into smaller times for better shutdown
+def sleep(sleep_sec,sleep_steps):
+  delay_timer = 0
+  delay_sec = sleep_sec/sleep_steps
+  while delay_timer < sleep_sec and not rospy.is_shutdown():
+    time.sleep(delay_sec)
+    delay_timer = delay_timer + delay_sec
 
 
 
@@ -105,6 +96,7 @@ def find_topic(topic_name):
     #rospy.loginfo(topic_entry[0])
     if topic_entry[0].find(topic_name) != -1:
       topic = topic_entry[0]
+      break
   return topic
 
 ### Function to check for a topic 

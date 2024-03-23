@@ -1,27 +1,11 @@
 #!/usr/bin/env python
 #
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
+# Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
 #
-# This license applies to any user of NEPI Engine software
+# This file is part of nepi-engine
+# (see https://github.com/nepi-engine).
 #
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
 # Sample NEPI Mission Script.
@@ -62,28 +46,12 @@ TAKEOFF_EXTRA_WAIT_TIME = 2
 GOTO_LOCATION = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
 GOTO_LOCATION_CORNERS =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999],[47.65397990,-122.31912330, -999, -999]]
 
-# GoTo Position Local Body Settings
-###################
-# goto_position is [X_BODY_METERS, Y_BODY_METERS, Z_BODY_METERS, YEW_BODY_DEGREES]
-# Local Body Position goto Function use these body relative x,y,z,yaw conventions
-# x+ axis is forward
-# y+ axis is right
-# z+ axis is down
-# Only yaw orientation updated
-# yaw+ clockwise, yaw- counter clockwise from x axis (0 degrees faces x+ and rotates positive using right hand rule around z+ axis down)
-GOTO_POSITION = [10,5,0,0] # [X, Y, Z, YAW] Offset in xyz meters yaw body +- 180 (+Z is Down). Use 0 value for no change
-
-# GoTo Attitude NED Settings
-###################
-# goto_attitudeInp is [ROLL_NED_DEG, PITCH_NED_DEG, YEW_NED_DEGREES]
-GOTO_POSE = [-999,30,-999] # Roll, Pitch, Yaw Degrees: Enter -999 to use current value
-
 #########################################
 # ROS NAMESPACE SETUP
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
 
 #########################################
 # Node Class
@@ -143,16 +111,8 @@ class drone_inspection_demo_mission(object):
     success = True
     ##########################################
     # Send goto Position Command
-    print("Starting goto Position Local Process")
-    success = nepi_rbx.goto_rbx_position(self,GOTO_POSITION)
-    #########################################
-    # Send goto Location Command
-    print("Starting goto Location Global Process")
+    print("Starting goto Location Process")
     success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION)
-    #########################################
-    # Send goto Attitude Command
-    print("Sending goto Attitude Control Message")
-    success = nepi_rbx.goto_rbx_pose(self,GOTO_POSE)
     #########################################
     # Run Mission Actions
     print("Starting Mission Actions")
@@ -177,10 +137,12 @@ class drone_inspection_demo_mission(object):
     ###########################
     # Start Your Custom Actions
     ###########################
-    ## Change Vehicle Mode to Guided
+    ## Send Snapshot Trigger
     success = True
-    print("Sending snapshot event trigger")
+    success = nepi_rbx.set_rbx_process_name(self,"SNAPSHOT EVENT")
+    rospy.loginfo("Sending snapshot event trigger")
     self.snapshot()
+    nepi.sleep(2,10)
     ###########################
     # Stop Your Custom Actions
     ###########################

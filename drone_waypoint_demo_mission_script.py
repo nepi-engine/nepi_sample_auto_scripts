@@ -1,27 +1,11 @@
 #!/usr/bin/env python
 #
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
+# Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
 #
-# This license applies to any user of NEPI Engine software
+# This file is part of nepi-engine
+# (see https://github.com/nepi-engine).
 #
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
 # Sample NEPI Mission Script.
@@ -66,7 +50,7 @@ GOTO_LOCATION = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = "/nepi/s2x/"
+NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
 
 #########################################
 # Node Class
@@ -115,7 +99,7 @@ class drone_waypoint_demo_mission(object):
     ###########################
     # Stop Your Custom Actions
     ###########################
-    print("Pre-Mission Actions Complete")
+    rospy.loginfo("Pre-Mission Actions Complete")
     return success
 
   ## Function for custom mission
@@ -128,7 +112,7 @@ class drone_waypoint_demo_mission(object):
     ###########################
     # Stop Your Custom Process
     ###########################
-    print("Mission Processes Complete")
+    rospy.loginfo("Mission Processes Complete")
     return success
 
   ## Function for custom mission actions
@@ -136,14 +120,16 @@ class drone_waypoint_demo_mission(object):
     ###########################
     # Start Your Custom Actions
     ###########################
-    ## Change Vehicle Mode to Guided
+    ## Send Snapshot Trigger
     success = True
-    print("Sending snapshot event trigger")
+    success = nepi_rbx.set_rbx_process_name(self,"SNAPSHOT EVENT")
+    rospy.loginfo("Sending snapshot event trigger")
     self.snapshot()
+    nepi.sleep(2,10)
     ###########################
     # Stop Your Custom Actions
     ###########################
-    print("Mission Actions Complete")
+    rospy.loginfo("Mission Actions Complete")
     return success
 
   ## Function for custom post-mission actions
@@ -160,7 +146,7 @@ class drone_waypoint_demo_mission(object):
     ###########################
     # Stop Your Custom Actions
     ###########################
-    print("Post-Mission Actions Complete")
+    rospy.loginfo("Post-Mission Actions Complete")
     return success
 
   #######################
@@ -174,9 +160,8 @@ class drone_waypoint_demo_mission(object):
 
   ### Function to send snapshot event trigger and wait for completion
   def snapshot(self):
-    global snapshot_trigger_pub
-    snapshot_trigger_pub.publish(Empty())
-    print("Snapshot trigger sent")
+    self.snapshot_trigger_pub.publish(Empty())
+    rospy.loginfo("Snapshot trigger sent")
 
   #######################
   # Node Cleanup Function
@@ -200,19 +185,22 @@ if __name__ == '__main__':
   
   #########################################
   # Run Pre-Mission Custom Actions
-  print("Starting Pre-goto Actions")
+  rospy.loginfo("Starting Pre-goto Actions")
   success = node.pre_mission_actions()
   #########################################
   # Start Mission
   #########################################
   # Send goto Location Command
-  print("Starting Mission Processes")
+  rospy.loginfo("Starting Mission Processes")
   success = node.mission()
+  # Run Mission Actions
+  rospy.loginfo("Starting Mission Actions")
+  succes = node.mission_actions()
   #########################################
   # End Mission
   #########################################
   # Run Post-Mission Actions
-  print("Starting Post-Goto Actions")
+  rospy.loginfo("Starting Post-Goto Actions")
   success = node.post_mission_actions()
   #########################################
   # Mission Complete, Shutting Down
