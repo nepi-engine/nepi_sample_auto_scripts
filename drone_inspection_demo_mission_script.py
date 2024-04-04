@@ -200,22 +200,24 @@ if __name__ == '__main__':
   node_class = eval(node_name)
   node = node_class()
   
-  #########################################
-  # Run Pre-Mission Custom Actions
-  print("Starting Pre-goto Actions")
-  success = node.pre_mission_actions()
-  #########################################
-  # Start Mission
-  #########################################
-  # Send goto Location Command
-  print("Starting Mission Processes")
-  success = node.mission()
-  #########################################
-  # End Mission
-  #########################################
-  # Run Post-Mission Actions
-  print("Starting Post-Goto Actions")
-  success = node.post_mission_actions()
+  while not rospy.is_shutdown():
+    #########################################
+    # Run Pre-Mission Custom Actions
+    print("Starting Pre-goto Actions")
+    success = node.pre_mission_actions()
+    #########################################
+    # Start Mission
+    #########################################
+    # Send goto Location Command
+    print("Starting Mission Processes")
+    success = node.mission()
+    #########################################
+    # End Mission
+    #########################################
+    # Run Post-Mission Actions
+    print("Starting Post-Goto Actions")
+    success = node.post_mission_actions()
+    nepi.sleep(10,100)
   #########################################
   # Mission Complete, Shutting Down
   rospy.signal_shutdown("Mission Complete, Shutting Down")

@@ -65,6 +65,7 @@ class ai_detector_config(object):
     rospy.loginfo("Found topic: " + image_topic)
     self.classifier_selection = ClassifierSelection(img_topic=image_topic, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
     ## Start Node Processes
+    nepi.sleep(1,10)
     rospy.loginfo("Starting object detector: " + str(self.start_classifier_pub.name))
     self.start_classifier_pub.publish(self.classifier_selection)
     ## Initiation Complete
