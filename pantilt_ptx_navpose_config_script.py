@@ -25,7 +25,6 @@ from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 # USER SETTINGS - Edit as Necessary 
 #########################################
 
-CONNECT_PTX_HEADING = True # Set to True to configure Heading to PTX Heading output
 SYNC_NEPI_CLOCK = False
 #########################################
 # ROS NAMESPACE SETUP
@@ -38,11 +37,8 @@ NEPI_PTX_NAMESPACE = NEPI_BASE_NAMESPACE + "iqr_pan_tilt/ptx/"
 
 # NavPose Source Topics
 NEPI_NAVPOSE_SOURCE_GPS_TOPIC = ""  # Enter "" to Ignore
-NEPI_NAVPOSE_SOURCE_ODOM_TOPIC = NEPI_PTX_NAMESPACE + "odom"
-if CONNECT_PTX_HEADING:
-  NEPI_NAVPOSE_SOURCE_HEADING_TOPIC = NEPI_PTX_NAMESPACE + "heading"
-else:
-  NEPI_NAVPOSE_SOURCE_HEADING_TOPIC = ""  # Enter "" to Ignore
+NEPI_NAVPOSE_SOURCE_ODOM_TOPIC = NEPI_PTX_NAMESPACE + "odometry"
+NEPI_NAVPOSE_SOURCE_HEADING_TOPIC = ""  # Enter "" to Ignore
 
 #########################################
 # Node Class
