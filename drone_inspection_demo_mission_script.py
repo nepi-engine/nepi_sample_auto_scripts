@@ -27,8 +27,8 @@
 import rospy
 import sys
 import time
-from resources import nepi
-from resources import nepi_rbx
+from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_rbx
 
 from std_msgs.msg import Empty, UInt8, Int8, Float32, Float64, Float64MultiArray
 
@@ -44,14 +44,14 @@ TAKEOFF_EXTRA_WAIT_TIME = 2
 # Altitude is specified as meters above the WGS-84 and converted to AMSL before sending
 # Yaw is specified in NED frame degrees 0-360 or +-180 
 GOTO_LOCATION = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
-GOTO_LOCATION_CORNERS =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999],[47.65397990,-122.31912330, -999, -999]]
+GOTO_LOCATION_CORNERS =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999]]
 
 #########################################
 # ROS NAMESPACE SETUP
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -96,7 +96,7 @@ class drone_inspection_demo_mission(object):
     success = nepi_rbx.set_rbx_state(self,"ARM")
     # Send Takeoff Command
     success=nepi_rbx.go_rbx_action(self,"TAKEOFF")
-    nepi.sleep(TAKEOFF_EXTRA_WAIT_TIME,20)
+    nepi_ros.sleep(TAKEOFF_EXTRA_WAIT_TIME,20)
     ###########################
     # Stop Your Custom Actions
     ###########################
@@ -119,7 +119,8 @@ class drone_inspection_demo_mission(object):
     success = self.mission_actions()
    #########################################
     # Send goto Location Loop Command
-    for ind in range(4):
+ 
+    for ind in range(3):
       # Send goto Location Command
       print("Starting goto Location Corners Process")
       success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION_CORNERS[ind])
@@ -142,7 +143,7 @@ class drone_inspection_demo_mission(object):
     success = nepi_rbx.set_rbx_process_name(self,"SNAPSHOT EVENT")
     rospy.loginfo("Sending snapshot event trigger")
     self.snapshot()
-    nepi.sleep(2,10)
+    nepi_ros.sleep(2,10)
     ###########################
     # Stop Your Custom Actions
     ###########################
@@ -159,7 +160,7 @@ class drone_inspection_demo_mission(object):
     #success = nepi_rbx.set_rbx_mode(self,"LOITER") # Uncomment to change to Loiter mode
     success = nepi_rbx.set_rbx_mode(self,"RTL") # Uncomment to change to home mode
     #success = nepi_rbx.set_rbx_mode(self,"RESUME") # Uncomment to return to last mode
-    nepi.sleep(1,10)
+    nepi_ros.sleep(1,10)
     ###########################
     # Stop Your Custom Actions
     ###########################
@@ -199,12 +200,11 @@ if __name__ == '__main__':
   rospy.loginfo("Launching node named: " + node_name)
   node_class = eval(node_name)
   node = node_class()
-  
-  while not rospy.is_shutdown():
-    #########################################
-    # Run Pre-Mission Custom Actions
-    print("Starting Pre-goto Actions")
-    success = node.pre_mission_actions()
+  #########################################
+  # Run Pre-Mission Custom Actions
+  print("Starting Pre-goto Actions")
+  success = node.pre_mission_actions()
+  while not rospy.is_shutdown(): 
     #########################################
     # Start Mission
     #########################################
@@ -212,15 +212,14 @@ if __name__ == '__main__':
     print("Starting Mission Processes")
     success = node.mission()
     #########################################
-    # End Mission
-    #########################################
-    # Run Post-Mission Actions
-    print("Starting Post-Goto Actions")
-    success = node.post_mission_actions()
-    nepi.sleep(10,100)
+  # End Mission
+  #########################################
+  # Run Post-Mission Actions
+  print("Starting Post-Goto Actions")
+  success = node.post_mission_actions()
   #########################################
   # Mission Complete, Shutting Down
-  rospy.signal_shutdown("Mission Complete, Shutting Down")
+  #rospy.signal_shutdown("Mission Complete, Shutting Down")
 
   #Set up node shutdown
   rospy.on_shutdown(node.cleanup_actions)

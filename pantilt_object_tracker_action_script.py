@@ -22,7 +22,7 @@ import sys
 import rospy
 import statistics
 import numpy as np
-from resources import nepi
+from nepi_edge_sdk_base import nepi_ros 
 
 from std_msgs.msg import UInt8, Empty, Float32
 from sensor_msgs.msg import Image
@@ -63,7 +63,7 @@ PTX_OBJ_CENTERED_BUFFER_RATIO = 0.15 # Hysteresis band about center of image for
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 
 #########################################
@@ -100,7 +100,7 @@ class pantilt_object_tracker_action(object):
     # Wait for ptx status topic to publish
     ptx_status_topic = "/ptx/status"
     rospy.loginfo("Waiting for topic name: " + ptx_status_topic)
-    ptx_topic=nepi.wait_for_topic(ptx_status_topic)
+    ptx_topic=nepi_ros.wait_for_topic(ptx_status_topic)
     PTX_NAMESPACE = (ptx_topic.rpartition("ptx")[0] + "ptx/")
     rospy.loginfo("Found ptx namespace: " + PTX_NAMESPACE)
     # PanTilt Status Topics
@@ -123,11 +123,11 @@ class pantilt_object_tracker_action(object):
     rospy.loginfo("Connecting to NEPI Detector Image Topic")
     rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
     rospy.loginfo("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-    nepi.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
+    nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
     img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, self.image_callback)
     while self.img_width == 0 and self.img_height == 0 and not rospy.is_shutdown():
       rospy.loginfo("Waiting for Classifier Detection Image")
-      nepi.sleep(1,100)
+      nepi_ros.sleep(1,100)
     img_sub.unregister() # Don't need it anymore
     ## Create Class Publishers
     self.send_pt_home_pub = rospy.Publisher(PTX_GOHOME_TOPIC, Empty, queue_size=10)

@@ -30,8 +30,8 @@ import rospy
 import sys
 import time
 import math
-from resources import nepi
-from resources import nepi_rbx
+from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_rbx
 
 from std_msgs.msg import Empty, UInt8, Int8, Float32, Float64, Float64MultiArray
 from sensor_msgs.msg import NavSatFix, Image
@@ -54,7 +54,7 @@ TRIGGER_RESET_DELAY_S = 1 # Min delay between triggers
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -77,7 +77,7 @@ class drone_follow_object_mission(object):
     # Wait for AI targeting detection topic and subscribe to it
     AI_TARGETING_TOPIC = "targeting/targeting_data"
     rospy.loginfo("Waiting for topic: " + AI_TARGETING_TOPIC)
-    ai_targeting_topic_name = nepi.wait_for_topic(AI_TARGETING_TOPIC)
+    ai_targeting_topic_name = nepi_ros.wait_for_topic(AI_TARGETING_TOPIC)
     rospy.loginfo("Starting move to object callback")
     rospy.Subscriber(ai_targeting_topic_name, TargetLocalization, self.move_to_object_callback, queue_size = 1)
     # Setup snapshot processes
@@ -107,7 +107,7 @@ class drone_follow_object_mission(object):
     self.snapshot()
     rospy.loginfo("Sending snapshot event trigger")
     rospy.loginfo("Waiting for " + str(SNAPSHOT_TIME_S) + " secs after trigger")
-    nepi.sleep(SNAPSHOT_TIME_S,100)
+    nepi_ros.sleep(SNAPSHOT_TIME_S,100)
     ###########################
     # Stop Your Custom Actions
     ###########################
@@ -167,7 +167,7 @@ class drone_follow_object_mission(object):
 ##        rospy.loginfo("Switching back to original mode")
 ##        nepi_rbx.set_rbx_mode(self,"RESUME")
         rospy.loginfo("Delaying next trigger for " + str(TRIGGER_RESET_DELAY_S) + " secs")
-        nepi.sleep(TRIGGER_RESET_DELAY_S,100)
+        nepi_ros.sleep(TRIGGER_RESET_DELAY_S,100)
         rospy.loginfo("Waiting for next " + OBJ_LABEL_OF_INTEREST + " detection")
       else:
         rospy.loginfo("No valid range value for target, skipping actions")

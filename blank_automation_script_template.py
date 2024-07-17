@@ -17,7 +17,7 @@
 import rospy
 import time
 import sys
-from resources import nepi
+from nepi_edge_sdk_base import nepi_ros 
 
 from std_msgs.msg import Empty, Float32
 
@@ -31,7 +31,7 @@ from std_msgs.msg import Empty, Float32
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class

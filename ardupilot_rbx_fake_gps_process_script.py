@@ -47,8 +47,8 @@ import sys
 import numpy as np
 import math
 import random
-from resources import nepi
-from resources import nepi_navpose
+from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_nav
 
 from std_msgs.msg import Empty, UInt8, Int8, Float32, Float64, Float64MultiArray, Header
 from mavros_msgs.msg import HilGPS, State
@@ -56,6 +56,7 @@ from geometry_msgs.msg import Point
 from geographic_msgs.msg import GeoPoint
 from mavros_msgs.srv import CommandHome
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
+from nepi_ros_interfaces.msg import RBXGotoPose, RBXGotoPosition, RBXGotoLocation
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
 #########################################
@@ -83,7 +84,7 @@ PRINT_LOCATION_1HZ = False # rospy.loginfo current location at 1Hz
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -116,12 +117,12 @@ class ardupilot_rbx_fake_gps_process(object):
     self.current_home_wgs84_geo.longitude =FAKE_GPS_START_GEOPOINT_WGS84[1]
     self.current_home_wgs84_geo.altitude = FAKE_GPS_START_GEOPOINT_WGS84[2]
     ## Define Class Namespaces
-    self.NEPI_NAVPOSE_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
+    self.nepi_nav_SERVICE_NAME = NEPI_BASE_NAMESPACE + "nav_pose_query"
     # MAVLINK Namespace
     # Find Mavlink Topic Name
     node_string = "mavlink_tty"
     rospy.loginfo("Waiting for node that includes string: " + node_string)
-    node_name = nepi.wait_for_node(node_string)
+    node_name = nepi_ros.wait_for_node(node_string)
     MAVLINK_NAMESPACE = (node_name + '/')
     rospy.loginfo("Found mavlink namespace: " + MAVLINK_NAMESPACE)
     # MAVLINK Fake GPS Publish Topic
@@ -147,7 +148,7 @@ class ardupilot_rbx_fake_gps_process(object):
     rospy.Timer(rospy.Duration(self.navpose_update_interval), self.update_current_heading_callback)
     while self.current_heading_deg is None and not rospy.is_shutdown():
       rospy.loginfo("Waiting for current heading from navpose service call")
-      nepi.sleep(1,10)
+      nepi_ros.sleep(1,10)
       #Start fake gps publish and print callbacks
       rospy.loginfo("Starting fake gps publishing to " + MAVLINK_HILGPS_TOPIC)
       rospy.Timer(rospy.Duration(self.gps_publish_interval_sec), self.mavlink_fake_gps_pub_callback)
@@ -155,7 +156,7 @@ class ardupilot_rbx_fake_gps_process(object):
     # Wait for rbx status topic to publish and get rbx namespace
     rbx_status_topic = "/rbx/status"
     rospy.loginfo("Waiting for rbx status message on topic: " + rbx_status_topic)
-    rbx_topic=nepi.wait_for_topic(rbx_status_topic)
+    rbx_topic=nepi_ros.wait_for_topic(rbx_status_topic)
     NEPI_RBX_NAMESPACE = (rbx_topic.rpartition("rbx")[0] + "rbx/")
     rospy.loginfo("Found rbx namespace: " + NEPI_RBX_NAMESPACE)
     rospy.loginfo("Found rbx status topic: " + rbx_topic)
@@ -167,8 +168,8 @@ class ardupilot_rbx_fake_gps_process(object):
     NEPI_RBX_GO_ACTION_TOPIC = NEPI_RBX_NAMESPACE + "go_action"  # Int to Defined Dictionary RBX_MODES
     NEPI_RBX_GET_TAKEOFF_M_TOPIC = NEPI_RBX_NAMESPACE + "get_takeoff_m"  # Float meters takeoff height
     #Start fake gps rbx control subscribers
-    rospy.Subscriber(NEPI_RBX_GOTO_POSITION_TOPIC, Float64MultiArray, self.rbx_goto_position_callback)
-    rospy.Subscriber(NEPI_RBX_GOTO_LOCATION_TOPIC, Float64MultiArray, self.rbx_goto_location_callback)
+    rospy.Subscriber(NEPI_RBX_GOTO_POSITION_TOPIC, RBXGotoPosition, self.rbx_goto_position_callback)
+    rospy.Subscriber(NEPI_RBX_GOTO_LOCATION_TOPIC, RBXGotoLocation, self.rbx_goto_location_callback)
     rospy.Subscriber(NEPI_RBX_SET_HOME_CURRENT_TOPIC, Empty, self.rbx_set_home_current_callback)
     rospy.Subscriber(NEPI_RBX_SET_MODE_TOPIC, UInt8, self.rbx_set_mode_callback)
     rospy.Subscriber(NEPI_RBX_GO_ACTION_TOPIC, UInt8, self.rbx_go_action_callback)
@@ -226,7 +227,7 @@ class ardupilot_rbx_fake_gps_process(object):
     rospy.loginfo('')
     rospy.loginfo(delta_geo)
     
-    move_dist_m = nepi_navpose.distance_geopoints(org_geo,new_geo)
+    move_dist_m = nepi_nav.distance_geopoints(org_geo,new_geo)
     move_time = MOVE_UPDATE_TIME_SEC_PER_METER * move_dist_m
     move_steps = move_time * GPS_PUB_RATE_HZ
     stp_interval_sec = float(move_time)/float(move_steps)
@@ -253,7 +254,7 @@ class ardupilot_rbx_fake_gps_process(object):
         rospy.loginfo("")
         rospy.loginfo("Updated to")
         rospy.loginfo(self.current_location_wgs84_geo)
-        current_error_m = nepi_navpose.distance_geopoints(cur_geo,new_geo)
+        current_error_m = nepi_nav.distance_geopoints(cur_geo,new_geo)
         rospy.loginfo("Current move error : " + "%.2f" % (current_error_m) + " meters")
         rospy.loginfo_timer=0
     rospy.loginfo('')
@@ -300,7 +301,7 @@ class ardupilot_rbx_fake_gps_process(object):
     self.fake_gps_enabled = False
     rospy.loginfo("Waiting for GPS to reset")  
     self.fake_gps_enabled = False
-    nepi.sleep(10,100)
+    nepi_ros.sleep(10,100)
     self.fake_gps_enabled = True
 
 
@@ -318,7 +319,7 @@ class ardupilot_rbx_fake_gps_process(object):
   def update_current_heading_callback(self,timer):
     # Get current NEPI NavPose data from NEPI ROS nav_pose_query service call
     try:
-      get_navpose_service = rospy.ServiceProxy(self.NEPI_NAVPOSE_SERVICE_NAME, NavPoseQuery)
+      get_navpose_service = rospy.ServiceProxy(self.nepi_nav_SERVICE_NAME, NavPoseQuery)
       nav_pose_response = get_navpose_service(NavPoseQueryRequest())
       self.current_heading_deg = nav_pose_response.nav_pose.heading.heading
       #rospy.loginfo('')
@@ -335,9 +336,9 @@ class ardupilot_rbx_fake_gps_process(object):
     rospy.loginfo("Recieved GoTo Position Message")
     rospy.loginfo("")
     rospy.loginfo(position_cmd_msg)
-    new_position = position_cmd_msg.data
+    new_position = [position_cmd_msg.x_meters,position_cmd_msg.y_meters,position_cmd_msg.z_meters,yaw_cmd_msg.roll_deg]
     rospy.loginfo("Sending Fake GPS Setpoint Position Update")
-    new_geopoint_wgs84=nepi_navpose.get_geopoint_at_body_point(self.current_location_wgs84_geo, \
+    new_geopoint_wgs84=nepi_nav.get_geopoint_at_body_point(self.current_location_wgs84_geo, \
                                                   self.current_heading_deg, new_position)    
     self.mavlink_fake_gps_move(new_geopoint_wgs84)
 
@@ -348,7 +349,7 @@ class ardupilot_rbx_fake_gps_process(object):
     rospy.loginfo("Recieved GoTo Location Message")
     rospy.loginfo("")
     rospy.loginfo(location_cmd_msg)
-    new_location = location_cmd_msg.data
+    new_location = [location_cmd_msg.lat,location_cmd_msg.long,location_cmd_msg.altitude_meters,location_cmd_msg.yaw_deg]
     new_geopoint_wgs84=GeoPoint()
     new_geopoint_wgs84.latitude = new_location[0]
     new_geopoint_wgs84.longitude = new_location[1]

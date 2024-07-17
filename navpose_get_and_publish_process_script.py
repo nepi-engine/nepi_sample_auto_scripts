@@ -47,8 +47,8 @@ import math
 import time
 import sys
 import tf
-from resources import nepi
-from resources import nepi_navpose
+from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_nav
 
 from std_msgs.msg import Bool, String, Float64, Float64MultiArray
 from nav_msgs.msg import Odometry
@@ -69,7 +69,7 @@ NAVPOSE_PUB_RATE_HZ = 10
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -129,27 +129,27 @@ class navpose_get_and_publish_process(object):
       # Get current navpose
       current_navpose = nav_pose_response.nav_pose
       # Get current heading in degrees
-      current_heading_deg = nepi_navpose.get_navpose_heading_deg(nav_pose_response)
+      current_heading_deg = nepi_nav.get_navpose_heading_deg(nav_pose_response)
       # Get current orientation vector (roll, pitch, yaw) in degrees enu frame
       current_orientation_enu_degs = Float64MultiArray()
-      current_orientation_enu_degs.data = nepi_navpose.get_navpose_orientation_enu_degs(nav_pose_response)
+      current_orientation_enu_degs.data = nepi_nav.get_navpose_orientation_enu_degs(nav_pose_response)
       # Get current orientation vector (roll, pitch, yaw) in degrees ned frame +-180
       current_orientation_ned_degs = Float64MultiArray()
-      current_orientation_ned_degs.data = nepi_navpose.get_navpose_orientation_ned_degs(nav_pose_response)
+      current_orientation_ned_degs.data = nepi_nav.get_navpose_orientation_ned_degs(nav_pose_response)
       # Get current position vector (x, y, z) in meters enu frame
       current_position_enu_m = Float64MultiArray()
-      current_position_enu_m.data = nepi_navpose.get_navpose_position_enu_m(nav_pose_response)
+      current_position_enu_m.data = nepi_nav.get_navpose_position_enu_m(nav_pose_response)
       # Get current position vector (x, y, z) in meters ned frame
       current_position_ned_m = Float64MultiArray()
-      current_position_ned_m.data = nepi_navpose.get_navpose_position_ned_m(nav_pose_response)
+      current_position_ned_m.data = nepi_nav.get_navpose_position_ned_m(nav_pose_response)
       # Get current location vector (lat, long, alt) in geopoint data with WGS84 height
       current_location_wgs84_geo = Float64MultiArray()
-      current_location_wgs84_geo.data =  nepi_navpose.get_navpose_location_wgs84_geo(nav_pose_response)  
+      current_location_wgs84_geo.data =  nepi_nav.get_navpose_location_wgs84_geo(nav_pose_response)  
       # Get current location vector (lat, long, alt) in geopoint data with AMSL height
       current_location_amsl_geo = Float64MultiArray()
-      current_location_amsl_geo.data =  nepi_navpose.get_navpose_location_amsl_geo(nav_pose_response)
+      current_location_amsl_geo.data =  nepi_nav.get_navpose_location_amsl_geo(nav_pose_response)
       # Get current geoid heihgt
-      current_geoid_height =  nepi_navpose.get_navpose_geoid_height(nav_pose_response)
+      current_geoid_height =  nepi_nav.get_navpose_geoid_height(nav_pose_response)
       # Publish new current navpose data
       self.navpose_navpose_pub.publish(current_navpose)
       self.navpose_heading_pub.publish(current_heading_deg)
@@ -161,7 +161,7 @@ class navpose_get_and_publish_process(object):
       self.navpose_location_wgs84_pub.publish(current_location_wgs84_geo)
       self.navpose_geoid_height_pub.publish(current_geoid_height)
     except rospy.ServiceException as e:
-      rospy.loginfo("Service call failed: %s"%e)
+      rospy.loginfo("Service call failed: " + str(e))
       time.sleep(1)
       rospy.signal_shutdown("Service call failed")
 

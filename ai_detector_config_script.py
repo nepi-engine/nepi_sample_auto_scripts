@@ -17,7 +17,7 @@
 import time
 import sys
 import rospy
-from resources import nepi
+from nepi_edge_sdk_base import nepi_ros 
 
 from sensor_msgs.msg import Image
 from std_msgs.msg import UInt8, Empty, String, Bool
@@ -39,7 +39,7 @@ DETECTION_THRESHOLD = 0.5
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -61,11 +61,10 @@ class ai_detector_config(object):
     ## Start Class Subscribers
     # Wait for image topic to publish
     rospy.loginfo("Waiting for topic name: " + IMAGE_INPUT_TOPIC_NAME)
-    image_topic=nepi.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
+    image_topic=nepi_ros.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
     rospy.loginfo("Found topic: " + image_topic)
     self.classifier_selection = ClassifierSelection(img_topic=image_topic, classifier=DETECTION_MODEL, detection_threshold=DETECTION_THRESHOLD)
     ## Start Node Processes
-    nepi.sleep(1,10)
     rospy.loginfo("Starting object detector: " + str(self.start_classifier_pub.name))
     self.start_classifier_pub.publish(self.classifier_selection)
     ## Initiation Complete

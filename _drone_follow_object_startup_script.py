@@ -16,7 +16,7 @@
 import rospy
 import sys
 import time
-from resources import nepi
+from nepi_edge_sdk_base import nepi_ros 
 
 #########################################
 # USER SETTINGS - Edit as Necessary 
@@ -34,7 +34,7 @@ SCRIPT_LIST = ["ardupilot_rbx_driver_script.py",
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -46,10 +46,10 @@ class drone_follow_object_startup(object):
   ### Node Initialization
   def __init__(self):
     rospy.loginfo("Starting Initialization Processes")
-    nepi.startup_script_initialize(self,NEPI_BASE_NAMESPACE)
+    nepi_ros.startup_script_initialize(self,NEPI_BASE_NAMESPACE)
     rospy.loginfo("Initialization Complete")
     # Launch scripts from list
-    nepi.launch_scripts(SCRIPT_LIST,self.launch_script_service,self.get_installed_scripts_service, \
+    nepi_ros.launch_scripts(SCRIPT_LIST,self.launch_script_service,self.get_installed_scripts_service, \
                         self.get_running_scripts_service)
     ## Initiation Complete
     rospy.loginfo("Initialization Complete")
@@ -64,7 +64,7 @@ class drone_follow_object_startup(object):
   def cleanup_actions(self):
     rospy.loginfo("Shutting down: Executing script cleanup actions")
     # Stop scripts from list
-    nepi.stop_scripts(SCRIPT_LIST,self.stop_script_service,self.get_installed_scripts_service, \
+    nepi_ros.stop_scripts(SCRIPT_LIST,self.stop_script_service,self.get_installed_scripts_service, \
                       self.get_running_scripts_service,self.scripts_running_at_start)
 
 

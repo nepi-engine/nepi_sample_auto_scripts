@@ -27,8 +27,8 @@
 import rospy
 import sys
 import time
-from resources import nepi
-from resources import nepi_rbx
+from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_rbx
 
 from std_msgs.msg import Empty, UInt8, Int8, Float32, Float64, Float64MultiArray
 
@@ -50,7 +50,7 @@ GOTO_LOCATION = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -95,7 +95,7 @@ class drone_waypoint_demo_mission(object):
     success = nepi_rbx.set_rbx_state(self,"ARM")
     # Send Takeoff Command
     success=nepi_rbx.go_rbx_action(self,"TAKEOFF")
-    nepi.sleep(TAKEOFF_EXTRA_WAIT_TIME,20)
+    nepi_ros.sleep(TAKEOFF_EXTRA_WAIT_TIME,20)
     ###########################
     # Stop Your Custom Actions
     ###########################
@@ -125,7 +125,7 @@ class drone_waypoint_demo_mission(object):
     success = nepi_rbx.set_rbx_process_name(self,"SNAPSHOT EVENT")
     rospy.loginfo("Sending snapshot event trigger")
     self.snapshot()
-    nepi.sleep(2,10)
+    nepi_ros.sleep(2,10)
     ###########################
     # Stop Your Custom Actions
     ###########################
@@ -142,7 +142,7 @@ class drone_waypoint_demo_mission(object):
     #success = nepi_rbx.set_rbx_mode(self,"LOITER") # Uncomment to change to Loiter mode
     success = nepi_rbx.set_rbx_mode(self,"RTL") # Uncomment to change to home mode
     #success = nepi_rbx.set_rbx_mode(self,"RESUME") # Uncomment to return to last mode
-    nepi.sleep(1,10)
+    nepi_ros.sleep(1,10)
     ###########################
     # Stop Your Custom Actions
     ###########################

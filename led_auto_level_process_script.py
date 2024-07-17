@@ -20,7 +20,7 @@ import rospy
 import numpy as np
 from numpy.linalg import norm
 import cv2
-from resources import nepi
+from nepi_edge_sdk_base import nepi_ros 
 
 from std_msgs.msg import Float32
 from sensor_msgs.msg import Image
@@ -48,7 +48,7 @@ LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -73,14 +73,14 @@ class led_auto_level_process(object):
     ## Create Class Publishers
     led_control_topic_name = LED_CONTROL_TOPIC_NAME
     rospy.loginfo("Waiting for topic name: " + led_control_topic_name)
-    led_control_topic=nepi.wait_for_topic(led_control_topic_name)
+    led_control_topic=nepi_ros.wait_for_topic(led_control_topic_name)
 
     rospy.loginfo("Found topic: " + led_control_topic)
     self.led_intensity_pub = rospy.Publisher(led_control_topic, Float32, queue_size = 1)
     ## Start Class Subscribers
     # Wait for topic
     rospy.loginfo("Waiting for topic: " + IMAGE_INPUT_TOPIC_NAME)
-    image_topic = nepi.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
+    image_topic = nepi_ros.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
     # Start image contours overlay process and pubslisher
     rospy.Subscriber(image_topic, Image, self.image_brightness_callback, queue_size = 1)
     # Start regular print callback

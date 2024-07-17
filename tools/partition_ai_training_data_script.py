@@ -1,36 +1,20 @@
 #!/usr/bin/env python
 #
-# NEPI Dual-Use License
-# Project: nepi_sample_auto_scripts
+# Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
 #
-# This license applies to any user of NEPI Engine software
+# This file is part of nepi-engine
+# (see https://github.com/nepi-engine).
 #
-# Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
-#
-# This software is dual-licensed under the terms of either a NEPI software developer license
-# or a NEPI software commercial license.
-#
-# The terms of both the NEPI software developer and commercial licenses
-# can be found at: www.numurus.com/licensing-nepi-engine
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - https://www.numurus.com/licensing-nepi-engine
-# - mailto:nepi@numurus.com
-#
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
-# Sample AI training data partioning script. 
+# Sample AI training data partitioning script. 
 # Uses onboard python libraries to
 # 1. Search all of the subfolders in the same folder as the script
 # for labeled image data
-# 2) Create radomized AI model train and test data pointer files
+# 2) Create randomized AI model train and test data pointer files
 # in the same folder as the script named "data_train.txt" and "data_test.txt"
-# based on user set partioning percentages
+# based on user set partitioning percentages
 
 import os
 from os.path import exists
@@ -44,6 +28,7 @@ import random
 # SETUP - Edit as Necessary 
 ##########################################
 TEST_DATA_PERCENTAGE = 20
+LABEL_FILE_TYPE_EXT = 'txt'
 
 ##########################################
 # Methods
@@ -61,7 +46,7 @@ def add_data_set(image_dir,f_train,f_test,f_unlabeled):
         #print('Found image file"')
         image_file = (image_dir + '/' + f)
         #print(image_file)
-        label_file = (image_dir + '/' + f.split(".png")[0]+'.xml')
+        label_file = (image_dir + '/' + f.split(".png")[0]+ '.' + LABEL_FILE_TYPE_EXT)
         #print('Looking for label file:')
         #print(label_file)
         if exists(label_file):

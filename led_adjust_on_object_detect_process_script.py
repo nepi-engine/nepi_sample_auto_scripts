@@ -22,7 +22,7 @@ import sys
 import rospy
 import statistics
 import numpy as np
-from resources import nepi
+from nepi_edge_sdk_base import nepi_ros 
 
 from std_msgs.msg import Empty, Float32
 from sensor_msgs.msg import Image
@@ -46,7 +46,7 @@ LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 
 #########################################
@@ -82,16 +82,16 @@ class led_adjust_on_object_detect_process(object):
     rospy.loginfo("Connecting to NEPI Detector Image Topic")
     rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
     rospy.loginfo("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-    nepi.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
+    nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
     img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, self.image_callback)
     while self.img_width == 0 and self.img_height == 0 and not rospy.is_shutdown():
       rospy.loginfo("Waiting for Classifier Detection Image")
-      nepi.sleep(1,100)
+      nepi_ros.sleep(1,100)
     img_sub.unregister() # Don't need it anymore
     ## Create Class Publishers
     led_control_topic_name = LED_CONTROL_TOPIC_NAME
     rospy.loginfo("Waiting for topic name: " + led_control_topic_name)
-    led_control_topic=nepi.wait_for_topic(led_control_topic_name)
+    led_control_topic=nepi_ros.wait_for_topic(led_control_topic_name)
     rospy.loginfo("Found topic: " + led_control_topic)
     self.led_intensity_pub = rospy.Publisher(led_control_topic, Float32, queue_size = 1)
     ## Start Class Subscribers

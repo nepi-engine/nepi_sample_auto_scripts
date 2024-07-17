@@ -29,8 +29,8 @@
 import rospy
 import sys
 import time
-from resources import nepi
-from resources import nepi_rbx
+from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_rbx
 
 from std_msgs.msg import Empty, UInt8, Int8, Float32, Float64, Float64MultiArray
 from sensor_msgs.msg import NavSatFix, Image
@@ -54,7 +54,7 @@ TRIGGER_RESET_DELAY_S = 10 # Min delay between triggers
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -82,7 +82,7 @@ class drone_detect_loiter_snapshot_mission(object):
     rospy.loginfo("Connecting to NEPI Detector Image Topic")
     rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
     rospy.loginfo("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-    ai_image_topic_name = nepi.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
+    ai_image_topic_name = nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
     img_sub = rospy.Subscriber(ai_image_topic_name, Image, self.ai_image_callback)
     while self.img_width == 0 and self.img_height == 0:
       rospy.loginfo("Waiting for Classifier Detection Image")
@@ -115,7 +115,7 @@ class drone_detect_loiter_snapshot_mission(object):
     success = nepi_rbx.set_rbx_process_name(self,"SNAPSHOT EVENT")
     self.snapshot()
     rospy.loginfo("Waiting for " + str(SNAPSHOT_TIME_S) + " secs after trigger")
-    nepi.sleep(SNAPSHOT_TIME_S,100)
+    nepi_ros.sleep(SNAPSHOT_TIME_S,100)
     ###########################
     # Stop Your Custom Actions
     ###########################
@@ -176,7 +176,7 @@ class drone_detect_loiter_snapshot_mission(object):
             success = nepi_rbx.set_rbx_mode(self,"RESUME")
             #########################################
             rospy.loginfo("Delaying next trigger for " + str(TRIGGER_RESET_DELAY_S) + " secs")
-            nepi.sleep(TRIGGER_RESET_DELAY_S,100)
+            nepi_ros.sleep(TRIGGER_RESET_DELAY_S,100)
             self.reset_delay_timer = 0
             self.last_reset_time = time.time()
             rospy.loginfo("Waiting for AI Object Detection")

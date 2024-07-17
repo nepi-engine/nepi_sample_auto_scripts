@@ -19,7 +19,8 @@ import sys
 import rospy
 import numpy as np
 import cv2
-from resources import nepi
+from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_img
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
@@ -38,7 +39,7 @@ IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -61,7 +62,7 @@ class opencv_image_contours_process(object):
     ## Start Class Subscribers
     # Wait for topic
     rospy.loginfo("Waiting for topic: " + IMAGE_INPUT_TOPIC_NAME)
-    image_topic = nepi.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
+    image_topic = nepi_ros.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
     # Start image contours overlay process and pubslisher
     rospy.Subscriber(image_topic, Image, self.image_custom_callback, queue_size = 1)
     ## Start Node Processes
@@ -72,38 +73,19 @@ class opencv_image_contours_process(object):
   ### Node Methods
 
   ### Add your CV2 image customization code here
-  def image_custom_callback(self,img_msg):
+  def image_custom_callback(self,ros_img_msg):
     #Convert image from ros to cv2
-    bridge = CvBridge()
-    cv_image = bridge.imgmsg_to_cv2(img_msg, "bgr8")
-    # Get contours
-    cv_image.setflags(write=1)
-    cv_image_gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-    ret, thresh2 = cv2.threshold(cv_image_gray, 150, 255, cv2.THRESH_BINARY)
-    contours3, hierarchy3 = cv2.findContours(thresh2, cv2.RETR_LIST, 
-                                         cv2.CHAIN_APPROX_NONE)
-    # Add contours as overlay
-    cv2.drawContours(cv_image, contours3, -1, (0, 255, 0), 2, 
-                   cv2.LINE_AA)
-    # Add text overlay
-    font                   = cv2.FONT_HERSHEY_SIMPLEX
-    bottomLeftCornerOfText = (10,10)
-    fontScale              = 0.5
-    fontColor              = (0, 255, 0)
-    thickness              = 1
-    lineType               = 1
-    cv2.putText(cv_image,'Image with Contours', 
-      bottomLeftCornerOfText, 
-      font, 
-      fontScale,
-      fontColor,
-      thickness,
-      lineType)
+    cv2_image = nepi_img.rosimg_2_cv2img(ros_img_msg)
+
+    # Get and overlay image contours
+    [contours, hierarchy] = nepi_img.cv2_get_contours(cv2_image)
+    cv2_image = nepi_img.cv2_overlay_contours(cv2_image,contours)
+ 
     #Convert image from cv2 to ros
-    img_out_msg = bridge.cv2_to_imgmsg(cv_image,"bgr8")#desired_encoding='passthrough')
+    ros_img_out_msg = nepi_img.cv2img_to_rosimg(cv2_image)
     # Publish new image to ros
     if not rospy.is_shutdown():
-      self.contour_image_pub.publish(img_out_msg) # You can view the enhanced_2D_image
+      self.contour_image_pub.publish(ros_img_out_msg) # You can view the enhanced_2D_image
 
   #######################
   # Node Cleanup Function

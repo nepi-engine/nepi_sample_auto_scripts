@@ -27,7 +27,7 @@ import sys
 import rospy
 import numpy as np
 import cv2
-from resources import nepi
+from nepi_edge_sdk_base import nepi_ros 
 
 from sensor_msgs.msg import Image
 from rospy.numpy_msg import numpy_msg
@@ -58,7 +58,7 @@ FOV_HORZ_DEG=110 # Camera Horizontal Field of View (FOV)
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -90,19 +90,19 @@ class ai_3d_targeting_process(object):
     print("Starting Initialization")
     # Wait for topic by name
     print("Waiting for topic name: " + IMAGE_INPUT_TOPIC_NAME)
-    image_topic=nepi.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
+    image_topic=nepi_ros.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
     print("Found topic: " + image_topic)
     rospy.Subscriber(image_topic, Image, self.object_targeting_callback, queue_size = 1)
     print("Initialization Complete")
     # Wait for topic by name
     print("Waiting for topic name: " + DEPTH_MAP_INPUT_TOPIC_NAME)
-    depth_map_topic=nepi.wait_for_topic(DEPTH_MAP_INPUT_TOPIC_NAME)
+    depth_map_topic=nepi_ros.wait_for_topic(DEPTH_MAP_INPUT_TOPIC_NAME)
     print("Found topic: " + depth_map_topic)
     rospy.Subscriber(depth_map_topic, numpy_msg(Image), self.get_depth_data_callback, queue_size = 1)
     print("Starting targeteting subscriber")
     # Wait for topic
     print("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-    nepi.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
+    nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
     # Start Subscriber Topics
     print("Starting found object subscriber")
     rospy.Subscriber(FOUND_OBJECT_TOPIC, ObjectCount, self.found_object_callback, queue_size = 1)

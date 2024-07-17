@@ -21,8 +21,8 @@ import math
 import tf
 import time
 import sys
-from resources import nepi
-from resources import nepi_navpose
+from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_nav
 
 from std_msgs.msg import Float64, Empty
 from sensor_msgs.msg import NavSatFix
@@ -43,7 +43,7 @@ START_ORIENTATION_DEGS = [10.0,20.0,30.0]
 #########################################
 
 # ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi.get_base_namespace()
+NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
@@ -79,7 +79,7 @@ class navpose_set_fixed_config(object):
     heading_pub.publish(data=heading)
     orientation_pub = rospy.Publisher(SET_NAVPOSE_FIXED_ORIENTATION_TOPIC, QuaternionStamped, queue_size=1)
     rospy.sleep(1) # VERY IMPORTANT - Sleep a bit between declaring a publisher and using it subscribers have time to subscribe
-    current_orientation_quat = nepi_navpose.convert_rpy2quat(START_ORIENTATION_DEGS)
+    current_orientation_quat = nepi_nav.convert_rpy2quat(START_ORIENTATION_DEGS)
     new_quat = Quaternion()
     new_quat.x = current_orientation_quat[0]
     new_quat.y = current_orientation_quat[1]
