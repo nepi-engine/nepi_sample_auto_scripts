@@ -52,7 +52,7 @@ AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
 AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
 
 # Snapshot Publish Topic
-EVENT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "event_trigger"
+EVENT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_trigger"
 
 #########################################
 # Globals

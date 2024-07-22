@@ -22,11 +22,9 @@ from nepi_edge_sdk_base import nepi_ros
 # USER SETTINGS - Edit as Necessary 
 #########################################
 
-SCRIPT_LIST = ["ardupilot_rbx_driver_script.py",
-                "ardupilot_rbx_fake_gps_process_script.py",
-                "ai_detector_config_script.py",
+SCRIPT_LIST = [ "ai_detector_config_script.py",
                 "ai_3d_targeting_process_script.py",
-               	"drone_follow_object_mission_script.py"] #  Script filenames to start/stop
+                "drone_follow_object_mission_script.py"] #  Script filenames to start/stop
 
 
 #########################################

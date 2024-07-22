@@ -1,0 +1,34 @@
+# Nav/Pose Data File
+start_time: 2024-07-10T232757.277
+ 
+     gps:
+       timestamp: 1720653091.111125
+       status: NO FIX
+       service: GPS
+       latitude: 0.000000
+       longitude: 0.000000
+       altitude: 0.000000
+     odometry:
+       timestamp: 1720654077.001453
+       source_frame: odom
+       position:
+          x: 0.201021
+          y: -0.591746
+          z: -0.005676
+       orientation:
+          quaternion_x: -0.025068
+          quaternion_y: -0.051555
+          quaternion_z: 0.180543
+          quaternion_w: 0.981895
+       linear_velocity:
+          x: 0.000000
+          y: 0.000000
+          z: 0.000000
+       angular_velocity:
+          x: 0.000000
+          y: 0.000000
+          z: 0.000000
+     heading:
+       timestamp: 1720653091.111125
+       deg: 0.000000
+       ref: magnetic

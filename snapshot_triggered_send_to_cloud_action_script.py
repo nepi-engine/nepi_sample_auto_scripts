@@ -45,7 +45,7 @@ NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 # Node Class
 #########################################
 
-class event_triggered_send_to_cloud_action(object):
+class snapshot_triggered_send_to_cloud_action(object):
 
   #######################
   ### Node Initialization
@@ -58,7 +58,7 @@ class event_triggered_send_to_cloud_action(object):
     NEPI_LINK_COLLECT_DATA_TOPIC = NEPI_LINK_NAMESPACE + "lb/create_data_set_now"
     NEPI_LINK_CONNECT_TOPIC = NEPI_LINK_NAMESPACE + "connect_now"
     ## Define Class Namespaces
-    EVENT_TOPIC = NEPI_BASE_NAMESPACE + "event_trigger"
+    EVENT_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_trigger"
     ## Define Class Services Calls
     ## Create Class Sevices    
     ## Create Class Publishers
