@@ -15,8 +15,7 @@
 
 
 #ToDo
-#- Figure out why no pointcloud data is showing up in rendered image. Maybe frame or center vector value issues?
-#- Fix pc min and max range functions in nepi_pc. Then use during the render process
+#- Figure out why no pointcloud data is showing up in rendered image when process clipping is disabled. 
 #- Create add_pointclouds function in nepi_pc.py that supports combining bw and rgb pointclouds and replace in node Add process
 #- Implement age_filter before pointcloud combine process
 #- Apply transforms to each point cloud before combining
@@ -72,7 +71,7 @@ Factory_Combine_Option = 'Add'
 Factory_Frame_3d = 'primary_pc_frame'
 Factory_Age_Filter_S = 10.0
 
-Factory_Clip_Range_Enabled = False
+Factory_Clip_Range_Enabled = True
 Factory_Clip_Min_Range_M = 0
 Factory_Clip_Max_Range_M = 20
 Factory_Voxel_DownSample_Size = 0.0 # Zero value skips process
@@ -188,8 +187,12 @@ class pointcloud_app(object):
     rospy.loginfo(msg)
     pc_topic = msg.data
     pc_topics = rospy.get_param('~pc_app/selected_pointclouds',self.init_selected_pointclouds)
+    add_topic = False
     if nepi_ros.check_for_topic(pc_topic):
       if pc_topic not in pc_topics:
+        add_topic = True
+      if add_topic:
+        rospy.loginfo("Adding Pointcloud topic to registered topics: " + pc_topic)
         pc_topics.append(pc_topic)
     rospy.set_param('~pc_app/selected_pointclouds',pc_topics)
     self.publish_selection_status()
@@ -198,7 +201,11 @@ class pointcloud_app(object):
     rospy.loginfo(msg)
     pc_topic = msg.data
     pc_topics = rospy.get_param('~pc_app/selected_pointclouds',self.init_selected_pointclouds)
+    remove_topic = False
     if pc_topic in pc_topics:
+      remove_topic = True
+    if remove_topic:
+      rospy.loginfo("Removing Pointcloud topic from registered topics: " + pc_topic)
       pc_topics.remove(pc_topic)
     rospy.set_param('~pc_app/selected_pointclouds',pc_topics)
     self.publish_selection_status()
@@ -210,7 +217,7 @@ class pointcloud_app(object):
     if pc_topic in pc_topics:
       rospy.set_param('~pc_app/primary_pointcloud',pc_topic)
     else:
-      rospy.loginfo("Ignoring Set Primary Pointcloud as it is not in selected list")
+      rospy.loginfo("PC_APP Ignoring Set Primary Pointcloud as it is not in selected list")
     self.publish_selection_status()
 
   def setAgeFilterCb(self,msg):
@@ -455,7 +462,7 @@ class pointcloud_app(object):
   ### Node Initialization
   def __init__(self):
    
-    rospy.loginfo("Starting Initialization Processes")
+    rospy.loginfo("PC_APP Starting Initialization Processes")
     self.initParamServerValues(do_updates = False)
     self.resetParamServer(do_updates = False)
    
@@ -488,7 +495,7 @@ class pointcloud_app(object):
 
     # Pointcloud Process Setup ########################################################
     proc_reset_controls_sub = rospy.Subscriber("~process/reset_controls", Empty, self.resetProcessControlsCb, queue_size = 10)
-    proc_range_clip_sub = rospy.Subscriber('~process/clip_range_enabled', Bool, self.rangeClipEnableCb, queue_size = 10)
+    proc_range_clip_sub = rospy.Subscriber('~process/set_clip_range_enable', Bool, self.rangeClipEnableCb, queue_size = 10)
     proc_range_meters_sub = rospy.Subscriber('~process/set_range_clip_m', RangeWindow, self.setRangeMetersCb, queue_size = 10)
     proc_set_clip_box_topic_sub = rospy.Subscriber('~set_clip_bounding_box3d_topic', String, self.setClipBoxTopicCb, queue_size = 10)
     proc_voxel_downsample_size_sub = rospy.Subscriber("~process/set_voxel_downsample_size", Float32, self.setVoxelSizeCb, queue_size = 10)
@@ -532,7 +539,7 @@ class pointcloud_app(object):
     rospy.Timer(rospy.Duration(self.update_data_products_interval_sec), self.updateDataProductsThread)
 
     ## Initiation Complete
-    rospy.loginfo("Initialization Complete")
+    rospy.loginfo("PC_APP Initialization Complete")
 
 
   #######################
@@ -551,6 +558,7 @@ class pointcloud_app(object):
     pass
 
   def initParamServerValues(self,do_updates = True):
+      rospy.loginfo("PC_APP Reseting param values to init values")
       self.init_selected_pointclouds = rospy.get_param('~pc_app/selected_pointclouds', [])
       self.init_primary_pointcloud = rospy.get_param('~pc_app/primary_pointcloud', "None")
       self.init_age_filter_s = rospy.get_param('~pc_app/age_filter_s', Factory_Age_Filter_S)
@@ -661,12 +669,9 @@ class pointcloud_app(object):
     status_msg.image_height = rospy.get_param('~pc_app/render/image_height', self.init_image_height)
 
     range_meters = RangeWindow()
-    if rospy.get_param('~pc_app/process/clip_range_enabled', self.init_proc_clip_range_enabled ):
-      range_meters.start_range =  rospy.get_param('~pc_app/process/range_min_m', self.init_proc_range_min_m)
-      range_meters.stop_range =   rospy.get_param('~pc_app/process/range_max_m', self.init_proc_range_max_m)
-    else:
-      range_meters.start_range =  self.clip_min_range_m
-      range_meters.stop_range =   self.clip_max_range_m
+    range_meters.start_range =  rospy.get_param('~pc_app/process/range_min_m', self.init_proc_range_min_m)
+    range_meters.stop_range =   rospy.get_param('~pc_app/process/range_max_m', self.init_proc_range_max_m)
+
     status_msg.range_min_max_m = range_meters
 
     range_ratios = RangeWindow()
@@ -712,26 +717,28 @@ class pointcloud_app(object):
     # Subscribe to topic pointcloud topics if not subscribed
     sel_topics = rospy.get_param('~pc_app/selected_pointclouds',self.init_selected_pointclouds)
     for sel_topic in sel_topics:
-      if sel_topic not in self.pc_subs_dict.keys():
+      if sel_topic != "" and sel_topic not in self.pc_subs_dict.keys():
         if nepi_ros.check_for_topic(sel_topic):
           topic_uid = sel_topic.replace('/','')
           exec('self.' + topic_uid + '_pc = None')
           exec('self.' + topic_uid + '_timestamp = None')
           exec('self.' + topic_uid + '_frame = None')
           exec('self.' + topic_uid + '_lock = threading.Lock()')
-          pc_sub = rospy.Subscriber(sel_topic, PointCloud2, lambda msg: self.pointcloudCb(msg, topic_uid), queue_size = 10)
+          rospy.loginfo("Subscribing to topic: " + sel_topic)
+          rospy.loginfo("with topic_uid: " + topic_uid)
+          pc_sub = rospy.Subscriber(sel_topic, PointCloud2, lambda msg: self.pointcloudCb(msg, sel_topic), queue_size = 10)
           self.pc_subs_dict[sel_topic] = pc_sub
-          rospy.loginfo("Pointcloud: " + sel_topic + " registered")
+          rospy.loginfo("PC_APP Pointcloud: " + sel_topic + " registered")
     # Unregister pointcloud subscribers if not in selected pointclouds list
     unreg_topic_list = []
     for topic in self.pc_subs_dict.keys():
       if topic not in sel_topics:
           pc_sub = self.pc_subs_dict[topic]
           pc_sub.unregister()
-          rospy.loginfo("Pointcloud: " + topic + " unregistered")
+          rospy.loginfo("PC_APP Pointcloud: " + topic + " unregistered")
           unreg_topic_list.append(topic) # Can't change dictionary while looping through dictionary
     for topic in unreg_topic_list: 
-          self.pc_subs_dict.pop[topic]
+          self.pc_subs_dict.pop(topic)
     # Update primary pointcloud if needed
     primary_pc = rospy.get_param('~pc_app/primary_pointcloud', self.init_primary_pointcloud)
     #print(self.pc_subs_dict.keys())
@@ -741,25 +748,26 @@ class pointcloud_app(object):
       else:
         primary_pc = "None"
       if primary_pc != "None":
-        rospy.loginfo("Primary pointcloud set to: " + primary_pc)
+        rospy.loginfo("PC_APP Primary pointcloud set to: " + primary_pc)
     rospy.set_param('~pc_app/primary_pointcloud', primary_pc)
     
 
   def pointcloudCb(self,msg,topic):
-      topic_uid = topic.replace('/','')
-      transforms_dict = rospy.get_param('~pc_app/transforms_dict',self.init_transforms_dict)
-      if topic in transforms_dict.keys():
-        transform = transforms_dict[topic]
-      else:
-        transform = ZERO_TRANSFORM
-        transforms_dict[topic] = transform  
-      eval('self.' + topic_uid + '_lock').acquire()
-      exec('self.' + topic_uid + '_timestamp = msg.header.stamp')
-      exec('self.' + topic_uid + '_frame = msg.header.frame_id')
-      o3d_pc = nepi_pc.rospc_to_o3dpc(msg, remove_nans=False)
-      # ToDo: Apply Frame Transforms before assigning and releasing
-      exec('self.' + topic_uid + '_pc = o3d_pc')
-      eval('self.' + topic_uid + '_lock').release()
+      if topic != "":
+        topic_uid = topic.replace('/','')
+        transforms_dict = rospy.get_param('~pc_app/transforms_dict',self.init_transforms_dict)
+        if topic in transforms_dict.keys():
+          transform = transforms_dict[topic]
+        else:
+          transform = ZERO_TRANSFORM
+          transforms_dict[topic] = transform  
+        eval('self.' + topic_uid + '_lock').acquire()
+        exec('self.' + topic_uid + '_timestamp = msg.header.stamp')
+        exec('self.' + topic_uid + '_frame = msg.header.frame_id')
+        o3d_pc = nepi_pc.rospc_to_o3dpc(msg, remove_nans=False)
+        # ToDo: Apply Frame Transforms before assigning and releasing
+        exec('self.' + topic_uid + '_pc = o3d_pc')
+        eval('self.' + topic_uid + '_lock').release()
 
   def updateDataProductsThread(self,timer):
     # Check if new data is needed
@@ -816,7 +824,7 @@ class pointcloud_app(object):
               o3d_pc_add = eval('self.' + topic_uid + '_pc')
               eval('self.' + topic_uid + '_lock').release()
             #else:
-              #rospy.loginfo("Combine pointcloud not registered yet: " + topic_puid)
+              #rospy.loginfo("PC_APP Combine pointcloud not registered yet: " + topic_puid)
             if ros_timestamp_add is not None:
               #pc_age = current_time - ros_timestamp_add
               pc_age = 0.0 # Temp 
@@ -888,24 +896,16 @@ class pointcloud_app(object):
             # ToDo: Fix self pc_min_range_m and pc_max_range_m calcs
             min_range_m =  rospy.get_param('~pc_app/process/range_min_m', self.init_proc_range_min_m)
             max_range_m =   rospy.get_param('~pc_app/process/range_max_m', self.init_proc_range_max_m)
-            '''
-            if rospy.get_param('~pc_app/process/clip_range_enabled', self.init_proc_clip_range_enabled ):
-              min_range_m =  rospy.get_param('~pc_app/process/range_min_m', self.init_proc_range_min_m)
-              max_range_m =   rospy.get_param('~pc_app/process/range_max_m', self.init_proc_range_max_m)
-            else:
-              min_range_m =  self.pc_min_range_m
-              max_range_m =   self.pc_max_range_m
-            '''
+
 
             delta_range_m = max_range_m - min_range_m
             self.clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
             self.clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
             if start_range_ratio > 0 or stop_range_ratio < 1:
-              o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
               o3d_pc = nepi_pc.range_clip( o3d_pc, self.clip_min_range_m, self.clip_max_range_m)
       
             zoom_scaler = 1 - zoom_ratio
-            cam_view = [number*zoom_scaler for number in cam_view] # Apply IDX zoom control
+            cam_pos[0] = cam_pos[0] *zoom_scaler  # Apply IDX zoom control
 
             rotate_angle = (0.5 - rotate_ratio) * 2 * 180
             rotate_vector = [0, 0, rotate_angle]
@@ -961,7 +961,6 @@ class pointcloud_app(object):
           snapshot_enabled = self.save_data_if.data_product_snapshot_enabled(data_product)
           # Save data if enabled
           if saving_is_enabled or snapshot_enabled:
-              eval("self." + data_product + "_lock.acquire()")
               if cv2_img is not None:
                   device_name = rospy.get_param('~pc_app/device_name', self.init_device_name)
                   if (self.save_data_if.data_product_should_save(data_product) or snapshot_enabled):
@@ -970,7 +969,6 @@ class pointcloud_app(object):
                       if os.path.isfile(full_path_filename) is False:
                           cv2.imwrite(full_path_filename, cv2_img)
                           self.save_data_if.data_product_snapshot_reset(data_product)
-              eval("self." + data_product + "_lock.release()")
 
   def save_pc2file(self,data_product,o3d_pc,ros_timestamp):
       if self.save_data_if is not None:
@@ -978,7 +976,6 @@ class pointcloud_app(object):
           snapshot_enabled = self.save_data_if.data_product_snapshot_enabled(data_product)
           # Save data if enabled
           if saving_is_enabled or snapshot_enabled:
-              eval("self." + data_product + "_lock.acquire()")
               if o3d_pc is not None:
                   device_name = rospy.get_param('~pc_app/device_name', self.init_device_name)
                   if (self.save_data_if.data_product_should_save(data_product) or snapshot_enabled):
@@ -987,7 +984,6 @@ class pointcloud_app(object):
                       if os.path.isfile(full_path_filename) is False:
                           nepi_pc.save_pointcloud(o3d_pc,full_path_filename)
                           self.save_data_if.data_product_snapshot_reset(data_product)
-              eval("self." + data_product + "_lock.release()")
 
                 
 
@@ -1038,7 +1034,7 @@ class pointcloud_app(object):
   # Node Cleanup Function
   
   def cleanup_actions(self):
-    rospy.loginfo("Shutting down: Executing script cleanup actions")
+    rospy.loginfo("PC_APP Shutting down: Executing script cleanup actions")
 
 
 #########################################
@@ -1048,7 +1044,7 @@ if __name__ == '__main__':
   node_name = "pointcloud_app"
   rospy.init_node(name=node_name)
   #Launch the node
-  rospy.loginfo("Launching node named: " + node_name)
+  rospy.loginfo("PC_APP Launching node named: " + node_name)
   node_class = eval(node_name)
   node = node_class()
   #Set up node shutdown
