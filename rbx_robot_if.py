@@ -911,7 +911,7 @@ class ROSRBXRobotIF:
         rospy.Timer(rospy.Duration(self.rbx_status_pub_interval), self.statusPublishCb)
 
         # Start additional subscribers
-        rospy.Subscriber('~rbx/reset_factory', Empty, self.resetFactoryCb, queue_size=1) # start local callback
+        rospy.Subscriber('~reset_factory', Empty, self.resetFactoryCb, queue_size=1) # start local callback
         rospy.Subscriber("~rbx/set_process_name" , String, self.setProcessNameCb)
 
         # Start additional publishers
