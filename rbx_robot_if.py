@@ -96,6 +96,7 @@ class ROSRBXRobotIF:
     current_geoid_height_m = 0
     
     home_location = [0,0,0]
+    last_cmd_string = ""
 
     rbx_state_last = None
     rbx_mode_last = None
@@ -236,6 +237,8 @@ class ROSRBXRobotIF:
             self.update_prev_errors( [0,0,0,0,0,0,0] )
             self.rbx_status.process_last = self.states[new_state_ind]
             self.rbx_status.process_current = "None"
+            str_val = self.states[new_state_ind]
+            self.last_cmd_string = "nepi_rbx.set_rbx_state(self,'" + str_val + "',timeout_s = " + str(self.rbx_info.cmd_timeout)
         self.publishInfo()
         
 
@@ -261,6 +264,8 @@ class ROSRBXRobotIF:
             self.update_prev_errors( [0,0,0,0,0,0,0] )
             self.rbx_status.process_last = self.modes[new_mode_ind]
             self.rbx_status.process_current = "None"
+            str_val = self.modes[new_mode_ind]
+            self.last_cmd_string = "nepi_rbx.set_rbx_mode(self,'" + str_val + "',timeout_s = " + str(self.rbx_info.cmd_timeout)
         self.publishInfo()
 
 
@@ -362,6 +367,10 @@ class ROSRBXRobotIF:
                     self.rbx_status.cmd_success = self.rbx_cmd_success_current
                     time.sleep(1)
                     self.rbx_status.ready = True
+
+                    str_val = self.actions[action_ind]
+                    self.last_cmd_string = "nepi_rbx.go_rbx_action(self,'" + str_val + "',timeout_s = " + str(self.rbx_info.cmd_timeout)
+                    self.publishInfo()
         else:
             self.update_error_msg("Ignoring Go Action command, no Set Action Function")
 
@@ -411,6 +420,8 @@ class ROSRBXRobotIF:
                 self.rbx_status.cmd_success = self.rbx_cmd_success_current
                 time.sleep(1)
                 self.rbx_status.ready = True
+                self.last_cmd_string = "nepi_rbx.go_rbx_home(self,timeout_s = " + str(self.rbx_info.cmd_timeout)
+                self.publishInfo()
         else:
             self.update_error_msg("Ignoring Go command, Autononous Controls not Ready")
 
@@ -433,6 +444,8 @@ class ROSRBXRobotIF:
                 self.rbx_status.cmd_success = self.rbx_cmd_success_current
                 time.sleep(1)
                 self.rbx_status.ready = True
+                self.last_cmd_string = "nepi_rbx.go_rbx_stop(self,timeout_s = " + str(self.rbx_info.cmd_timeout)
+                self.publishInfo()
         else:
             self.update_error_msg("Ignoring Go command, Autononous Controls not Ready")
 
@@ -461,6 +474,10 @@ class ROSRBXRobotIF:
                 self.rbx_status.cmd_success = self.rbx_cmd_success_current
                 time.sleep(1)
                 self.rbx_status.ready = True
+
+                str_val = str(setpoint_data)
+                self.last_cmd_string = "nepi_rbx.goto_rbx_pose(self,'" + str_val + "',timeout_s = " + str(self.rbx_info.cmd_timeout)
+                self.publishInfo()
         else:
             self.update_error_msg("Ignoring Go command, Autononous Controls not Ready")
 
@@ -492,6 +509,10 @@ class ROSRBXRobotIF:
                 self.rbx_status.cmd_success = self.rbx_cmd_success_current
                 time.sleep(1)
                 self.rbx_status.ready = True
+                
+                str_val = str(setpoint_data)
+                self.last_cmd_string = "nepi_rbx.goto_rbx_position(self,'" + str_val + "',timeout_s = " + str(self.rbx_info.cmd_timeout)
+                self.publishInfo()
         else:
             self.update_error_msg("Ignoring Go command, Autononous Controls not Ready")
 
@@ -518,6 +539,10 @@ class ROSRBXRobotIF:
                 self.rbx_status.cmd_success = self.rbx_cmd_success_current
                 time.sleep(1)
                 self.rbx_status.ready = True
+
+                str_val = str(setpoint_data)
+                self.last_cmd_string = "nepi_rbx.goto_rbx_location(self,'" + str_val + "',timeout_s = " + str(self.rbx_info.cmd_timeout)
+                self.publishInfo()
         else:
             self.update_error_msg("Ignoring Go command, Autononous Controls not Ready")
 
@@ -999,6 +1024,7 @@ class ROSRBXRobotIF:
         self.rbx_status.current_pitch  = self.current_orientation_ned_degs[1]
         self.rbx_status.current_yaw = self.current_orientation_ned_degs[2]
 
+        self.rbx_status.last_cmd_string = self.last_cmd_string
 
         ## Update Control Info
         if self.manualControlsReadyFunction is not None:
