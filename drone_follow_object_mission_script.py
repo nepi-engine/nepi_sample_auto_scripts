@@ -47,6 +47,9 @@ from nepi_ros_interfaces.msg import TargetLocalization
 #RBX Robot Name
 RBX_ROBOT_NAME = "ardupilot"
 
+# Robot Settings Overides
+###################
+TAKEOFF_HEIGHT_M = 10.0
 # Ignore Yaw Control
 IGNORE_YAW_CONTROL = True
 
@@ -55,100 +58,111 @@ OBJ_LABEL_OF_INTEREST = "chair"
 TARGET_OFFSET_GOAL_M = 0.1 # How close to set setpoint to target
 TRIGGER_RESET_DELAY_S = 5 # Time between detect/move checks 
 
-# Process Timeout Values
-STATE_TIMEOUT_SEC = 5
-MODE_TIMEOUT_SEC = 5
-ACTION_TIMEOUT_SEC = 10
-GOTO_TIMEOUT_SEC = 12
-
 # Set Home Poistion
 ENABLE_FAKE_GPS = True
 SET_HOME = True
 HOME_LOCATION = [47.6540828,-122.3187578,0.0]
 
-#########################################
-# ROS NAMESPACE SETUP
-#########################################
+# Goto Error Settings
+GOTO_MAX_ERROR_M = 2.0 # Goal reached when all translation move errors are less than this value
+GOTO_MAX_ERROR_DEG = 2.0 # Goal reached when all rotation move errors are less than this value
+GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be good before proceeding
 
-# ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
+# CMD Timeout Values
+CMD_STATE_TIMEOUT_SEC = 5
+CMD_MODE_TIMEOUT_SEC = 5
+CMD_ACTION_TIMEOUT_SEC = 15
+CMD_GOTO_TIMEOUT_SEC = 15
 
 #########################################
 # Node Class
 #########################################
 
 class drone_follow_object_mission(object):
+  NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
+
   rbx_settings = []
   rbx_info = RBXInfo()
   rbx_status = RBXStatus()
   #######################
   ### Node Initialization
   def __init__(self):
-    rospy.loginfo("Starting Initialization Processes")
-    rospy.loginfo("Waiting for namespace containing: " + RBX_ROBOT_NAME)
+    rospy.loginfo("DRONE_INSPECT: Starting Initialization Processes")
+    rospy.loginfo("DRONE_INSPECT: Waiting for namespace containing: " + RBX_ROBOT_NAME)
     robot_namespace = nepi_ros.wait_for_node(RBX_ROBOT_NAME)
     robot_namespace = robot_namespace + "/"
-    rospy.loginfo("Found namespace: " + robot_namespace)
+    rospy.loginfo("DRONE_INSPECT: Found namespace: " + robot_namespace)
     rbx_namespace = (robot_namespace + "rbx/")
-    rospy.loginfo("Using rbx namesapce " + rbx_namespace)
+    rospy.loginfo("DRONE_INSPECT: Using rbx namesapce " + rbx_namespace)
     nepi_rbx.rbx_initialize(self,rbx_namespace)
     time.sleep(1)
 
-    # Setup Settings, Info, and Status Subscribers
+    #### publishers used below are defined in nepi_rbx.initialize() helper function call above
+
+    ## Setup Settings Callback
     self.NEPI_RBX_SETTINGS_TOPIC = robot_namespace + "settings_status"
-    rospy.loginfo("Waiting for topic: " + self.NEPI_RBX_SETTINGS_TOPIC)
+    rospy.loginfo("DRONE_INSPECT: Waiting for topic: " + self.NEPI_RBX_SETTINGS_TOPIC)
     nepi_ros.wait_for_topic(self.NEPI_RBX_SETTINGS_TOPIC)
     rbx_settings_pub = rospy.Publisher(robot_namespace + 'publish_settings', Empty, queue_size=1)
-    rospy.loginfo("Starting rbx settings scubscriber callback")
+    rospy.loginfo("DRONE_INSPECT: Starting rbx settings scubscriber callback")
     rospy.Subscriber(self.NEPI_RBX_SETTINGS_TOPIC, String, self.rbx_settings_callback, queue_size=None)
     while self.rbx_settings is None and not rospy.is_shutdown():
-      rospy.loginfo("Waiting for current rbx settings to publish")
+      rospy.loginfo("DRONE_INSPECT: Waiting for current rbx settings to publish")
       time.sleep(1)
       rbx_settings_pub.publish(Empty())
-    rospy.loginfo(self.rbx_info)
+    # Apply Takeoff Height setting overide
+    th_setting = nepi_ros.get_setting_from_settings('takeoff_height_m',self.rbx_settings)
+    th_setting[2] = str(TAKEOFF_HEIGHT_M)
+    th_update_msg = nepi_ros.create_update_msg_from_setting(th_setting)
+    self.rbx_setting_update_pub.publish(th_update_msg) 
+    nepi_ros.sleep(2,10)
+    rospy.loginfo("DRONE_INSPECT: Current Robot Settings")
+    settings_str = str(self.rbx_settings)
+    rospy.loginfo("DRONE_INSPECT: " + settings_str)
 
+
+    ## Setup Info Update Callback
     self.NEPI_RBX_INFO_TOPIC = rbx_namespace + "info" # RBX Info Message
-    rospy.loginfo("Waiting for topic: " + self.NEPI_RBX_INFO_TOPIC)
+    rospy.loginfo("DRONE_INSPECT: Waiting for topic: " + self.NEPI_RBX_INFO_TOPIC)
     nepi_ros.wait_for_topic(self.NEPI_RBX_INFO_TOPIC)
     rbx_info_pub = rospy.Publisher(rbx_namespace + 'publish_info', Empty, queue_size=1)
-    rospy.loginfo("Starting rbx info scubscriber callback")
+    rospy.loginfo("DRONE_INSPECT: Starting rbx info scubscriber callback")
     rospy.Subscriber(self.NEPI_RBX_INFO_TOPIC,RBXInfo, self.rbx_info_callback, queue_size=None)
     while self.rbx_info is None and not rospy.is_shutdown():
-      rospy.loginfo("Waiting for current rbx info to publish")
+      rospy.loginfo("DRONE_INSPECT: Waiting for current rbx info to publish")
       time.sleep(1)
       rbx_info_pub.publish(Empty())
-    rospy.loginfo(self.rbx_info)
+    info_str = str(self.rbx_info)
+    rospy.loginfo("DRONE_INSPECT: " + info_str)
 
+    ## Setup Status Update Callback
     self.NEPI_RBX_STATUS_TOPIC = rbx_namespace + "status" # RBX Status Message
-    rospy.loginfo("Waiting for topic: " + self.NEPI_RBX_STATUS_TOPIC)
+    rospy.loginfo("DRONE_INSPECT: Waiting for topic: " + self.NEPI_RBX_STATUS_TOPIC)
     nepi_ros.wait_for_topic(self.NEPI_RBX_STATUS_TOPIC)
     rbx_status_pub = rospy.Publisher(rbx_namespace + 'publish_status', Empty, queue_size=1)
-    rospy.loginfo("Starting rbx status scubscriber callback")
+    rospy.loginfo("DRONE_INSPECT: Starting rbx status scubscriber callback")
     rospy.Subscriber(self.NEPI_RBX_STATUS_TOPIC, RBXStatus, self.rbx_status_callback, queue_size=None)
     while self.rbx_status is None and not rospy.is_shutdown():
-      rospy.loginfo("Waiting for current rbx status to publish")
+      rospy.loginfo("DRONE_INSPECT: Waiting for current rbx status to publish")
       time.sleep(0.1)
       rbx_status_pub.publish(Empty())
-    rospy.loginfo(self.rbx_status)
+    status_str = str(self.rbx_status)
+    rospy.loginfo("DRONE_INSPECT: " + status_str)
 
     # Create fake gps update process
     self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
-
     if SET_HOME:
-      rospy.loginfo("Upating RBX Home Location")
+      rospy.loginfo("DRONE_INSPECT: Upating RBX Home Location")
       new_home_geo = GeoPoint()
       new_home_geo.latitude = HOME_LOCATION[0]
       new_home_geo.longitude = HOME_LOCATION[1]
       new_home_geo.altitude = HOME_LOCATION[2]
       self.rbx_set_home_pub.publish(new_home_geo)
-
       self.rbx_reset_fake_gps_pub.publish(Empty())
       nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
 
-    self.rbx_set_cmd_timeout_pub.publish(5)
-
     ###########################     
-    # AI 3D Targeting Subscribers
+    # Sutup AI 3d targeting 
     ###########################
     # Wait for AI targeting detection topic and subscribe to it
     AI_TARGETING_TOPIC = "targeting/targeting_data"
@@ -180,11 +194,11 @@ class drone_follow_object_mission(object):
     ###########################
     success = True
     # Set Mode to Guided
-    success = nepi_rbx.set_rbx_mode(self,"GUIDED",timeout_s = MODE_TIMEOUT_SEC)
+    success = nepi_rbx.set_rbx_mode(self,"GUIDED",timeout_s = CMD_MODE_TIMEOUT_SEC)
     # Arm System
-    success = nepi_rbx.set_rbx_state(self,"ARM",timeout_s = STATE_TIMEOUT_SEC)
+    success = nepi_rbx.set_rbx_state(self,"ARM",timeout_s = CMD_STATE_TIMEOUT_SEC)
     # Send Takeoff Command
-    success=nepi_rbx.go_rbx_action(self,"TAKEOFF",timeout_s = ACTION_TIMEOUT_SEC)
+    success=nepi_rbx.go_rbx_action(self,"TAKEOFF",timeout_s = CMD_ACTION_TIMEOUT_SEC)
     nepi_ros.sleep(2,10)
     ###########################
     # Stop Your Custom Actions
@@ -213,10 +227,10 @@ class drone_follow_object_mission(object):
     # Start Your Custom Actions
     ###########################
     success = True
-    #success = nepi_rbx.set_rbx_mode(self,"LAND", timeout_s = MODE_TIMEOUT_SEC) # Uncomment to change to Land mode
-    #success = nepi_rbx.set_rbx_mode(self,"LOITER", timeout_s = MODE_TIMEOUT_SEC) # Uncomment to change to Loiter mode
-    success = nepi_rbx.set_rbx_mode(self,"RTL", timeout_s = MODE_TIMEOUT_SEC) # Uncomment to change to home mode
-    #success = nepi_rbx.set_rbx_mode(self,"RESUME", timeout_s = MODE_TIMEOUT_SEC) # Uncomment to return to last mode
+    #success = nepi_rbx.set_rbx_mode(self,"LAND", timeout_s = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to Land mode
+    #success = nepi_rbx.set_rbx_mode(self,"LOITER", timeout_s = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to Loiter mode
+    success = nepi_rbx.set_rbx_mode(self,"RTL", timeout_s = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to home mode
+    #success = nepi_rbx.set_rbx_mode(self,"RESUME", timeout_s = CMD_MODE_TIMEOUT_SEC) # Uncomment to return to last mode
     nepi_ros.sleep(1,10)
     ###########################
     # Stop Your Custom Actions
