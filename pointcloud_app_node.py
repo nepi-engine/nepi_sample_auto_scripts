@@ -16,7 +16,7 @@
 
 #ToDo
 #- Add pointcloud render enable control to node params, add node subscriber, add to to RenderStatus msg, and have asher add control to RUI
-#- Figure out why no pointcloud data is showing up in rendered image when process clipping is disabled. 
+#- Fix the nepi_pc get min and max bounds 
 #- Create add_pointclouds function in nepi_pc.py that supports combining bw and rgb pointclouds and replace in node Add process
 #- Implement age_filter before pointcloud combine process
 #- Apply transforms to each point cloud before combining
@@ -93,6 +93,7 @@ Factory_Cam_FOV = 60
 Factory_Cam_View = [3, 0, 0]
 Factory_Cam_Pos = [-5, 0, 0]
 Factory_Cam_Rot = [0, 0, 1]
+Factory_Render_Enable = True
 
 Render_Background = [0, 0, 0, 0]
 
@@ -167,6 +168,7 @@ class pointcloud_app(object):
     rospy.set_param('~pc_app/render/cam_view', Factory_Cam_View)
     rospy.set_param('~pc_app/render/cam_pos', Factory_Cam_Pos)
     rospy.set_param('~pc_app/render/cam_rot', Factory_Cam_Rot)
+    rospy.set_param('~pc_app/render/render_enable', Factory_Render_Enable)
    
     self.publish_selection_status()
     self.publish_process_status()
@@ -361,6 +363,8 @@ class pointcloud_app(object):
     rospy.set_param('~pc_app/render/cam_view',self.init_view_cam_view)
     rospy.set_param('~pc_app/render/cam_pos',self.init_view_cam_pos)
     rospy.set_param('~pc_app/render/cam_rot',self.init_view_cam_rot)
+    rospy.set_param('~pc_app/render/render_enable', self.init_render_enable)
+    
     if do_updates:
       self.publish_render_status()
 
@@ -451,6 +455,11 @@ class pointcloud_app(object):
     new_array.append(msg.z)
     rospy.set_param('~pc_app/render/cam_rot',new_array)
     self.publish_render_status()
+  
+  def setRenderEnableCb(self,msg):
+    render_enable = msg.data
+    rospy.set_param('~pc_app/render/render_enable', render_enable)
+    self.publish_render_status()
 
   def setRangeRatiosCb(self,msg):
     #rospy.loginfo(msg)
@@ -524,6 +533,7 @@ class pointcloud_app(object):
     view_cam_view_sub = rospy.Subscriber("~render/set_camera_view", Vector3, self.setCamViewCb, queue_size = 10)
     view_cam_position_sub = rospy.Subscriber("~render/set_camera_position", Vector3, self.setCamPositionCb, queue_size = 10)
     view_cam_rotate_sub = rospy.Subscriber("~render/set_camera_rotation", Vector3, self.setCamRotationCb, queue_size = 10)
+    render_enable_sub = rospy.Subscriber("~render/set_render_enable", Bool, self.setRenderEnableCb, queue_size = 10)
 
     self.view_status_pub = rospy.Publisher("~render/status", PointcloudRenderStatus, queue_size=1, latch=True)
     self.view_img_pub = rospy.Publisher("~render/pointcloud_image", Image, queue_size=1)
@@ -592,6 +602,8 @@ class pointcloud_app(object):
       self.init_view_cam_view = rospy.get_param('~pc_app/render/cam_view', Factory_Cam_View)
       self.init_view_cam_pos = rospy.get_param('~pc_app/render/cam_pos', Factory_Cam_Pos)
       self.init_view_cam_rot = rospy.get_param('~pc_app/render/cam_rot', Factory_Cam_Rot)
+      self.init_render_enable = rospy.get_param('~pc_app/render/render_enable', Factory_Render_Enable)
+      
       self.resetParamServer(do_updates)
 
   def resetParamServer(self,do_updates = True):
@@ -686,7 +698,6 @@ class pointcloud_app(object):
     range_ratios.stop_range =   rospy.get_param('~pc_app/render/stop_range_ratio', self.init_view_stop_range_ratio)
     status_msg.range_clip_ratios = range_ratios
 
-
     status_msg.zoom_ratio = rospy.get_param('~pc_app/render/zoom_ratio',self.init_view_zoom_ratio)
     status_msg.rotate_ratio = rospy.get_param('~pc_app/render/rotate_ratio',self.init_view_rotate_ratio)
     status_msg.tilt_ratio = rospy.get_param('~pc_app/render/tilt_ratio',self.init_view_tilt_ratio)
@@ -714,6 +725,9 @@ class pointcloud_app(object):
     cam_rot.y = rot[1]
     cam_rot.z = rot[2]
     status_msg.camera_rotation = cam_rot
+    
+    render_enable = rospy.get_param('~pc_app/render/render_enable',self.init_render_enable)
+    status_msg.render_enable = render_enable
 
     self.view_status_pub.publish(status_msg)
 
