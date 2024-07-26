@@ -902,9 +902,10 @@ class pointcloud_app(object):
 
           if pc_saving_is_enabled is True or pc_snapshot_enabled is True:
             self.save_pc2file('pointcloud',o3d_pc,ros_timestamp)
-
-
-          if need_img:
+            
+          render_enable = rospy.get_param('~pc_app/render/render_enable', self.init_render_enable)
+	  
+          if need_img and render_enable:
             # Render the pointcloud image
             img_width = rospy.get_param('~pc_app/render/image_width',  self.init_image_width)
             img_height = rospy.get_param('~pc_app/render/image_height', self.init_image_height)
