@@ -97,55 +97,14 @@ class drone_inspection_demo_mission(object):
 
     #### publishers used below are defined in nepi_rbx.initialize() helper function call above
 
-    ## Setup Settings Callback
-    self.NEPI_RBX_SETTINGS_TOPIC = robot_namespace + "settings_status"
-    rospy.loginfo("DRONE_INSPECT: Waiting for topic: " + self.NEPI_RBX_SETTINGS_TOPIC)
-    nepi_ros.wait_for_topic(self.NEPI_RBX_SETTINGS_TOPIC)
-    rbx_settings_pub = rospy.Publisher(robot_namespace + 'publish_settings', Empty, queue_size=1)
-    rospy.loginfo("DRONE_INSPECT: Starting rbx settings scubscriber callback")
-    rospy.Subscriber(self.NEPI_RBX_SETTINGS_TOPIC, String, self.rbx_settings_callback, queue_size=None)
-    while self.rbx_settings is None and not rospy.is_shutdown():
-      rospy.loginfo("DRONE_INSPECT: Waiting for current rbx settings to publish")
-      time.sleep(1)
-      rbx_settings_pub.publish(Empty())
     # Apply Takeoff Height setting overide
     th_setting = nepi_ros.get_setting_from_settings('takeoff_height_m',self.rbx_settings)
     th_setting[2] = str(TAKEOFF_HEIGHT_M)
     th_update_msg = nepi_ros.create_update_msg_from_setting(th_setting)
     self.rbx_setting_update_pub.publish(th_update_msg) 
     nepi_ros.sleep(2,10)
-    rospy.loginfo("DRONE_INSPECT: Current Robot Settings")
     settings_str = str(self.rbx_settings)
-    rospy.loginfo("DRONE_INSPECT: " + settings_str)
-
-
-    ## Setup Info Update Callback
-    self.NEPI_RBX_INFO_TOPIC = rbx_namespace + "info" # RBX Info Message
-    rospy.loginfo("DRONE_INSPECT: Waiting for topic: " + self.NEPI_RBX_INFO_TOPIC)
-    nepi_ros.wait_for_topic(self.NEPI_RBX_INFO_TOPIC)
-    rbx_info_pub = rospy.Publisher(rbx_namespace + 'publish_info', Empty, queue_size=1)
-    rospy.loginfo("DRONE_INSPECT: Starting rbx info scubscriber callback")
-    rospy.Subscriber(self.NEPI_RBX_INFO_TOPIC,RBXInfo, self.rbx_info_callback, queue_size=None)
-    while self.rbx_info is None and not rospy.is_shutdown():
-      rospy.loginfo("DRONE_INSPECT: Waiting for current rbx info to publish")
-      time.sleep(1)
-      rbx_info_pub.publish(Empty())
-    info_str = str(self.rbx_info)
-    rospy.loginfo("DRONE_INSPECT: " + info_str)
-
-    ## Setup Status Update Callback
-    self.NEPI_RBX_STATUS_TOPIC = rbx_namespace + "status" # RBX Status Message
-    rospy.loginfo("DRONE_INSPECT: Waiting for topic: " + self.NEPI_RBX_STATUS_TOPIC)
-    nepi_ros.wait_for_topic(self.NEPI_RBX_STATUS_TOPIC)
-    rbx_status_pub = rospy.Publisher(rbx_namespace + 'publish_status', Empty, queue_size=1)
-    rospy.loginfo("DRONE_INSPECT: Starting rbx status scubscriber callback")
-    rospy.Subscriber(self.NEPI_RBX_STATUS_TOPIC, RBXStatus, self.rbx_status_callback, queue_size=None)
-    while self.rbx_status is None and not rospy.is_shutdown():
-      rospy.loginfo("DRONE_INSPECT: Waiting for current rbx status to publish")
-      time.sleep(0.1)
-      rbx_status_pub.publish(Empty())
-    status_str = str(self.rbx_status)
-    rospy.loginfo("DRONE_INSPECT: " + status_str)
+    rospy.loginfo("DRONE_INSPECT: Udated settings:" + settings_str)
 
     # Create fake gps update process
     self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
@@ -164,6 +123,20 @@ class drone_inspection_demo_mission(object):
     self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
     ## Initiation Complete
     rospy.loginfo("DRONE_INSPECT: Initialization Complete")
+
+
+  #######################
+  ### RBX Settings, Info, and Status Callbacks
+  def rbx_settings_callback(self, msg):
+    self.rbx_settings = nepi_ros.parse_settings_msg_data(msg.data)
+
+
+  def rbx_info_callback(self, msg):
+    self.rbx_info = msg
+
+
+  def rbx_status_callback(self, msg):
+    self.rbx_status = msg
 
   #######################
   ### Node Methods
@@ -265,15 +238,6 @@ class drone_inspection_demo_mission(object):
     print("Post-Mission Actions Complete")
     return success
 
-  #######################
-  # RBX Status Callbacks
-  ### Callback to update rbx current state value
-  def rbx_info_callback(self,info_msg):
-    self.rbx_info = info_msg
-
-  ### Callback to update rbx current state value
-  def rbx_status_callback(self,status_msg):
-    self.rbx_status = status_msg
 
   #######################
   # Mission Action Functions
@@ -283,17 +247,6 @@ class drone_inspection_demo_mission(object):
     self.snapshot_trigger_pub.publish(Empty())
     print("Snapshot trigger sent")
 
-  #######################
-  ### RBX Status Callbacks
-  def rbx_settings_callback(self, msg):
-    self.rbx_settings = nepi_ros.parse_settings_msg_data(msg.data)
-
-  def rbx_info_callback(self, msg):
-    self.rbx_info = msg
-
-
-  def rbx_status_callback(self, msg):
-    self.rbx_status = msg
 
   #######################
   # Node Cleanup Function

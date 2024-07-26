@@ -182,7 +182,18 @@ class drone_follow_object_mission(object):
     rospy.loginfo("Starting move to object callback")
     rospy.Subscriber(ai_targeting_topic_name, TargetLocalization, self.move_to_object_callback, queue_size = 1)
 
-  
+  #######################
+  ### RBX Settings, Info, and Status Callbacks
+  def rbx_settings_callback(self, msg):
+    self.rbx_settings = nepi_ros.parse_settings_msg_data(msg.data)
+
+
+  def rbx_info_callback(self, msg):
+    self.rbx_info = msg
+
+
+  def rbx_status_callback(self, msg):
+    self.rbx_status = msg
 
   #######################
   ### Node Methods    
