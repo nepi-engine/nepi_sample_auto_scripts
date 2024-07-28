@@ -108,6 +108,9 @@ class drone_inspection_demo_mission(object):
 
     # Create fake gps update process
     self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
+    if ENABLE_FAKE_GPS:
+      rospy.loginfo("DRONE_INSPECT: Enabled Fake GPS")
+      time.sleep(2)
     if SET_HOME:
       rospy.loginfo("DRONE_INSPECT: Upating RBX Home Location")
       new_home_geo = GeoPoint()
