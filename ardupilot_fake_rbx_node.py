@@ -33,7 +33,7 @@ from nepi_edge_sdk_base import nepi_nav
 from nepi_edge_sdk_base import nepi_nav
 from nepi_edge_sdk_base import nepi_rbx
 
-from nepi_edge_sdk_rbx.rbx_robot_if import ROSRBXRobotIF
+from nepi_drivers_rbx.rbx_robot_if import ROSRBXRobotIF
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
@@ -175,29 +175,30 @@ class ArdupilotRBX():
         #self.publishMsg(setting)
           
 
-    # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-    self.publishMsg(self.node_name + ": Launching NEPI IDX (ROS) interface...")
-    self.device_info_dict["node_name"] = self.node_name
-    self.device_info_dict["device_name"] = self.node_name
-    if self.node_name.find("_") != -1:
-        split_name = self.node_name.rsplit('_', 1)
-        self.device_info_dict["identifier"] = split_name[1] + split_name[1]
-    else:
-        self.device_info_dict["identifier"] = ""
-    
-    self.device_info_dict["serial_number"] = ""
-    self.device_info_dict["hw_version"] = ""
-    self.device_info_dict["sw_version"] = ""
-
-
-    ## Define RBX NavPose Publishers
+    ## Define RBX Fake GPS
     ROBOT_NAMESPACE = rospy.get_name() + "/"
     NEPI_RBX_NAVPOSE_GPS_TOPIC = ROBOT_NAMESPACE + "fake_gps_stream"
     FAKE_GPS_NAMESPACE =  ROBOT_NAMESPACE + "fake_gps/"
     self.publishMsg("Setting up fake_gps at namespace: " + FAKE_GPS_NAMESPACE)
     fake_gps = ArdupilotFakeGPS(robot_namespace = ROBOT_NAMESPACE)
     time.sleep(2) 
-    rospy.loginfo(FAKE_GPS_NAMESPACE)
+
+
+    # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
+    self.publishMsg(self.node_name + ": Launching NEPI IDX (ROS) interface...")
+    self.device_info_dict["node_name"] = self.node_name
+    if self.node_name.find("_") != -1:
+        split_name = self.node_name.rsplit('_', 1)
+        self.device_info_dict["robot_name"] = split_name[0]
+        self.device_info_dict["identifier"] = split_name[1] 
+    else:
+        self.device_info_dict["robot_name"] = self.node_name
+        self.device_info_dict["identifier"] = ""
+    
+    self.device_info_dict["serial_number"] = ""
+    self.device_info_dict["hw_version"] = ""
+    self.device_info_dict["sw_version"] = ""
+
     self.rbx_if = ROSRBXRobotIF(device_info = self.device_info_dict,
                                   capSettings = self.cap_settings,
                                   factorySettings = self.factory_settings,

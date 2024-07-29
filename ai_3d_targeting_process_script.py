@@ -17,9 +17,10 @@
 
 
 # Requires the following additional scripts are running
-# a)ai_detector_config_script.py
+# a)zed2_idx_driver_script.py
+# b)ai_detector_config_script.py
 # These scripts are available for download at:
-# [link text](https://github.com/nepi-engine/nepi_sample_auto_scripts)
+# [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
 import time
 import sys

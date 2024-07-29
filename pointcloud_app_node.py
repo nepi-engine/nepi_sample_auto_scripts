@@ -29,10 +29,13 @@ import os
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = '/nepi/s2x/'
 os.environ["ROS_NAMESPACE"] = NEPI_BASE_NAMESPACE[0:-1]
+import rospy
+
+
 
 import time
 import sys
-import rospy
+
 import copy
 import numpy as np
 import threading
@@ -108,7 +111,7 @@ STANDARD_IMAGE_SIZES = ['630 x 900','720 x 1080','955 x 600','1080 x 1440','1024
 # Node Class
 #########################################
 
-class pointcloud_app(object):
+class NepiPointcloudApp(object):
   combine_options = ["Add"]
   data_products = ["pointcloud","pointcloud_image"]
   frame3d_list = ['nepi_center_frame','primary_pc_frame','map']
@@ -486,10 +489,8 @@ class pointcloud_app(object):
     # Set up save data and save config services ########################################################
     self.save_data_if = SaveDataIF(data_product_names = self.data_products)
     # Temp Fix until added as NEPI ROS Node
-    thisNamespace = NEPI_BASE_NAMESPACE + "pointcloud_app"
     self.save_cfg_if = SaveCfgIF(updateParamsCallback=self.initParamServerValues, 
-                                 paramsModifiedCallback=self.updateFromParamServer,
-                                 namespace = thisNamespace)
+                                 paramsModifiedCallback=self.updateFromParamServer)
 
 
     ## App Setup ########################################################
@@ -520,7 +521,7 @@ class pointcloud_app(object):
     proc_frame_3d_sub = rospy.Subscriber('~set_frame_3d', String, self.setFrame3dCb, queue_size = 10)
 
     self.proc_status_pub = rospy.Publisher("~process/status", PointcloudProcessStatus, queue_size=1, latch=True)
-    self.proc_pc_pub = rospy.Publisher("~process/pointcloud", PointCloud2, queue_size=1)
+    self.proc_pc_pub = rospy.Publisher("~pointcloud", PointCloud2, queue_size=1)
 
     # Pointcloud Render Subscribers ########################################################
     view_reset_controls_sub = rospy.Subscriber("~render/reset_controls", Empty, self.resetRenderControlsCb, queue_size = 10)
@@ -536,7 +537,7 @@ class pointcloud_app(object):
     render_enable_sub = rospy.Subscriber("~render/set_render_enable", Bool, self.setRenderEnableCb, queue_size = 10)
 
     self.view_status_pub = rospy.Publisher("~render/status", PointcloudRenderStatus, queue_size=1, latch=True)
-    self.view_img_pub = rospy.Publisher("~render/pointcloud_image", Image, queue_size=1)
+    self.view_img_pub = rospy.Publisher("~pointcloud_image", Image, queue_size=1)
 
 
 
@@ -1066,12 +1067,11 @@ class pointcloud_app(object):
 # Main
 #########################################
 if __name__ == '__main__':
-  node_name = "pointcloud_app"
+  node_name = "app_pointcloud"
   rospy.init_node(name=node_name)
   #Launch the node
   rospy.loginfo("PC_APP: Launching node named: " + node_name)
-  node_class = eval(node_name)
-  node = node_class()
+  node = NepiPointcloudApp()
   #Set up node shutdown
   rospy.on_shutdown(node.cleanup_actions)
   # Spin forever (until object is detected)
