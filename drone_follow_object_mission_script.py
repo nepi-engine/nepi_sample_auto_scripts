@@ -113,19 +113,18 @@ class drone_follow_object_mission(object):
     settings_str = str(self.rbx_settings)
     rospy.loginfo("DRONE_FOLLOW: Udated settings:" + settings_str)
 
-    # Create fake gps update process
-    self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
+    # Setup Fake GPS if Enabled   
     if ENABLE_FAKE_GPS:
-      rospy.loginfo("DRONE_FOLLOW: Enabled Fake GPS")
+      rospy.loginfo("DRONE_INSPECT: Enabled Fake GPS")
+      self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
       time.sleep(2)
     if SET_HOME:
-      rospy.loginfo("DRONE_FOLLOW: Upating RBX Home Location")
+      rospy.loginfo("DRONE_INSPECT: Upating RBX Home Location")
       new_home_geo = GeoPoint()
       new_home_geo.latitude = HOME_LOCATION[0]
       new_home_geo.longitude = HOME_LOCATION[1]
       new_home_geo.altitude = HOME_LOCATION[2]
       self.rbx_set_home_pub.publish(new_home_geo)
-      self.rbx_reset_fake_gps_pub.publish(Empty())
       nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
 
     ###########################     
@@ -241,7 +240,7 @@ class drone_follow_object_mission(object):
       rospy.loginfo("DRONE_FOLLOW: Detected a " + OBJ_LABEL_OF_INTEREST + "with valid range")
       setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
       sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))
-      sp_y_m = setpoint_range_m * math.sin(math.radians(target_yaw_d))
+      sp_y_m = - setpoint_range_m * math.sin(math.radians(target_yaw_d))
       sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d))
       sp_yaw_d = target_yaw_d
       if IGNORE_YAW_CONTROL:

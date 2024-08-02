@@ -67,8 +67,8 @@ GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be go
 # CMD Timeout Values
 CMD_STATE_TIMEOUT_SEC = 5
 CMD_MODE_TIMEOUT_SEC = 5
-CMD_ACTION_TIMEOUT_SEC = 15
-CMD_GOTO_TIMEOUT_SEC = 15
+CMD_ACTION_TIMEOUT_SEC = 20
+CMD_GOTO_TIMEOUT_SEC = 20
 
 
 #########################################
@@ -106,10 +106,10 @@ class drone_inspection_demo_mission(object):
     settings_str = str(self.rbx_settings)
     rospy.loginfo("DRONE_INSPECT: Udated settings:" + settings_str)
 
-    # Create fake gps update process
-    self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
+    # Setup Fake GPS if Enabled   
     if ENABLE_FAKE_GPS:
       rospy.loginfo("DRONE_INSPECT: Enabled Fake GPS")
+      self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
       time.sleep(2)
     if SET_HOME:
       rospy.loginfo("DRONE_INSPECT: Upating RBX Home Location")
@@ -118,7 +118,6 @@ class drone_inspection_demo_mission(object):
       new_home_geo.longitude = HOME_LOCATION[1]
       new_home_geo.altitude = HOME_LOCATION[2]
       self.rbx_set_home_pub.publish(new_home_geo)
-      self.rbx_reset_fake_gps_pub.publish(Empty())
       nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
 
     # Setup mission action processes
@@ -157,7 +156,7 @@ class drone_inspection_demo_mission(object):
     # Send Takeoff Command
     success=nepi_rbx.go_rbx_action(self,"TAKEOFF",timeout_sec =CMD_ACTION_TIMEOUT_SEC)
     time.sleep(2)
-    error_str = str(self.rbx_status.errors_prev)
+    error_str = str(self.rbx_status.errors_current)
     if success:
       rospy.loginfo("DRONE_INSPECT: Takeoff completed with errors: " + error_str )
     else:
@@ -176,11 +175,10 @@ class drone_inspection_demo_mission(object):
     ###########################
     success = True
     ##########################################
-    # Send goto Position Command
+    # Send goto Location Command
     print("Starting goto Location Process")
     success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION,timeout_sec =CMD_GOTO_TIMEOUT_SEC)
-
-    error_str = str(self.rbx_status.errors_prev)
+    error_str = str(self.rbx_status.errors_current)
     if success:
       rospy.loginfo("DRONE_INSPECT: Goto Location completed with errors: " + error_str )
     else:
