@@ -176,7 +176,7 @@ class drone_follow_object_mission(object):
     # Arm System
     success = nepi_rbx.set_rbx_state(self,"ARM",timeout_sec = CMD_STATE_timeout_secEC)
     # Send Takeoff Command
-    success=nepi_rbx.go_rbx_action(self,"TAKEOFF",timeout_sec = CMD_ACTION_timeout_secEC)
+    success=nepi_rbx.go_rbx_setup_action(self,"TAKEOFF",timeout_sec = CMD_ACTION_timeout_secEC)
     nepi_ros.sleep(2,10)
     ###########################
     # Stop Your Custom Actions

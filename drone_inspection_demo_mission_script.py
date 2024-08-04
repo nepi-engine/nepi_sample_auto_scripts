@@ -154,7 +154,7 @@ class drone_inspection_demo_mission(object):
     # Arm System
     success = nepi_rbx.set_rbx_state(self,"ARM",timeout_sec = CMD_STATE_TIMEOUT_SEC)
     # Send Takeoff Command
-    success=nepi_rbx.go_rbx_action(self,"TAKEOFF",timeout_sec =CMD_ACTION_TIMEOUT_SEC)
+    success=nepi_rbx.setup_rbx_action(self,"TAKEOFF",timeout_sec =CMD_ACTION_TIMEOUT_SEC)
     time.sleep(2)
     error_str = str(self.rbx_status.errors_current)
     if success:

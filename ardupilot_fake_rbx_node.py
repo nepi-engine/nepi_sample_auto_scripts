@@ -70,16 +70,18 @@ class ArdupilotRBX:
 
   # RBX State and Mode Dictionaries
   RBX_NAVPOSE_HAS_GPS = True
-  RBX_NAVPOSE_HAS_ORIENTATION = True
-  RBX_NAVPOSE_HAS_HEADING = True
+  RBX_NAVPOSE_HAS_ORIENTATION = False
+  RBX_NAVPOSE_HAS_HEADING = False
 
   RBX_STATES = ["DISARM","ARM"]
   RBX_MODES = ["STABILIZE","LAND","RTL","LOITER","GUIDED","RESUME"]
-  RBX_ACTIONS = ["TAKEOFF","LAUNCH"]
+  RBX_SETUP_ACTIONS = ["TAKEOFF","LAUNCH"]
+  RBX_GO_ACTIONS = []
 
   RBX_STATE_FUNCTIONS = ["disarm","arm"]
   RBX_MODE_FUNCTIONS = ["stabilize","land","rtl","loiter","guided","resume"]
-  RBX_ACTION_FUNCTIONS = ["takeoff","launch"]
+  RBX_SETUP_ACTION_FUNCTIONS = ["takeoff","launch"]  
+  RBX_GO_ACTION_FUNCTIONS = []
 
   # Create shared class variables and thread locks 
   
@@ -209,8 +211,10 @@ class ArdupilotRBX:
                                   getModeIndFunction = self.getModeInd,
                                   setModeIndFunction = self.setModeInd,
                                   checkStopFunction = self.checkStopFunction,
-                                  actions = self.RBX_ACTIONS, 
-                                  setActionIndFunction = self.setActionInd,
+                                  setup_actions = self.RBX_SETUP_ACTIONS, 
+                                  setSetupActionIndFunction = self.setSetupActionInd,
+                                  go_actions = self.RBX_GO_ACTIONS, 
+                                  setGoActionIndFunction = self.setGoActionInd,
                                   manualControlsReadyFunction = None, #self.manualControlsReady,
                                   getMotorControlRatios=None,
                                   setMotorControlRatio=None,
@@ -358,8 +362,13 @@ class ArdupilotRBX:
   def getMotorControlRatios(self):
     return []
 
-  def setActionInd(self,action_ind):
-    set_action_function = globals()[self.RBX_ACTION_FUNCTIONS[action_ind]]
+  def setSetupActionInd(self,action_ind):
+    set_action_function = globals()[self.RBX_SETUP_ACTION_FUNCTIONS[action_ind]]
+    success = set_action_function(self)
+    return success
+
+  def setGoActionInd(self,action_ind):
+    set_action_function = globals()[self.RBX_GO_ACTION_FUNCTIONS[action_ind]]
     success = set_action_function(self)
     return success
 
@@ -514,6 +523,8 @@ class ArdupilotRBX:
       self.publishMsg("Mode set to " + mode_new)
     else:
       self.publishMsg("Setting mode value timed-out")
+      
+ 
 
 
 
@@ -556,6 +567,8 @@ class ArdupilotRBX:
     return self.takeoff_action()
 
   def takeoff_action(self):
+    self.rbx_if.update_prev_errors()
+    self.rbx_if.update_current_errors( [0,0,0,0,0,0,0] )
     cmd_success = False
     takeoff_height_m = float(self.settings_dict['takeoff_height_m'])
     takeoff_min_pitch_deg = float(self.settings_dict['takeoff_min_pitch_deg'])
@@ -563,8 +576,7 @@ class ArdupilotRBX:
     geo_point = GeoPoint()
     geo_point.latitude = self.rbx_if.current_location_wgs84_geo[0]
     geo_point.longitude = self.rbx_if.current_location_wgs84_geo[1]
-    start_alt = self.rbx_if.current_location_wgs84_geo[2]
-    goal_alt = start_alt + takeoff_height_m
+    goal_alt = self.rbx_if.current_location_wgs84_geo[2] + takeoff_height_m
     geo_point.altitude = goal_alt
     self.fake_gps_goto_location_pub.publish(geo_point)
 
@@ -572,14 +584,12 @@ class ArdupilotRBX:
     timeout_sec = self.rbx_if.rbx_info.cmd_timeout
     check_interval_s = float(timeout_sec) / 100
     check_timer = 0
-    alt_error = abs(goal_alt - self.rbx_if.current_location_wgs84_geo[2])
+    alt_error = (goal_alt - self.rbx_if.current_location_wgs84_geo[2])
     while (abs(alt_error) > error_bound_m and check_timer < timeout_sec):
       self.rbx_if.update_current_errors( [0,0,alt_error,0,0,0,0] )
       alt_error = (goal_alt - self.rbx_if.current_location_wgs84_geo[2])
       time.sleep(check_interval_s)
       check_timer += check_interval_s
-    self.rbx_if.update_current_errors( [0,0,0,0,0,0,0] )
-    self.rbx_if.update_prev_errors( [0,0,alt_error,0,0,0,0] )
     if (check_timer < timeout_sec):
       cmd_success = True
       self.takeoff_complete = True
