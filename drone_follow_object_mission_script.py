@@ -239,9 +239,9 @@ class drone_follow_object_mission(object):
     if target_class == OBJ_LABEL_OF_INTEREST and  target_range_m != -999:
       rospy.loginfo("DRONE_FOLLOW: Detected a " + OBJ_LABEL_OF_INTEREST + "with valid range")
       setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
-      sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))
-      sp_y_m = - setpoint_range_m * math.sin(math.radians(target_yaw_d))
-      sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d))
+      sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))  # X is Forward
+      sp_y_m = - setpoint_range_m * math.sin(math.radians(target_yaw_d)) # Y is Right
+      sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d)) # Z is Down
       sp_yaw_d = target_yaw_d
       if IGNORE_YAW_CONTROL:
         sp_yaw_d = -999
