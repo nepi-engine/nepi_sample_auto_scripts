@@ -125,7 +125,8 @@ class drone_follow_object_mission(object):
       new_home_geo.longitude = HOME_LOCATION[1]
       new_home_geo.altitude = HOME_LOCATION[2]
       self.rbx_set_home_pub.publish(new_home_geo)
-      nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
+      if ENABLE_FAKE_GPS:
+      	nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
 
     ###########################     
     # Sutup AI 3d targeting 
@@ -176,7 +177,7 @@ class drone_follow_object_mission(object):
     # Arm System
     success = nepi_rbx.set_rbx_state(self,"ARM",timeout_sec = CMD_STATE_timeout_secEC)
     # Send Takeoff Command
-    success=nepi_rbx.go_rbx_setup_action(self,"TAKEOFF",timeout_sec = CMD_ACTION_timeout_secEC)
+    success=nepi_rbx.setup_rbx_action(self,"TAKEOFF",timeout_sec = CMD_ACTION_timeout_secEC)
     nepi_ros.sleep(2,10)
     ###########################
     # Stop Your Custom Actions

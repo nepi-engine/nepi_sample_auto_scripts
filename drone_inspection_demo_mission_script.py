@@ -118,7 +118,8 @@ class drone_inspection_demo_mission(object):
       new_home_geo.longitude = HOME_LOCATION[1]
       new_home_geo.altitude = HOME_LOCATION[2]
       self.rbx_set_home_pub.publish(new_home_geo)
-      nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
+      if ENABLE_FAKE_GPS:
+      	nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
 
     # Setup mission action processes
     SNAPSHOT_TRIGGER_TOPIC = self.NEPI_BASE_NAMESPACE + "snapshot_trigger"
