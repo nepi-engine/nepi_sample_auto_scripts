@@ -48,8 +48,8 @@ RESET_DELAY_S = 5 # Min delay between triggers
 NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 # AI Detector Subscriber Topics
-AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
-AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
+AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/bounding_boxes"
+AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/detection_image"
 
 # Snapshot Publish Topic
 EVENT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_trigger"
@@ -79,7 +79,7 @@ def initialize_actions():
   wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
   img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, image_callback)
   while img_width == 0 and img_height == 0:
-    print("Waiting for Classifier Detection Image")
+    print("Waiting for ai_detector_mgr Detection Image")
     time.sleep(1)
   img_sub.unregister() # Don't need it anymore
   # Set up object detector subscriber

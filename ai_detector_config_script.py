@@ -53,8 +53,8 @@ class ai_detector_config(object):
     rospy.loginfo("Starting Initialization Processes")
     ## Initialize Class Variables
     ## Define Class Namespaces
-    AI_START_TOPIC = NEPI_BASE_NAMESPACE + "start_classifier"
-    AI_STOP_TOPIC = NEPI_BASE_NAMESPACE + "stop_classifier"
+    AI_START_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/start_classifier"
+    AI_STOP_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/stop_classifier"
     ## Create Class Publishers
     self.start_classifier_pub = rospy.Publisher(AI_START_TOPIC, ClassifierSelection, queue_size=1)
     self.stop_classifier_pub = rospy.Publisher(AI_STOP_TOPIC, Empty, queue_size=10)

@@ -132,7 +132,7 @@ class drone_follow_object_mission(object):
     # Sutup AI 3d targeting 
     ###########################
     # Wait for AI targeting detection topic and subscribe to it
-    AI_TARGETING_TOPIC = "targeting/targeting_data"
+    AI_TARGETING_TOPIC = "ai_detector_mgr/target_localizations"
     rospy.loginfo("DRONE_FOLLOW: Waiting for topic: " + AI_TARGETING_TOPIC)
     ai_targeting_topic_name = nepi_ros.wait_for_topic(AI_TARGETING_TOPIC)
 

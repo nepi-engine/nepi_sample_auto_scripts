@@ -114,9 +114,9 @@ class pantilt_object_tracker_action(object):
     PTX_SET_SOFT_LIMITS_TOPIC = PTX_NAMESPACE + "set_soft_limits"
 
     # AI Detector Subscriber Topics
-    AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
-    AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
-    AI_FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "classifier/found_object"
+    AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/bounding_boxes"
+    AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/detection_image"
+    AI_FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/found_object"
     ## Class subscribers
 
     # Wait for AI detector image topic to publish
@@ -126,7 +126,7 @@ class pantilt_object_tracker_action(object):
     nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
     img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, self.image_callback)
     while self.img_width == 0 and self.img_height == 0 and not rospy.is_shutdown():
-      rospy.loginfo("Waiting for Classifier Detection Image")
+      rospy.loginfo("Waiting for Detection Image")
       nepi_ros.sleep(1,100)
     img_sub.unregister() # Don't need it anymore
     ## Create Class Publishers
