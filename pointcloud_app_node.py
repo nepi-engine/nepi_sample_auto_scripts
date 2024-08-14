@@ -825,8 +825,7 @@ class NepiPointcloudApp(object):
         ros_timestamp = eval('self.' + topic_puid + '_timestamp')
         primary_pc_frame = eval('self.' + topic_puid + '_frame')
         if ros_timestamp is not None:
-          #pc_age = abs(current_time - ros_timestamp)
-          #pc_age = pc_age.to_sec()
+          #pc_age = current_time - ros_timestamp_add
           pc_age = 0.0 # Temp 
           if pc_age <= age_filter_s:
             o3d_ppc = eval('self.' + topic_puid + '_pc')
@@ -851,8 +850,7 @@ class NepiPointcloudApp(object):
             #else:
               #rospy.loginfo("PC_APP: Combine pointcloud not registered yet: " + topic_puid)
             if ros_timestamp_add is not None:
-              #pc_age = abs(current_time - ros_timestamp)
-              #pc_age = pc_age.to_sec()
+              #pc_age = current_time - ros_timestamp_add
               pc_age = 0.0 # Temp 
               if o3d_pc_add is not None:
                 if pc_age <= age_filter_s:
@@ -872,7 +870,7 @@ class NepiPointcloudApp(object):
           if clip_enable:
             min_m = rospy.get_param('~pc_app/process/range_min_m', self.init_proc_range_min_m)
             max_m = rospy.get_param('~pc_app/process/range_max_m', self.init_proc_range_max_m)
-            o3d_pc = nepi_pc.range_clip_spherical(o3d_pc, min_m, max_m)
+            o3d_pc = nepi_pc.range_clip(o3d_pc, min_m, max_m)
 
           if self.bounding_box3d_topic != "NONE" and self.bounding_box3d_msg is not None:
             clip_box_msg = copy.deepcopy(self.bounding_box3d_msg)
@@ -931,7 +929,7 @@ class NepiPointcloudApp(object):
             self.clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
             self.clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
             if start_range_ratio > 0 or stop_range_ratio < 1:
-              o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, self.clip_min_range_m, self.clip_max_range_m)
+              o3d_pc = nepi_pc.range_clip( o3d_pc, self.clip_min_range_m, self.clip_max_range_m)
 
             if cam_pos[0] < 0:
               zoom_ratio = 1 - zoom_ratio

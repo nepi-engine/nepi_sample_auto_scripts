@@ -18,11 +18,9 @@
 # 6) Delays, then waits for next detection
 
 # Requires the following additional scripts are running
-# a) ardupilot_rbx_driver_script.py
+# a) ai_detector_config_script.py
 # (Optional) Some Snapshot Action Automation Script like the following
-#   b)snapshot_event_save_to_disk_action_script.py
-#   c)snapshot_event_send_to_cloud_action_script.py
-# d) (Optional) ardupilot_rbx_fake_gps_process_script.py if a real GPS fix is not available
+#   b)snapshot_trigger_save_to_disk_action_script.py
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
@@ -39,7 +37,7 @@ from nepi_ros_interfaces.msg import RBXInfo, RBXStatus, AxisControls, RBXErrorBo
      RBXGotoPose, RBXGotoPosition, RBXGotoLocation, SettingUpdate
 from nepi_ros_interfaces.srv import RBXCapabilitiesQuery, RBXCapabilitiesQueryResponse
 from sensor_msgs.msg import NavSatFix, Image
-from nepi_ros_interfaces.msg import TargetLocalization
+from nepi_ros_interfaces.msg import TargetLocalization, TargetLocalizations
 
 #########################################
 # USER SETTINGS - Edit as Necessary 
@@ -49,12 +47,12 @@ RBX_ROBOT_NAME = "ardupilot"
 
 # Robot Settings Overides
 ###################
-TAKEOFF_HEIGHT_M = 0.0
+TAKEOFF_HEIGHT_M = 10.0
 # Ignore Yaw Control
 IGNORE_YAW_CONTROL = True
 
 ###!!!!!!!! Set Automation action parameters !!!!!!!!
-OBJ_LABEL_OF_INTEREST = "chair"
+TARGET_TO_FOLLOW = "chair" # Either a target class name (will follow first found of that class) or specific target_id
 TARGET_OFFSET_GOAL_M = 0.1 # How close to set setpoint to target
 TRIGGER_RESET_DELAY_S = 5 # Time between detect/move checks 
 
@@ -69,10 +67,10 @@ GOTO_MAX_ERROR_DEG = 2.0 # Goal reached when all rotation move errors are less t
 GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be good before proceeding
 
 # CMD Timeout Values
-CMD_STATE_timeout_secEC = 5
-CMD_MODE_timeout_secEC = 5
-CMD_ACTION_timeout_secEC = 15
-CMD_GOTO_timeout_secEC = 15
+CMD_STATE_TIMEOUT_SEC = 5
+CMD_MODE_TIMEOUT_SEC = 5
+CMD_ACTION_TIMEOUT_SEC = 20
+CMD_GOTO_TIMEOUT_SEC = 20
 
 #########################################
 # Node Class
@@ -111,7 +109,13 @@ class drone_follow_object_mission(object):
     self.rbx_setting_update_pub.publish(th_update_msg) 
     nepi_ros.sleep(2,10)
     settings_str = str(self.rbx_settings)
-    rospy.loginfo("DRONE_FOLLOW: Udated settings:" + settings_str)
+    rospy.loginfo("DRONE_FOLLOW: Updated settings:" + settings_str)
+
+
+    # Mission Action Topics (If Required)
+    NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
+    SNAPSHOT_TRIGGER_TOPIC = NEPI_BASE_NAMESPACE + "snapshot_trigger"
+    self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
 
     # Setup Fake GPS if Enabled   
     if ENABLE_FAKE_GPS:
@@ -128,11 +132,14 @@ class drone_follow_object_mission(object):
       if ENABLE_FAKE_GPS:
       	nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
 
+
+
+
     ###########################     
     # Sutup AI 3d targeting 
     ###########################
     # Wait for AI targeting detection topic and subscribe to it
-    AI_TARGETING_TOPIC = "ai_detector_mgr/target_localizations"
+    AI_TARGETING_TOPIC = "app_ai_targeting/target_localizations"
     rospy.loginfo("DRONE_FOLLOW: Waiting for topic: " + AI_TARGETING_TOPIC)
     ai_targeting_topic_name = nepi_ros.wait_for_topic(AI_TARGETING_TOPIC)
 
@@ -147,7 +154,7 @@ class drone_follow_object_mission(object):
     self.pre_mission_actions()
     # Start misson processes
     rospy.loginfo("DRONE_FOLLOW: Starting move to object callback")
-    rospy.Subscriber(ai_targeting_topic_name, TargetLocalization, self.move_to_object_callback, queue_size = 1)
+    rospy.Subscriber(ai_targeting_topic_name, TargetLocalizations, self.move_to_object_callback, queue_size = 1)
  
  
   #######################
@@ -173,11 +180,17 @@ class drone_follow_object_mission(object):
     ###########################
     success = True
     # Set Mode to Guided
-    success = nepi_rbx.set_rbx_mode(self,"GUIDED",timeout_sec = CMD_MODE_timeout_secEC)
+    success = nepi_rbx.set_rbx_mode(self,"GUIDED",timeout_sec =CMD_MODE_TIMEOUT_SEC)
     # Arm System
-    success = nepi_rbx.set_rbx_state(self,"ARM",timeout_sec = CMD_STATE_timeout_secEC)
+    success = nepi_rbx.set_rbx_state(self,"ARM",timeout_sec = CMD_STATE_TIMEOUT_SEC)
     # Send Takeoff Command
-    success=nepi_rbx.setup_rbx_action(self,"TAKEOFF",timeout_sec = CMD_ACTION_timeout_secEC)
+    success=nepi_rbx.setup_rbx_action(self,"TAKEOFF",timeout_sec =CMD_ACTION_TIMEOUT_SEC)
+    time.sleep(1)
+    error_str = str(self.rbx_status.errors_current)
+    if success:
+      rospy.loginfo("DRONE_INSPECT: Takeoff completed with errors: " + error_str )
+    else:
+      rospy.loginfo("DRONE_INSPECT: Takeoff failed with errors: " + error_str )
     nepi_ros.sleep(2,10)
     ###########################
     # Stop Your Custom Actions
@@ -191,6 +204,7 @@ class drone_follow_object_mission(object):
     ###########################
     # Start Your Custom Actions
     ###########################
+    self.snapshot_trigger_pub.publish(Empty)
     success = True
     #########################################
 
@@ -206,10 +220,10 @@ class drone_follow_object_mission(object):
     # Start Your Custom Actions
     ###########################
     success = True
-    #success = nepi_rbx.set_rbx_mode(self,"LAND", timeout_sec = CMD_MODE_timeout_secEC) # Uncomment to change to Land mode
-    #success = nepi_rbx.set_rbx_mode(self,"LOITER", timeout_sec = CMD_MODE_timeout_secEC) # Uncomment to change to Loiter mode
-    success = nepi_rbx.set_rbx_mode(self,"RTL", timeout_sec = CMD_MODE_timeout_secEC) # Uncomment to change to home mode
-    #success = nepi_rbx.set_rbx_mode(self,"RESUME", timeout_sec = CMD_MODE_timeout_secEC) # Uncomment to return to last mode
+    #success = nepi_rbx.set_rbx_mode(self,"LAND", timeout_sec = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to Land mode
+    #success = nepi_rbx.set_rbx_mode(self,"LOITER", timeout_sec = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to Loiter mode
+    success = nepi_rbx.set_rbx_mode(self,"RTL", timeout_sec = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to home mode
+    #success = nepi_rbx.set_rbx_mode(self,"RESUME", timeout_sec = CMD_MODE_TIMEOUT_SEC) # Uncomment to return to last mode
     nepi_ros.sleep(1,10)
     ###########################
     # Stop Your Custom Actions
@@ -229,41 +243,49 @@ class drone_follow_object_mission(object):
       self.img_width = img_msg.width
 
   # Action upon detection and targeting for object of interest 
-  def move_to_object_callback(self,target_data_msg):
+  def move_to_object_callback(self,targets_data_msg):
     #rospy.loginfo("DRONE_FOLLOW: Recieved target data message")
     #rospy.loginfo(target_data_msg)
     # Check for the object of interest and take appropriate actions
-    target_class = target_data_msg.name
-    target_range_m = target_data_msg.range_m # [x,y,z]
-    target_yaw_d = target_data_msg.azimuth_deg  # dz
-    target_pitch_d = target_data_msg.elevation_deg # dy
-    if target_class == OBJ_LABEL_OF_INTEREST and  target_range_m != -999:
-      rospy.loginfo("DRONE_FOLLOW: Detected a " + OBJ_LABEL_OF_INTEREST + "with valid range")
-      setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
-      sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))  # X is Forward
-      sp_y_m = - setpoint_range_m * math.sin(math.radians(target_yaw_d)) # Y is Right
-      sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d)) # Z is Down
-      sp_yaw_d = target_yaw_d
-      if IGNORE_YAW_CONTROL:
-        sp_yaw_d = -999
-      setpoint_position_body_m = [sp_x_m,sp_y_m,sp_z_m,sp_yaw_d]
-      # Send poisition update
-      rospy.loginfo("DRONE_FOLLOW: Sending setpoint position body command")
-      rospy.loginfo(setpoint_position_body_m)
-      success = nepi_rbx.goto_rbx_position(self,setpoint_position_body_m)
-      #########################################
-      # Run Mission Actions
-      #rospy.loginfo("DRONE_FOLLOW: Starting Mission Actions")
-      #success = self.mission_actions()
-      ##########################################
-##        rospy.loginfo("DRONE_FOLLOW: Switching back to original mode")
-##        nepi_rbx.set_rbx_mode(self,"RESUME")
-      rospy.loginfo("DRONE_FOLLOW: Delaying next trigger for " + str(TRIGGER_RESET_DELAY_S) + " secs")
-      nepi_ros.sleep(TRIGGER_RESET_DELAY_S,100)
-      rospy.loginfo("DRONE_FOLLOW: Waiting for next " + OBJ_LABEL_OF_INTEREST + " detection")
-    else:
-      rospy.loginfo("DRONE_FOLLOW: Target range value invalid, skipping actions")
-      time.sleep(1)
+    for target_data_msg in targets_data_msg.target_localizations:
+      target_class = target_data_msg.Class
+      target_range_m = target_data_msg.range_m # [x,y,z]
+      target_yaw_d = target_data_msg.azimuth_deg  # dz
+      target_pitch_d = target_data_msg.elevation_deg # dy
+      if target_class == TARGET_TO_FOLLOW and  target_range_m != -999:
+        rospy.loginfo("DRONE_FOLLOW: Detected a " + TARGET_TO_FOLLOW + "with valid range")
+        setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
+        sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))  # X is Forward
+        sp_y_m = setpoint_range_m * math.sin(math.radians(target_yaw_d)) # Y is Right
+        sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d)) # Z is Down
+        sp_yaw_d = target_yaw_d
+        if IGNORE_YAW_CONTROL:
+          sp_yaw_d = -999
+        setpoint_position_body_m = [sp_x_m,sp_y_m,sp_z_m,sp_yaw_d]
+        rospy.logwarn(setpoint_position_body_m)
+        # Send poisition update
+        rospy.loginfo("DRONE_FOLLOW: Sending setpoint position body command")
+        rospy.loginfo(setpoint_position_body_m)
+        success = nepi_rbx.goto_rbx_position(self,setpoint_position_body_m)
+        error_str = str(self.rbx_status.errors_current)
+        if success:
+          rospy.loginfo("DRONE_FOLLOW: Goto Position completed with errors: " + error_str )
+        else:
+          rospy.loginfo("DRONE_FOLLOW: Goto Position failed with errors: " + error_str )
+        nepi_ros.sleep(2,10)
+        #########################################
+        # Run Mission Actions
+        #rospy.loginfo("DRONE_FOLLOW: Starting Mission Actions")
+        #success = self.mission_actions()
+        ##########################################
+  ##        rospy.loginfo("DRONE_FOLLOW: Switching back to original mode")
+  ##        nepi_rbx.set_rbx_mode(self,"RESUME")
+        rospy.loginfo("DRONE_FOLLOW: Delaying next trigger for " + str(TRIGGER_RESET_DELAY_S) + " secs")
+        nepi_ros.sleep(TRIGGER_RESET_DELAY_S,100)
+        rospy.loginfo("DRONE_FOLLOW: Waiting for next " + TARGET_TO_FOLLOW + " detection")
+      else:
+        rospy.loginfo("DRONE_FOLLOW: Target range value invalid, skipping actions")
+        time.sleep(1)
 
 
   #######################

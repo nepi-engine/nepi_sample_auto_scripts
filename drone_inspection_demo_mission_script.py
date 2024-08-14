@@ -166,7 +166,7 @@ class drone_inspection_demo_mission(object):
     ###########################
     # Stop Your Custom Actions
     ###########################
-    print("Pre-Mission Actions Complete")
+    rospy.loginfo("DRONE_INSPECT: Pre-Mission Actions Complete")
     return success
 
   ## Function for custom mission
@@ -177,7 +177,7 @@ class drone_inspection_demo_mission(object):
     success = True
     ##########################################
     # Send goto Location Command
-    print("Starting goto Location Process")
+    rospy.loginfo("DRONE_INSPECT: Starting goto Location Process")
     success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION,timeout_sec =CMD_GOTO_TIMEOUT_SEC)
     error_str = str(self.rbx_status.errors_current)
     if success:
@@ -187,23 +187,23 @@ class drone_inspection_demo_mission(object):
     nepi_ros.sleep(2,10)
     #########################################
     # Run Mission Actions
-    print("Starting Mission Actions")
+    rospy.loginfo("DRONE_INSPECT: Starting Mission Actions")
     success = self.mission_actions()
    #########################################
     # Send goto Location Loop Command
     '''
     for ind in range(3):
       # Send goto Location Command
-      print("Starting goto Location Corners Process")
+      rospy.loginfo("DRONE_INSPECT: Starting goto Location Corners Process")
       success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION_CORNERS[ind],timeout_sec =CMD_GOTO_TIMEOUT_SEC)
       # Run Mission Actions
-      print("Starting Mission Actions")
+      rospy.loginfo("DRONE_INSPECT: Starting Mission Actions")
       success = self.mission_actions()
     '''
     ###########################
     # Stop Your Custom Process
     ###########################
-    print("Mission Processes Complete")
+    rospy.loginfo("DRONE_INSPECT: Mission Processes Complete")
     return success
 
   ## Function for custom mission actions
@@ -220,7 +220,7 @@ class drone_inspection_demo_mission(object):
     ###########################
     # Stop Your Custom Actions
     ###########################
-    print("Mission Actions Complete")
+    rospy.loginfo("DRONE_INSPECT: Mission Actions Complete")
     return success
 
   ## Function for custom post-mission actions
@@ -237,7 +237,7 @@ class drone_inspection_demo_mission(object):
     ###########################
     # Stop Your Custom Actions
     ###########################
-    print("Post-Mission Actions Complete")
+    rospy.loginfo("DRONE_INSPECT: Post-Mission Actions Complete")
     return success
 
 
@@ -247,7 +247,7 @@ class drone_inspection_demo_mission(object):
   ### Function to send snapshot event trigger and wait for completion
   def snapshot(self):
     self.snapshot_trigger_pub.publish(Empty())
-    print("Snapshot trigger sent")
+    rospy.loginfo("DRONE_INSPECT: Snapshot trigger sent")
 
 
   #######################
@@ -271,20 +271,20 @@ if __name__ == '__main__':
   node = node_class()
   #########################################
   # Run Pre-Mission Custom Actions
-  print("Starting Mission Actions")
+  rospy.loginfo("DRONE_INSPECT: Starting Mission Actions")
   success = node.pre_mission_actions()
   if success:
     #########################################
     # Start Mission
     #########################################
     # Send goto Location Command
-    print("Starting Mission Processes")
+    rospy.loginfo("DRONE_INSPECT: Starting Mission Processes")
     success = node.mission()
     #########################################
   # End Mission
   #########################################
   # Run Post-Mission Actions
-  print("Starting Post-Goto Actions")
+  rospy.loginfo("DRONE_INSPECT: Starting Post-Goto Actions")
   success = node.post_mission_actions()
   nepi_ros.sleep(10,100)
   #########################################

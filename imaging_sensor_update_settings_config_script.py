@@ -31,6 +31,7 @@ SENSOR_NAME = "color_2d_image"
 
 Update_Rate_Hz = 0.5 # Send update every 2 second
 
+# Replace with actual setting values for your imaging device
 SETTINGS_UPDATE_LIST = [["Discrete","TestDiscrete","Option_3"],
   			["String","TestString","NewString"],
   			["Bool","TestBool","False"],
