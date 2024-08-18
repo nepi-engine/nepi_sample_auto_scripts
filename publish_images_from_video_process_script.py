@@ -30,11 +30,11 @@ from sensor_msgs.msg import Image
 Current_Path = (os.path.dirname(os.path.realpath(__file__)) )
 
 ### Open and publish image
-Image_Folder= Current_Path + "/sample_data"
-Image_File = "test_image.png"
+Video_Folder= Current_Path + "/sample_data"
+Video_File = "sample_avi_960x400_ocean.avi"
 
-Publish_Image_Topic_Name = "test_image"
-Publish_Image_Rate_Hz = 20
+Publish_Image_Encoding = "bgr8"  # "bgr8" or "mono8"
+Publish_Image_Topic_Name =  "video_images"
 
 #########################################
 # ROS NAMESPACE SETUP
@@ -47,7 +47,8 @@ NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 # Node Class
 #########################################
 
-class publish_image_from_file_process(object):
+class publish_images_from_video_process(object):
+  count = 0
   #######################
   ### Node Initialization
   def __init__(self):
@@ -58,21 +59,33 @@ class publish_image_from_file_process(object):
     ## Create Class Sevices    
     ## Create Class Publishers
     # Open image file
-    if os.path.exists(Image_Folder):
-      file2open = (Image_Folder + '/' + Image_File)
-      if os.path.isfile(file2open):
-        print("Opening File: " + file2open)
-        cv_image = cv2.imread(file2open)
-        print(cv_image.shape)
-        self.img_out_msg = nepi_img.cv2img_to_rosimg(cv_image)
-        # Setup custom image publish topic
-        IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + Publish_Image_Topic_Name
-        print("Publishing image to topic: " + IMAGE_OUTPUT_TOPIC)
-        self.image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
-        # Start a timed image publish callback
-        pub_interval_sec = float(1)/Publish_Image_Rate_Hz
-        print("Publishing image at " + str(Publish_Image_Rate_Hz) + " Hz")
-        rospy.Timer(rospy.Duration(pub_interval_sec), self.image_publish_callback)
+    if os.path.exists(Video_Folder):
+      self.file2open = (Video_Folder + '/' + Video_File)
+      if os.path.isfile(self.file2open):
+        print("Opening File: " + self.file2open)
+        self.vidcap = cv2.VideoCapture(self.file2open)
+        if self.vidcap.isOpened() == True:
+          success,image = self.vidcap.read()
+          shape_str = str(image.shape)
+          print('Image size: ' + shape_str)
+          fps = self.vidcap.get(5)
+          print('Frames per second : ', fps,'FPS')
+
+          frame_count = self.vidcap.get(7)
+          print('Frame count : ', frame_count)
+
+          if success:
+            # Setup custom image publish topic
+            IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + Publish_Image_Topic_Name
+            print("Publishing image to topic: " + IMAGE_OUTPUT_TOPIC)
+            self.image_pub = rospy.Publisher(IMAGE_OUTPUT_TOPIC, Image, queue_size=10)
+            # Start a timed image publish callback
+            pub_interval_sec = float(1)/fps
+            print("Publishing image at " + str(fps) + " Hz")
+            rospy.Timer(rospy.Duration(pub_interval_sec), self.image_publish_callback)
+          else:
+            print("Unable to grap image from video file")
+            rospy.signal_shutdown("Unable to grap image from video file")
       else:
         print("File not found in specified folder")
     else:
@@ -86,9 +99,16 @@ class publish_image_from_file_process(object):
 
   ### Add your CV2 image customization code here
   def image_publish_callback(self,timer):
-    # Publish new image to ros
-    if not rospy.is_shutdown():
-      self.image_pub.publish(self.img_out_msg) 
+    success,cv_image = self.vidcap.read()
+    if success == False:
+      self.vidcap.release()
+      time.sleep(1)
+      self.vidcap = cv2.VideoCapture(self.file2open)
+    else: 
+      # Publish new image to ros
+      img_out_msg = nepi_img.cv2img_to_rosimg(cv_image,encoding=Publish_Image_Encoding)
+      if not rospy.is_shutdown():
+        self.image_pub.publish(img_out_msg) 
 
 
 
