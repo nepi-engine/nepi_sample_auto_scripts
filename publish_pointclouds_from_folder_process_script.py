@@ -154,6 +154,7 @@ class publish_pointclouds_from_file_process(object):
     seq_num = self.seq_num + 1
     for ind in range(len(self.pc_msgs_list)):  
       if not rospy.is_shutdown():
+        self.pc_msgs_list[ind].header.stamp = rospy.Time.now()
         self.pc_pubs_list[ind].publish(self.pc_msgs_list[ind])
 
   #######################

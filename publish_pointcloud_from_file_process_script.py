@@ -107,6 +107,7 @@ class publish_pointcloud_from_file_process(object):
     self.pc2_out_msg.header.seq = self.seq_num
     # Publish new pointcloud to ros
     if not rospy.is_shutdown():
+      self.custom_pointcloud_pub.header.stamp = rospy.Time.now()
       self.custom_pointcloud_pub.publish(self.pc2_out_msg)
       # You can view the enhanced_2D_pointcloud topic at 
       # //192.168.179.103:9091/ in a connected web browser
