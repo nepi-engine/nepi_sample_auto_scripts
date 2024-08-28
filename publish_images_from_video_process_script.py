@@ -30,10 +30,12 @@ from sensor_msgs.msg import Image
 Current_Path = (os.path.dirname(os.path.realpath(__file__)) )
 
 ### Open and publish image
-Video_Folder= Current_Path + "/sample_data"
-Video_File = "sample_avi_960x400_ocean.avi"
+#Source_Folder= Current_Path + "/sample_data"
+Source_Folder= "/mnt/nepi_storage/sample_data"
 
-Publish_Image_Encoding = "bgr8"  # "bgr8" or "mono8"
+Source_File = "sample_avi_960x400_ocean.avi"
+
+Publish_Image_Encoding = "bgr8"  # "bgr8", "rgb8", or "mono8"
 Publish_Image_Topic_Name =  "video_images"
 
 #########################################
@@ -59,8 +61,8 @@ class publish_images_from_video_process(object):
     ## Create Class Sevices    
     ## Create Class Publishers
     # Open image file
-    if os.path.exists(Video_Folder):
-      self.file2open = (Video_Folder + '/' + Video_File)
+    if os.path.exists(Source_Folder):
+      self.file2open = (Source_Folder + '/' + Source_File)
       if os.path.isfile(self.file2open):
         print("Opening File: " + self.file2open)
         self.vidcap = cv2.VideoCapture(self.file2open)
@@ -108,6 +110,7 @@ class publish_images_from_video_process(object):
       # Publish new image to ros
       img_out_msg = nepi_img.cv2img_to_rosimg(cv_image,encoding=Publish_Image_Encoding)
       if not rospy.is_shutdown():
+        img_out_msg.header.stamp = rospy.Time.now()
         self.image_pub.publish(img_out_msg) 
 
 

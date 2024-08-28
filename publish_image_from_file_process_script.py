@@ -30,9 +30,11 @@ from sensor_msgs.msg import Image
 Current_Path = (os.path.dirname(os.path.realpath(__file__)) )
 
 ### Open and publish image
-Image_Folder= Current_Path + "/sample_data"
+#Source_Folder= Current_Path + "/sample_data"
+Source_Folder= "/mnt/nepi_storage/sample_data"
 Image_File = "test_image.png"
 
+Publish_Image_Encoding = "bgr8"  # "bgr8", "rgb8", or "mono8"
 Publish_Image_Topic_Name = "test_image"
 Publish_Image_Rate_Hz = 20
 
@@ -58,13 +60,13 @@ class publish_image_from_file_process(object):
     ## Create Class Sevices    
     ## Create Class Publishers
     # Open image file
-    if os.path.exists(Image_Folder):
-      file2open = (Image_Folder + '/' + Image_File)
+    if os.path.exists(Source_Folder):
+      file2open = (Source_Folder + '/' + Image_File)
       if os.path.isfile(file2open):
         print("Opening File: " + file2open)
         cv_image = cv2.imread(file2open)
         print(cv_image.shape)
-        self.img_out_msg = nepi_img.cv2img_to_rosimg(cv_image)
+        self.img_out_msg = nepi_img.cv2img_to_rosimg(cv_image,encoding=Publish_Image_Encoding)
         # Setup custom image publish topic
         IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + Publish_Image_Topic_Name
         print("Publishing image to topic: " + IMAGE_OUTPUT_TOPIC)
@@ -88,6 +90,7 @@ class publish_image_from_file_process(object):
   def image_publish_callback(self,timer):
     # Publish new image to ros
     if not rospy.is_shutdown():
+      self.img_out_msg.header.stamp = rospy.Time.now()
       self.image_pub.publish(self.img_out_msg) 
 
 

@@ -39,7 +39,8 @@ from nepi_edge_sdk_base import nepi_pc
 Current_Path = (os.path.dirname(os.path.realpath(__file__)) )
 
 ### Open and publish image
-Pointcloud_Path = Current_Path + "/sample_data/"
+#Source_Folder = Current_Path + "/sample_data/"
+Source_Folder = "/mnt/nepi_storage/sample_data"
 
 Publish_Image_Topic_Name = "test_pointcloud"
 Publish_Image_Rate_Hz = 5
@@ -60,19 +61,19 @@ TRANSFORM_PUB_NAMESPACE = NEPI_BASE_NAMESPACE + "pointcloud_app/add_transform"
 
 
 
-class publish_pointclouds_from_file_process(object):
+class publish_pointclouds_from_folder_process(object):
   seq_num = 0
-
+  transforms_msg_list = dict()
   #######################
   ### Node Initialization
   def __init__(self):
     rospy.loginfo("Starting Initialization Processes")
     # Get list of image files in the folder
-    print("Looking for pcd files in folder: " + Pointcloud_Path)
-    if os.path.exists(Pointcloud_Path):
-      [pcd_file_list, num_pcd_files] = nepi_ros.get_file_list(Pointcloud_Path,'pcd')
+    print("Looking for pcd files in folder: " + Source_Folder)
+    if os.path.exists(Source_Folder):
+      [pcd_file_list, num_pcd_files] = nepi_ros.get_file_list(Source_Folder,'pcd')
       print(num_pcd_files)
-      [transforms_file_list, num_tf_files] = nepi_ros.get_file_list(Pointcloud_Path,'txt')
+      [transforms_file_list, num_tf_files] = nepi_ros.get_file_list(Source_Folder,'txt')
       if num_pcd_files > 0:
         print("Found pointcloud files")
         for pcd_file in pcd_file_list:
@@ -81,20 +82,21 @@ class publish_pointclouds_from_file_process(object):
           transform_file = pcd_file.replace('.pcd','_transform.txt')
           if transform_file not in transforms_file_list:
             print("No transform file found, so creating one")
-            new_file = open(transform_file,'w')
-            new_file.writelines(Zero_Transform)
-            new_file.close()
+            try:
+              new_file = open(transform_file,'w')
+              new_file.writelines(Zero_Transform)
+              new_file.close()
+            except:
+              pass
       else:
-        print("No pcd files found in folder " + Pointcloud_Path)
+        print("No pcd files found in folder " + Source_Folder)
     else:
-      print("Folder " + Pointcloud_Path + " not found")
+      print("Folder " + Source_Folder + " not found")
 
-    # Create a transform publisher
-    transform_pub = rospy.Publisher(TRANSFORM_PUB_NAMESPACE,Frame3DTransformUpdate,queue_size=10)
     # Read Pointclouds in from found files in folder
     self.pc_pubs_list = []
     self.pc_msgs_list = []
-    [transforms_file_list, num_tf_files] = nepi_ros.get_file_list(Pointcloud_Path,'txt')
+    [transforms_file_list, num_tf_files] = nepi_ros.get_file_list(Source_Folder,'txt')
     print("Loading tranfer files")
     for transform_file in transforms_file_list:
           transform_filename = os.path.basename(transform_file).split('.')[0]
@@ -116,23 +118,26 @@ class publish_pointclouds_from_file_process(object):
         transform_val_list = []
         for str_val in transform_str_list:
           transform_val_list.append(float(str_val))
-        transform_msg = Frame3DTransform()
-        transform_msg.translate_vector.x = transform_val_list[0]
-        transform_msg.translate_vector.y  = transform_val_list[1]
-        transform_msg.translate_vector.z  = transform_val_list[2]
-        transform_msg.rotate_vector.x = transform_val_list[3]
-        transform_msg.rotate_vector.y = transform_val_list[4]
-        transform_msg.rotate_vector.z = transform_val_list[5]
-        transform_msg.heading_offset = transform_val_list[6]
+      else:
+        transform_val_list = [0,0,0,0,0,0,0]
+      transform_msg = Frame3DTransform()
+      transform_msg.translate_vector.x = transform_val_list[0]
+      transform_msg.translate_vector.y  = transform_val_list[1]
+      transform_msg.translate_vector.z  = transform_val_list[2]
+      transform_msg.rotate_vector.x = transform_val_list[3]
+      transform_msg.rotate_vector.y = transform_val_list[4]
+      transform_msg.rotate_vector.z = transform_val_list[5]
+      transform_msg.heading_offset = transform_val_list[6]
 
-        transform_update_msg = Frame3DTransformUpdate()
-        transform_update_msg.topic_namespace = pc_namespace
-        transform_update_msg.transform = transform_msg
-        print("Publishing transform update msg")
-        print(transform_update_msg)
-        transform_pub.publish(transform_update_msg)
+      transform_update_msg = Frame3DTransformUpdate()
+      transform_update_msg.topic_namespace = pc_namespace
+      transform_update_msg.transform = transform_msg
+      self.transforms_msg_list = transform_update_msg
+ 
       print("Creating pointcloud publisher: " + pc_namespace)
       self.pc_pubs_list.append(rospy.Publisher(pc_namespace, PointCloud2, queue_size=1))
+    # Create a transform publisher
+    transform_pub = rospy.Publisher(TRANSFORM_PUB_NAMESPACE,Frame3DTransformUpdate,queue_size=10)
     nepi_ros.sleep(1,10)
     # Start Pointclouds publisher
     pub_interval_sec = float(1)/Publish_Image_Rate_Hz
@@ -156,6 +161,13 @@ class publish_pointclouds_from_file_process(object):
       if not rospy.is_shutdown():
         self.pc_msgs_list[ind].header.stamp = rospy.Time.now()
         self.pc_pubs_list[ind].publish(self.pc_msgs_list[ind])
+        if transform_msg_list[ind] != None:
+          transform_add_topic = nepi_ros.find_topic(TRANSFORM_PUB_NAMESPACE)
+          if transoform_add_topic != "":
+            #print("Publishing transform update msg")
+            #print(transform_update_msg)
+            transform_pub.publish(transform_msg_list[ind])
+            transform_msg_list[ind] = None
 
   #######################
   # Node Cleanup Function

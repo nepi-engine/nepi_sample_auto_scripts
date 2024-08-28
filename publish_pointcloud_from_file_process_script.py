@@ -37,8 +37,9 @@ from nepi_edge_sdk_base import nepi_pc
 Current_Path = (os.path.dirname(os.path.realpath(__file__)) )
 
 ### Open and publish image
-Pointcloud_Path = Current_Path + "/sample_data"
-Pointcloud_File="test_pointcloud.pcd"
+#Source_Folder = Current_Path + "/sample_data"
+Source_Folder = "/mnt/nepi_storage/sample_data"
+Source_File="test_pointcloud.pcd"
 
 Publish_Image_Topic_Name = "test_pointcloud"
 Publish_Image_Rate_Hz = 2
@@ -72,11 +73,10 @@ class publish_pointcloud_from_file_process(object):
 
     ## Start Node Processes
     # Read PointCloud fron File
-    pc_in = (Pointcloud_Path + Pointcloud_File)
+    pc_in = (Source_Folder + Source_File)
     time_start = time.time()
     self.open3d_pc = o3d.io.read_point_cloud(pc_in)
     print(type(self.open3d_pc))	
-    print(isinstance(self.open3d_pc,PointCloud))
     self.pc2_out_msg = nepi_pc.o3dpc_to_rospc(self.open3d_pc)
     print("Number of points: " + str(self.pc2_out_msg.width))
     print("PointCloud2 header")
@@ -107,7 +107,7 @@ class publish_pointcloud_from_file_process(object):
     self.pc2_out_msg.header.seq = self.seq_num
     # Publish new pointcloud to ros
     if not rospy.is_shutdown():
-      self.custom_pointcloud_pub.header.stamp = rospy.Time.now()
+      self.pc2_out_msg.header.stamp = rospy.Time.now()
       self.custom_pointcloud_pub.publish(self.pc2_out_msg)
       # You can view the enhanced_2D_pointcloud topic at 
       # //192.168.179.103:9091/ in a connected web browser

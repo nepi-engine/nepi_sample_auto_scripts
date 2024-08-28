@@ -30,10 +30,15 @@ from nepi_edge_sdk_base import nepi_img
 Current_Path = (os.path.dirname(os.path.realpath(__file__)) )
 
 ### Open and publish images
-Image_Folder= Current_Path + "/sample_data"
-Image_Type = 'png'
+Source_Folder= Current_Path + "/sample_data"
+Source_Folder= "/mnt/nepi_storage/sample_data"
+File_Types = ['png','PNG','jpg','jpeg','JPG']
 
+Publish_Image_Encoding = "bgr8"  # "bgr8", "rgb8", or "mono8"
 Publish_Images_Topic_Name = "test_images"
+
+
+
 
 #########################################
 # ROS NAMESPACE SETUP
@@ -48,8 +53,8 @@ NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 #########################################
 
 class publish_images_from_folder_process(object):
-  current_image_ind = 0
-  num_image_files = 0
+  current_file_ind = 0
+  num_files = 0
   
   #######################
   ### Node Initialization
@@ -67,15 +72,20 @@ class publish_images_from_folder_process(object):
     ## Start Class Subscribers
     ## Start Node Processes
     # Get list of image files in the folder
-    if os.path.exists(Image_Folder):
-      [self.image_file_list, self.num_image_files] = nepi_ros.get_file_list(Image_Folder,Image_Type)
-      if self.num_image_files > 0:
+    self.file_list = []
+    self.num_files = 0
+    if os.path.exists(Source_Folder):
+      for f_type in File_Types:
+        [file_list, num_files] = nepi_ros.get_file_list(Source_Folder,f_type)
+        self.file_list.extend(file_list)
+        self.num_files += num_files
+      if self.num_files > 0:
         pub_interval_sec = 1
         rospy.Timer(rospy.Duration(pub_interval_sec), self.image_publish_callback)
       else:
-        print("No image files fount in folder " + Image_Folder + " not found")
+        print("No image files found in folder " + Source_Folder + " not found")
     else:
-      print("Folder " + Image_Folder + " not found")
+      print("Folder " + Source_Folder + " not found")
     ## Initiation Complete
     rospy.loginfo("Initialization Complete")
 
@@ -84,17 +94,18 @@ class publish_images_from_folder_process(object):
 
   ### Add your CV2 image customization code here
   def image_publish_callback(self,timer):
-    if self.current_image_ind > (self.num_image_files-1):
-      self.current_image_ind = 0 # Start over
-    file2open = self.image_file_list[self.current_image_ind]
-    self.current_image_ind = self.current_image_ind + 1
+    if self.current_file_ind > (self.num_files-1):
+      self.current_file_ind = 0 # Start over
+    file2open = self.file_list[self.current_file_ind]
+    self.current_file_ind = self.current_file_ind + 1
     print("Opening File: " + file2open)
     cv_image = cv2.imread(file2open)
     print(cv_image.shape)
     #Convert image from cv2 to ros
-    img_out_msg = nepi_img.cv2img_to_rosimg(cv_image)
+    img_out_msg = nepi_img.cv2img_to_rosimg(cv_image,encoding=Publish_Image_Encoding)
     # Publish new image to ros
     if not rospy.is_shutdown():
+      img_out_msg.header.stamp = rospy.Time.now()
       self.image_pub.publish(img_out_msg) 
 
 
