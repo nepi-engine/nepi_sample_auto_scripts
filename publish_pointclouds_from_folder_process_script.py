@@ -53,7 +53,7 @@ Zero_Transform = '0 0 0 0 0 0 0'
 
 # ROS namespace setup
 NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
-TRANSFORM_PUB_NAMESPACE = NEPI_BASE_NAMESPACE + "pointcloud_app/add_transform"
+TRANSFORM_PUB_NAMESPACE = NEPI_BASE_NAMESPACE + "app_pointcloud/add_transform"
 
 #########################################
 # Node Class
@@ -63,7 +63,7 @@ TRANSFORM_PUB_NAMESPACE = NEPI_BASE_NAMESPACE + "pointcloud_app/add_transform"
 
 class publish_pointclouds_from_folder_process(object):
   seq_num = 0
-  transforms_msg_list = dict()
+  transforms_msg_list = []
   #######################
   ### Node Initialization
   def __init__(self):
@@ -109,7 +109,7 @@ class publish_pointclouds_from_folder_process(object):
       pc_topic_name = pc_topic_name.replace('.','')
       pc_namespace = NEPI_BASE_NAMESPACE + 'pointclouds/' + pc_topic_name
       # Publish pointcloud transforms to pointcloud app
-      transform_file = pcd_file.split('.')[0] + ".txt"
+      transform_file = pcd_file.split('.')[0] + "_transform.txt"
       if transform_file in transforms_file_list:
         file = open(transform_file,'r')
         transform_str = file.readline()
@@ -132,12 +132,13 @@ class publish_pointclouds_from_folder_process(object):
       transform_update_msg = Frame3DTransformUpdate()
       transform_update_msg.topic_namespace = pc_namespace
       transform_update_msg.transform = transform_msg
-      self.transforms_msg_list = transform_update_msg
+      self.transforms_msg_list.append(transform_update_msg)
  
       print("Creating pointcloud publisher: " + pc_namespace)
       self.pc_pubs_list.append(rospy.Publisher(pc_namespace, PointCloud2, queue_size=1))
     # Create a transform publisher
-    transform_pub = rospy.Publisher(TRANSFORM_PUB_NAMESPACE,Frame3DTransformUpdate,queue_size=10)
+    print(TRANSFORM_PUB_NAMESPACE)
+    self.transform_pub = rospy.Publisher(TRANSFORM_PUB_NAMESPACE,Frame3DTransformUpdate,queue_size=10)
     nepi_ros.sleep(1,10)
     # Start Pointclouds publisher
     pub_interval_sec = float(1)/Publish_Image_Rate_Hz
@@ -161,13 +162,15 @@ class publish_pointclouds_from_folder_process(object):
       if not rospy.is_shutdown():
         self.pc_msgs_list[ind].header.stamp = rospy.Time.now()
         self.pc_pubs_list[ind].publish(self.pc_msgs_list[ind])
-        if transform_msg_list[ind] != None:
+        print(self.transforms_msg_list[ind])
+        if self.transforms_msg_list[ind] != None:
           transform_add_topic = nepi_ros.find_topic(TRANSFORM_PUB_NAMESPACE)
-          if transoform_add_topic != "":
+          print(transform_add_topic)
+          if transform_add_topic != "":
             #print("Publishing transform update msg")
             #print(transform_update_msg)
-            transform_pub.publish(transform_msg_list[ind])
-            transform_msg_list[ind] = None
+            self.transform_pub.publish(self.transforms_msg_list[ind])
+            self.transforms_msg_list[ind] = None
 
   #######################
   # Node Cleanup Function

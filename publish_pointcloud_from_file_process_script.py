@@ -73,7 +73,7 @@ class publish_pointcloud_from_file_process(object):
 
     ## Start Node Processes
     # Read PointCloud fron File
-    pc_in = (Source_Folder + Source_File)
+    pc_in = (Source_Folder + "/" + Source_File)
     time_start = time.time()
     self.open3d_pc = o3d.io.read_point_cloud(pc_in)
     print(type(self.open3d_pc))	
