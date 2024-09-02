@@ -27,6 +27,7 @@ import glob
 import fileinput
 import random
 
+IMAGE_FILE_TYPES = ['jpg','JPG','jpeg','png','PNG']
 
 ##########################################
 # SETUP - Edit as Necessary 
@@ -42,7 +43,9 @@ def check_data_set(image_dir):
   data_size = len(files)
   ind = 0
   for f in os.listdir(image_dir):
-    if f.endswith("png"):
+    f_ext = os.path.splitext(f)[1]
+    f_ext = f_ext.replace(".","")
+    if f_ext in IMAGE_FILE_TYPES:
       #print('Found image file')
       image_file = (image_dir + '/' + f)
       #print(image_file)
@@ -58,7 +61,7 @@ def check_data_set(image_dir):
         print('Deleting file')
         os.remove(image_file)
         print('Looking for label file')
-        label_file = (image_dir + '/' + f.split(".png")[0]+'.xml')
+        label_file = (image_dir + '/' + f.split(f_ext)[0]+'xml')
         #print(label_file)
         if exists(label_file):
           print('Found xml label file for bad image:')

@@ -24,11 +24,12 @@ import glob
 import fileinput
 import random
 
+IMAGE_FILE_TYPES = ['jpg','JPG','jpeg','png','PNG']
+
 ##########################################
 # SETUP - Edit as Necessary 
 ##########################################
 TEST_DATA_PERCENTAGE = 20
-LABEL_FILE_TYPE_EXT = 'txt'
 
 ##########################################
 # Methods
@@ -40,13 +41,18 @@ def add_data_set(image_dir,f_train,f_test,f_unlabeled):
   ind = 0
   data_test_size = int(float(1)/float(TEST_DATA_PERCENTAGE) * data_size)
   test_array = random.sample(range(data_size), k=data_test_size)
-  for f in os.listdir(image_dir):
+  files = os.listdir(image_dir)
+  #print("Found Files:")
+  #print(files)
+  for f in files:
+    f_ext = os.path.splitext(f)[1]
+    f_ext = f_ext.replace(".","")
     try:
-      if f.endswith("png"):
-        #print('Found image file"')
+      if f_ext in IMAGE_FILE_TYPES:
+        print('Found image file"')
         image_file = (image_dir + '/' + f)
         #print(image_file)
-        label_file = (image_dir + '/' + f.split(".png")[0]+ '.' + LABEL_FILE_TYPE_EXT)
+        label_file = (image_dir + '/' + f.split(f_ext)[0]+'txt')
         #print('Looking for label file:')
         #print(label_file)
         if exists(label_file):
@@ -63,8 +69,8 @@ def add_data_set(image_dir,f_train,f_test,f_unlabeled):
           print(image_file)
           print('Adding image to data_unlabeled file list')
           f_unlabeled.write(image_file + '\n')
-    except:
-      continue
+    except Exception as e:
+      print("Excepton on file write: " + str(e))
             
 def get_folder_list(script_folder_path):
   filelist=os.listdir(script_folder_path + '/')

@@ -31,9 +31,10 @@ Current_Path = (os.path.dirname(os.path.realpath(__file__)) )
 
 ### Open and publish images
 Source_Folder= Current_Path + "/sample_data"
-Source_Folder= "/mnt/nepi_storage/sample_data"
+Source_Folder= "/mnt/nepi_storage/data_labeling/HardHats/Images"
 File_Types = ['png','PNG','jpg','jpeg','JPG']
 
+Publish_Image_Size = [800,600]
 Publish_Image_Encoding = "bgr8"  # "bgr8", "rgb8", or "mono8"
 Publish_Images_Topic_Name = "test_images"
 
@@ -100,7 +101,9 @@ class publish_images_from_folder_process(object):
     self.current_file_ind = self.current_file_ind + 1
     print("Opening File: " + file2open)
     cv_image = cv2.imread(file2open)
-    print(cv_image.shape)
+    shape = cv_image.shape
+    print(shape)
+    cv_image = cv2.resize(cv_image,(Publish_Image_Size[0],Publish_Image_Size[1]))
     #Convert image from cv2 to ros
     img_out_msg = nepi_img.cv2img_to_rosimg(cv_image,encoding=Publish_Image_Encoding)
     # Publish new image to ros
