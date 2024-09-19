@@ -75,14 +75,14 @@ class opencv_image_contours_process(object):
   ### Add your CV2 image customization code here
   def image_custom_callback(self,ros_img_msg):
     #Convert image from ros to cv2
-    cv2_image = nepi_img.rosimg_2_cv2img(ros_img_msg)
+    cv2_image = nepi_img.rosimg_to_cv2img(ros_img_msg)
 
     # Get and overlay image contours
-    [contours, hierarchy] = nepi_img.cv2_get_contours(cv2_image)
-    cv2_image = nepi_img.cv2_overlay_contours(cv2_image,contours)
+    [contours, hierarchy] = nepi_img.get_contours(cv2_image)
+    cv2_image = nepi_img.overlay_contours(cv2_image,contours)
  
     #Convert image from cv2 to ros
-    ros_img_out_msg = nepi_img.cv2img_to_rosimg(cv2_image)
+    ros_img_out_msg = nepi_img.cv2img_to_rosimg(cv2_image, encoding = "bgr8")
     # Publish new image to ros
     if not rospy.is_shutdown():
       self.contour_image_pub.publish(ros_img_out_msg) # You can view the enhanced_2D_image
