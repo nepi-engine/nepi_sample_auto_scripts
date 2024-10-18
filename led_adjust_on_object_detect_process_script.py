@@ -23,6 +23,7 @@ import rospy
 import statistics
 import numpy as np
 from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_msg
 
 from std_msgs.msg import Empty, Float32
 from sensor_msgs.msg import Image
@@ -45,21 +46,24 @@ LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 # ROS NAMESPACE SETUP
 #########################################
 
-# ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
-
 
 #########################################
 # Node Class
 #########################################
 
-class led_adjust_on_object_detect_process(object):
+class ledAiAdjust(object):
 
   #######################
   ### Node Initialization
-  
+  DEFAULT_NODE_NAME = "auto_led_ai_adjust" # Can be overwitten by luanch command
   def __init__(self):
-    rospy.loginfo("Starting Initialization Processes")
+    #### AUTO SCRIPT INIT SETUP ####
+    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+    self.node_name = nepi_ros.get_node_name()
+    self.base_namespace = nepi_ros.get_base_namespace()
+    nepi_msg.createMsgPublishers(self)
+    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+    ##############################
     ## Initialize Class Variables
     self.led_intensity_pub = None
     self.object_label_of_interest = OBJECT_LABEL_OF_INTEREST
@@ -73,40 +77,46 @@ class led_adjust_on_object_detect_process(object):
     self.object_detected = False
     ## Define Class Namespaces
     # AI Detector Subscriber Topics
-    AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "classifier/bounding_boxes"
-    AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "classifier/detection_image"
-    AI_FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "classifier/found_object"
+    AI_BOUNDING_BOXES_TOPIC = self.base_namespace + "classifier/bounding_boxes"
+    AI_DETECTION_IMAGE_TOPIC = self.base_namespace + "classifier/detection_image"
+    AI_FOUND_OBJECT_TOPIC = self.base_namespace + "classifier/found_object"
     ## Class subscribers
 
     # Wait for AI detector image topic to publish
-    rospy.loginfo("Connecting to NEPI Detector Image Topic")
-    rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
-    rospy.loginfo("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
+    nepi_msg.publishMsgInfo(self,"Connecting to NEPI Detector Image Topic")
+    nepi_msg.publishMsgInfo(AI_DETECTION_IMAGE_TOPIC )
+    nepi_msg.publishMsgInfo(self,"Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
     nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
     img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, self.image_callback)
     while self.img_width == 0 and self.img_height == 0 and not rospy.is_shutdown():
-      rospy.loginfo("Waiting for Classifier Detection Image")
+      nepi_msg.publishMsgInfo(self,"Waiting for Classifier Detection Image")
       nepi_ros.sleep(1,100)
     img_sub.unregister() # Don't need it anymore
     ## Create Class Publishers
     led_control_topic_name = LED_CONTROL_TOPIC_NAME
-    rospy.loginfo("Waiting for topic name: " + led_control_topic_name)
+    nepi_msg.publishMsgInfo(self,"Waiting for topic name: " + led_control_topic_name)
     led_control_topic=nepi_ros.wait_for_topic(led_control_topic_name)
-    rospy.loginfo("Found topic: " + led_control_topic)
+    nepi_msg.publishMsgInfo(self,"Found topic: " + led_control_topic)
     self.led_intensity_pub = rospy.Publisher(led_control_topic, Float32, queue_size = 1)
     ## Start Class Subscribers
     # Set up object detector subscriber
-    rospy.loginfo("Starting object detection subscriber: Object of interest = " + self.object_label_of_interest + "...")
+    nepi_msg.publishMsgInfo(self,"Starting object detection subscriber: Object of interest = " + self.object_label_of_interest + "...")
     rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, self.object_detected_callback, queue_size = 1)
     #Set up found object subscriber which monitors all AI outputs
-    rospy.loginfo("Starting found object subscriber")
+    nepi_msg.publishMsgInfo(self,"Starting found object subscriber")
     rospy.Subscriber(AI_FOUND_OBJECT_TOPIC, ObjectCount, self.found_object_callback, queue_size = 1)
     ## Start Node Processes
     # Setup watchdog process
-    rospy.loginfo("Setting up watchdog timer")
+    nepi_msg.publishMsgInfo(self,"Setting up watchdog timer")
     rospy.Timer(rospy.Duration(self.wd_check_interval_sec), self.watchdog_timer_callback)
+    #########################################################
     ## Initiation Complete
-    rospy.loginfo("Initialization Complete")
+    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    #Set up node shutdown
+    nepi_ros.on_shutdown(self.cleanup_actions)
+    # Spin forever (until object is detected)
+    #nepi_ros.spin()
+    #########################################################
 
 
 
@@ -117,7 +127,7 @@ class led_adjust_on_object_detect_process(object):
   def image_callback(self,img_msg):
     # This is just to get the image size for ratio purposes
     if (self.img_height == 0 and self.img_width == 0):
-      rospy.loginfo("Initial input image received. Size = " + str(img_msg.width) + "x" + str(img_msg.height))
+      nepi_msg.publishMsgInfo(self,"Initial input image received. Size = " + str(img_msg.width) + "x" + str(img_msg.height))
       self.img_height = img_msg.height
       self.img_width = img_msg.width
 
@@ -163,7 +173,7 @@ class led_adjust_on_object_detect_process(object):
   def found_object_callback(self,found_obj_msg):
     self.wd_timer = 0
     if found_obj_msg.count == 0:
-      rospy.loginfo("No objects found")
+      nepi_msg.publishMsgInfo(self,"No objects found")
       self.object_detected=False
       if not rospy.is_shutdown():
         self.led_intensity_pub.publish(data = 0)
@@ -172,9 +182,9 @@ class led_adjust_on_object_detect_process(object):
   ### Setup a regular background scan process based on timer callback
   def watchdog_timer_callback(self,timer):
     # Called periodically no matter what as a Timer object callback
-    rospy.loginfo("Watchdog timer: " + str(self.wd_timer))
+    nepi_msg.publishMsgInfo(self,"Watchdog timer: " + str(self.wd_timer))
     if self.wd_timer > self.wd_timeout_sec:
-      rospy.loginfo("Past timeout time, turning lights off")
+      nepi_msg.publishMsgInfo(self,"Past timeout time, turning lights off")
       if not rospy.is_shutdown():
         self.led_intensity_pub.publish(data = 0)
     else:
@@ -187,7 +197,7 @@ class led_adjust_on_object_detect_process(object):
   
   def cleanup_actions(self):
     global led_intensity_pub
-    rospy.loginfo("Shutting down: Executing script cleanup actions")
+    nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
     self.led_intensity_pub.publish(data = 0)
 
 
@@ -196,18 +206,6 @@ class led_adjust_on_object_detect_process(object):
 # Main
 #########################################
 if __name__ == '__main__':
-  current_filename = sys.argv[0].split('/')[-1]
-  current_filename = current_filename.split('.')[0]
-  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name=current_filename)
-  #Launch the node
-  node_name = current_filename.rpartition("_")[0]
-  rospy.loginfo("Launching node named: " + node_name)
-  node_class = eval(node_name)
-  node = node_class()
-  #Set up node shutdown
-  rospy.on_shutdown(node.cleanup_actions)
-  # Spin forever (until object is detected)
-  rospy.spin()
+  ledAiAdjust()
 
 

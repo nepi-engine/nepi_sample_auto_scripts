@@ -21,6 +21,7 @@ import numpy as np
 from numpy.linalg import norm
 import cv2
 from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_msg
 
 from std_msgs.msg import Float32
 from sensor_msgs.msg import Image
@@ -47,47 +48,59 @@ LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 # ROS NAMESPACE SETUP
 #########################################
 
-# ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
 
 #########################################
 # Node Class
 #########################################
 
-class led_auto_level_process(object):
+class ledAutoAdjust(object):
 
   #######################
   ### Node Initialization
+  DEFAULT_NODE_NAME = "auto_led_auto_level" # Can be overwitten by luanch command
   def __init__(self):
-    rospy.loginfo("Starting Initialization Processes")
+    #### AUTO SCRIPT INIT SETUP ####
+    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+    self.node_name = nepi_ros.get_node_name()
+    self.base_namespace = nepi_ros.get_base_namespace()
+    nepi_msg.createMsgPublishers(self)
+    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+    ##############################
+
     ## Initialize Class Variables
     self.led_level_max = LED_LEVEL_MAX
     self.intensity_history = np.zeros(AVG_LENGTH)
     self.avg_intensity = 0
     self.img_brightness_ratio =0
     ## Define Class Namespaces
-    IMAGE_OUTPUT_TOPIC = NEPI_BASE_NAMESPACE + "image_custom"
+    IMAGE_OUTPUT_TOPIC = self.base_namespace + "image_custom"
     ## Define Class Services Calls
     ## Create Class Sevices    
     ## Create Class Publishers
     ## Create Class Publishers
     led_control_topic_name = LED_CONTROL_TOPIC_NAME
-    rospy.loginfo("Waiting for topic name: " + led_control_topic_name)
+    nepi_msg.publishMsgInfo("Waiting for topic name: " + led_control_topic_name)
     led_control_topic=nepi_ros.wait_for_topic(led_control_topic_name)
 
-    rospy.loginfo("Found topic: " + led_control_topic)
+    nepi_msg.publishMsgInfo("Found topic: " + led_control_topic)
     self.led_intensity_pub = rospy.Publisher(led_control_topic, Float32, queue_size = 1)
     ## Start Class Subscribers
     # Wait for topic
-    rospy.loginfo("Waiting for topic: " + IMAGE_INPUT_TOPIC_NAME)
+    nepi_msg.publishMsgInfo("Waiting for topic: " + IMAGE_INPUT_TOPIC_NAME)
     image_topic = nepi_ros.wait_for_topic(IMAGE_INPUT_TOPIC_NAME)
     # Start image contours overlay process and pubslisher
     rospy.Subscriber(image_topic, Image, self.image_brightness_callback, queue_size = 1)
     # Start regular print callback
     rospy.Timer(rospy.Duration(1), self.lxs_print_callback)
     ## Start Node Processes
+    #########################################################
     ## Initiation Complete
-    rospy.loginfo("Initialization Complete")
+    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    #Set up node shutdown
+    nepi_ros.on_shutdown(self.cleanup_actions)
+    # Spin forever (until object is detected)
+    #nepi_ros.spin()
+    #########################################################
 
   #######################
   ### Node Methods
@@ -134,26 +147,14 @@ class led_auto_level_process(object):
   # Node Cleanup Function
   
   def cleanup_actions(self):
-    rospy.loginfo("Shutting down: Executing script cleanup actions")
+    nepi_msg.publishMsgInfo("Shutting down: Executing script cleanup actions")
     self.led_intensity_pub.publish(data = 0)
 
 #########################################
 # Main
 #########################################
 if __name__ == '__main__':
-  current_filename = sys.argv[0].split('/')[-1]
-  current_filename = current_filename.split('.')[0]
-  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name=current_filename)
-  #Launch the node
-  node_name = current_filename.rpartition("_")[0]
-  rospy.loginfo("Launching node named: " + node_name)
-  node_class = eval(node_name)
-  node = node_class()
-  #Set up node shutdown
-  rospy.on_shutdown(node.cleanup_actions)
-  # Spin forever (until object is detected)
-  rospy.spin()
+  ledAutoAdjust()
 
 
 

@@ -18,6 +18,7 @@ import rospy
 import time
 import sys
 from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_msg 
 
 from std_msgs.msg import Empty, Float32
 
@@ -30,19 +31,24 @@ from std_msgs.msg import Empty, Float32
 # ROS NAMESPACE SETUP
 #########################################
 
-# ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
-
 #########################################
 # Node Class
 #########################################
 
-class name_of_file_without_script(object):
+class blankAutoScript(object):
 
   #######################
   ### Node Initialization
+  DEFAULT_NODE_NAME = "auto_blank" # Can be overwitten by luanch command
   def __init__(self):
-    rospy.loginfo("Starting Initialization Processes")
+    #### AUTO SCRIPT INIT SETUP ####
+    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+    self.node_name = nepi_ros.get_node_name()
+    self.base_namespace = nepi_ros.get_base_namespace()
+    nepi_msg.createMsgPublishers(self)
+    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+    ##############################
+
     ## Initialize Class Variables
     ## Define Class Namespaces
     ## Define Class Services Calls
@@ -51,7 +57,15 @@ class name_of_file_without_script(object):
     ## Start Class Subscribers
     ## Start Node Processes
     ## Initiation Complete
-    rospy.loginfo("Initialization Complete")
+
+    #########################################################
+    ## Initiation Complete
+    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    #Set up node shutdown
+    nepi_ros.on_shutdown(self.cleanup_actions)
+    # Spin forever (until object is detected)
+    #nepi_ros.spin()
+    #########################################################
 
   #######################
   ### Node Methods
@@ -61,24 +75,12 @@ class name_of_file_without_script(object):
   # Node Cleanup Function
   
   def cleanup_actions(self):
-    rospy.loginfo("Shutting down: Executing script cleanup actions")
+    nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
 
 
 #########################################
 # Main
 #########################################
 if __name__ == '__main__':
-  current_filename = sys.argv[0].split('/')[-1]
-  current_filename = current_filename.split('.')[0]
-  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name=current_filename)
-  #Launch the node
-  node_name = current_filename.rpartition("_")[0]
-  rospy.loginfo("Launching node named: " + node_name)
-  node_class = eval(node_name)
-  node = node_class()
-  #Set up node shutdown
-  rospy.on_shutdown(node.cleanup_actions)
-  # Spin forever (until object is detected)
-  rospy.spin()
+  blankAutoScript()
 

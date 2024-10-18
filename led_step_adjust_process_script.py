@@ -21,6 +21,7 @@ import rospy
 import time
 import sys
 from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_msg
 
 from std_msgs.msg import Empty, Float32
 
@@ -39,21 +40,25 @@ LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 # ROS NAMESPACE SETUP
 #########################################
 
-# ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
-
 
 #########################################
 # Node Class
 #########################################
 
-class led_step_adjust_process(object):
+class ledStepAdjust(object):
 
   #######################
   ### Node Initialization
-  
+  DEFAULT_NODE_NAME = "auto_led_step_adjust" # Can be overwitten by luanch command
   def __init__(self):
-    rospy.loginfo("Starting Initialization Processes")
+    #### AUTO SCRIPT INIT SETUP ####
+    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+    self.node_name = nepi_ros.get_node_name()
+    self.base_namespace = nepi_ros.get_base_namespace()
+    nepi_msg.createMsgPublishers(self)
+    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+    ##############################
+
     ## Initialize Class Variables
     self.led_level_max = LED_LEVEL_MAX
     self.led_level_step = LED_LEVEL_STEP
@@ -62,17 +67,23 @@ class led_step_adjust_process(object):
     ## Define Class Namespaces
     ## Create Class Publishers
     led_control_topic_name = LED_CONTROL_TOPIC_NAME
-    rospy.loginfo("Waiting for topic name: " + led_control_topic_name)
+    nepi_msg.publishMsgInfo(self,"Waiting for topic name: " + led_control_topic_name)
     led_control_topic=nepi_ros.wait_for_topic(led_control_topic_name)
-    rospy.loginfo("Found topic: " + led_control_topic)
+    nepi_msg.publishMsgInfo(self,"Found topic: " + led_control_topic)
     self.led_intensity_pub = rospy.Publisher(led_control_topic, Float32, queue_size = 1)
     ## Start Class Subscribers
     ## Start Node Processes
     #Start level step loop
-    rospy.loginfo("Starting LED level step loop")
+    nepi_msg.publishMsgInfo(self,"Starting LED level step loop")
     rospy.Timer(rospy.Duration(self.led_step_sec), self.led_step_callback)
+    #########################################################
     ## Initiation Complete
-    rospy.loginfo("Initialization Complete")
+    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    #Set up node shutdown
+    nepi_ros.on_shutdown(self.cleanup_actions)
+    # Spin forever (until object is detected)
+    #nepi_ros.spin()
+    #########################################################
 
   #######################
   ### Node Methods
@@ -82,7 +93,7 @@ class led_step_adjust_process(object):
     led_level = self.led_last_level + self.led_level_step
     if led_level > self.led_level_max:
       led_level = 0.0
-    rospy.loginfo("Setting LED level to: " + '%.2f' % led_level)
+    nepi_msg.publishMsgInfo(self,"Setting LED level to: " + '%.2f' % led_level)
     if not rospy.is_shutdown():
       self.led_intensity_pub.publish(data = led_level)
       self.led_last_level = led_level
@@ -92,7 +103,7 @@ class led_step_adjust_process(object):
   # Node Cleanup Function
   
   def cleanup_actions(self):
-    rospy.loginfo("Shutting down: Executing script cleanup actions")
+    nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
     self.led_intensity_pub.publish(data = 0)
 
 
@@ -100,17 +111,5 @@ class led_step_adjust_process(object):
 # Main
 #########################################
 if __name__ == '__main__':
-  current_filename = sys.argv[0].split('/')[-1]
-  current_filename = current_filename.split('.')[0]
-  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name=current_filename)
-  #Launch the node
-  node_name = current_filename.rpartition("_")[0]
-  rospy.loginfo("Launching node named: " + node_name)
-  node_class = eval(node_name)
-  node = node_class()
-  #Set up node shutdown
-  rospy.on_shutdown(node.cleanup_actions)
-  # Spin forever (until object is detected)
-  rospy.spin()
+  ledStepAdjust()
 

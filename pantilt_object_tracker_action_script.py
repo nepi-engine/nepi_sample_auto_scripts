@@ -8,342 +8,317 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
-# Sample NEPI Process Script. 
-# 1. Waits for ai detection topic
-# 2. Adjust LED level based on target location in image
+# Sample NEPI Mission Script.
+### Expects Classifier to be running ###
+# 1) Monitors AI detector output for specfic target class 
+# 3) Changes system to Loiter mode on detection
+# 4) Sends NEPI snapshot event trigger
+# 5) Waits to achieve waits set time to complete snapshot events
+# 6) Sets system back to original mode
+# 6) Delays, then waits for next detection
 
 # Requires the following additional scripts are running
-# a)ai_detector_config_script.py
+# a) ai_detector_config_script.py
+# (Optional) Some Snapshot Action Automation Script like the following
+#   b)snapshot_trigger_save_to_disk_action_script.py
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
-import time
-import sys
 import rospy
-import statistics
-import numpy as np
+import sys
+import time
+import math
 from nepi_edge_sdk_base import nepi_ros 
+from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_rbx
 
-from std_msgs.msg import UInt8, Empty, Float32
-from sensor_msgs.msg import Image
-from nepi_ros_interfaces.msg import PanTiltLimits, PanTiltPosition, PanTiltStatus, StringArray
-from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
-
+from std_msgs.msg import Empty,Bool, String, UInt8, Int8, Float32, Float64
+from geographic_msgs.msg import GeoPoint
+from nepi_ros_interfaces.msg import RBXInfo, RBXStatus, AxisControls, RBXErrorBounds, RBXGotoErrors, RBXMotorControl, \
+     RBXGotoPose, RBXGotoPosition, RBXGotoLocation, SettingUpdate
+from nepi_ros_interfaces.srv import RBXCapabilitiesQuery, RBXCapabilitiesQueryResponse
+from sensor_msgs.msg import NavSatFix, Image
+from nepi_ros_interfaces.msg import TargetLocalization, TargetLocalizations
 
 #########################################
 # USER SETTINGS - Edit as Necessary 
 #########################################
+#RBX Robot Name
+RBX_ROBOT_NAME = "ardupilot"
 
+# Robot Settings Overides
+###################
+TAKEOFF_HEIGHT_M = 10.0
+# Ignore Yaw Control
+IGNORE_YAW_CONTROL = True
 
+###!!!!!!!! Set Automation action parameters !!!!!!!!
+TARGET_TO_FOLLOW = "chair" # Either a target class name (will follow first found of that class) or specific target_id
+TARGET_OFFSET_GOAL_M = 0.1 # How close to set setpoint to target
+TRIGGER_RESET_DELAY_S = 5 # Time between detect/move checks 
 
-OBJECT_LABEL_OF_INTEREST = "person"
+# Set Home Poistion
+ENABLE_FAKE_GPS = True
+SET_HOME = True
+HOME_LOCATION = [47.6540828,-122.3187578,0.0]
 
-# AI Detector Image ROS Topic Name or Partial Name
-IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
-MIN_DETECT_BOX_AREA_RATIO = 0.01 # Filters background targets.
+# Goto Error Settings
+GOTO_MAX_ERROR_M = 2.0 # Goal reached when all translation move errors are less than this value
+GOTO_MAX_ERROR_DEG = 2.0 # Goal reached when all rotation move errors are less than this value
+GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be good before proceeding
 
-
-# Pan and Tilt scan settings
-PTX_SCAN_PAN_LIMIT_DEG = 40 # +- Pan Angle Limits
-PTX_SCAN_TILT_RATIO = 0.15 # Tilt Angle During Scanning + Up
-PTX_SCAN_SPEED_RATIO = 0.6
-PTX_SCAN_CHECK_INTERVAL = 0.25
-
-# Pan and Tilt tracking settings
-PTX_MAX_TRACK_SPEED_RATIO = 1.0
-PTX_MIN_TRACK_SPEED_RATIO = 0.1
-PTX_OBJECT_TILT_OFFSET_RATIO = 0.15 # Adjust tilt center to lower or raise the calculated object center
-PTX_OBJ_CENTERED_BUFFER_RATIO = 0.15 # Hysteresis band about center of image for tracking purposes
-
-
-
-
-#########################################
-# ROS NAMESPACE SETUP
-#########################################
-
-# ROS namespace setup
-NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
-
+# CMD Timeout Values
+CMD_STATE_TIMEOUT_SEC = 5
+CMD_MODE_TIMEOUT_SEC = 5
+CMD_ACTION_TIMEOUT_SEC = 20
+CMD_GOTO_TIMEOUT_SEC = 20
 
 #########################################
 # Node Class
 #########################################
 
-class pantilt_object_tracker_action(object):
+
+
+
+class droneFollowMission(object):
+
+  rbx_settings = []
+  rbx_info = RBXInfo()
+  rbx_status = RBXStatus()
+
 
   #######################
   ### Node Initialization
-  
+  DEFAULT_NODE_NAME = "auto_drone_follow" # Can be overwitten by luanch command
   def __init__(self):
-    rospy.loginfo("Starting Initialization Processes")
-    ## Initialize Class Variables
-    self.object_label_of_interest = OBJECT_LABEL_OF_INTEREST
-    self.img_width = 0 # Updated on receipt of first image
-    self.img_height = 0 # Updated on receipt of first image
-    self.img_area = 0 # Updated on receipt of first image
-    self.object_detected = False
+    #### AUTO SCRIPT INIT SETUP ####
+    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+    self.node_name = nepi_ros.get_node_name()
+    self.base_namespace = nepi_ros.get_base_namespace()
+    nepi_msg.createMsgPublishers(self)
+    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+    ##############################
 
-    self.pan_scan_direction = 1 # Keep track of current scan direction (1: Positive Limit, -1: Negative Limit)
-    self.img_width = 0 # Updated on receipt of first image
-    self.img_height = 0 # Updated on receipt of first image
-    
-    self.status = None
+    nepi_msg.publishMsgInfo(self,"Waiting for namespace containing: " + RBX_ROBOT_NAME)
+    robot_namespace = nepi_ros.wait_for_node(RBX_ROBOT_NAME)
+    robot_namespace = robot_namespace + "/"
+    nepi_msg.publishMsgInfo(self,"Found namespace: " + robot_namespace)
+    rbx_namespace = (robot_namespace + "rbx/")
+    nepi_msg.publishMsgInfo(self,"Using rbx namesapce " + rbx_namespace)
+    nepi_rbx.rbx_initialize(self,rbx_namespace)
+    time.sleep(1)
 
-    self.last_object_pan_ratio=0
-    self.total_tilt_degs = 90
-    self.current_tilt_ratio = 0.5
-    self.total_pan_degs = 90
-    self.current_pan_ratio = 0.5
+    #### publishers used below are defined in nepi_rbx.initialize() helper function call above
 
-    ## Define Class Namespaces
-    # Wait for ptx status topic to publish
-    ptx_status_topic = "/ptx/status"
-    rospy.loginfo("Waiting for topic name: " + ptx_status_topic)
-    ptx_topic=nepi_ros.wait_for_topic(ptx_status_topic)
-    PTX_NAMESPACE = (ptx_topic.rpartition("ptx")[0] + "ptx/")
-    rospy.loginfo("Found ptx namespace: " + PTX_NAMESPACE)
-    # PanTilt Status Topics
-    PTX_GET_STATUS_TOPIC = PTX_NAMESPACE + "status"
-    # PanTilt Control Publish Topics
-    PTX_SET_SPEED_RATIO_TOPIC = PTX_NAMESPACE + "set_speed_ratio"
-    PTX_GOHOME_TOPIC = PTX_NAMESPACE + "go_home"
-    PTX_STOP_TOPIC = PTX_NAMESPACE + "stop_moving"
-    PTX_GOTO_PAN_RATIO_TOPIC = PTX_NAMESPACE + "jog_to_yaw_ratio"
-    PTX_GOTO_TILT_RATIO_TOPIC = PTX_NAMESPACE + "jog_to_pitch_ratio"
-    PTX_SET_SOFT_LIMITS_TOPIC = PTX_NAMESPACE + "set_soft_limits"
+    # Apply Takeoff Height setting overide
+    th_setting = nepi_ros.get_setting_from_settings('takeoff_height_m',self.rbx_settings)
+    th_setting[2] = str(TAKEOFF_HEIGHT_M)
+    th_update_msg = nepi_ros.create_update_msg_from_setting(th_setting)
+    self.rbx_setting_update_pub.publish(th_update_msg) 
+    nepi_ros.sleep(2,10)
+    settings_str = str(self.rbx_settings)
+    nepi_msg.publishMsgInfo(self,"Updated settings:" + settings_str)
 
-    # AI Detector Subscriber Topics
-    AI_BOUNDING_BOXES_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/bounding_boxes"
-    AI_DETECTION_IMAGE_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/detection_image"
-    AI_FOUND_OBJECT_TOPIC = NEPI_BASE_NAMESPACE + "ai_detector_mgr/found_object"
-    ## Class subscribers
 
-    # Wait for AI detector image topic to publish
-    rospy.loginfo("Connecting to NEPI Detector Image Topic")
-    rospy.loginfo(AI_DETECTION_IMAGE_TOPIC )
-    rospy.loginfo("Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-    nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
-    img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, self.image_callback)
-    while self.img_width == 0 and self.img_height == 0 and not rospy.is_shutdown():
-      rospy.loginfo("Waiting for Detection Image")
-      nepi_ros.sleep(1,100)
-    img_sub.unregister() # Don't need it anymore
-    ## Create Class Publishers
-    self.send_pt_home_pub = rospy.Publisher(PTX_GOHOME_TOPIC, Empty, queue_size=10)
-    self.set_pt_speed_ratio_pub = rospy.Publisher(PTX_SET_SPEED_RATIO_TOPIC, Float32, queue_size=10)
-    self.set_pt_pan_ratio_pub = rospy.Publisher(PTX_GOTO_PAN_RATIO_TOPIC, Float32, queue_size=10)
-    self.set_pt_tilt_ratio_pub = rospy.Publisher(PTX_GOTO_TILT_RATIO_TOPIC, Float32, queue_size=10)
-    self.set_pt_soft_limits_pub = rospy.Publisher(PTX_SET_SOFT_LIMITS_TOPIC, PanTiltLimits, queue_size=10)
-    self.pt_stop_motion_pub = rospy.Publisher(PTX_STOP_TOPIC, Empty, queue_size=10)
-    ## Start Class Subscribers
-    # Start PT Status Callback
-    print("Starting Pan Tilt Stutus callback")
-    rospy.Subscriber(PTX_GET_STATUS_TOPIC, PanTiltStatus, self.pt_status_callback)  
-    # Set up object detector subscriber
-    rospy.loginfo("Starting object detection subscriber: Object of interest = " + self.object_label_of_interest + "...")
-    rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, self.object_detected_callback, queue_size = 1)
-    #Set up found object subscriber which monitors all AI outputs
-    rospy.loginfo("Starting found object subscriber")
-    rospy.Subscriber(AI_FOUND_OBJECT_TOPIC, ObjectCount, self.found_object_callback, queue_size = 1)
-    ## Start Node Processes
-    # Set up the timer that start scanning when no objects are detected
-    print("Setting up pan/tilt scan check timer")
-    rospy.Timer(rospy.Duration(PTX_SCAN_CHECK_INTERVAL), self.pt_scan_timer_callback)
+    # Mission Action Topics (If Required)
+    SNAPSHOT_TRIGGER_TOPIC = self.base_namespace + "snapshot_trigger"
+    self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
+
+    # Setup Fake GPS if Enabled   
+    if ENABLE_FAKE_GPS:
+      nepi_msg.publishMsgInfo(self,"Enabled Fake GPS")
+      self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
+      time.sleep(2)
+    if SET_HOME:
+      nepi_msg.publishMsgInfo(self,"Upating RBX Home Location")
+      new_home_geo = GeoPoint()
+      new_home_geo.latitude = HOME_LOCATION[0]
+      new_home_geo.longitude = HOME_LOCATION[1]
+      new_home_geo.altitude = HOME_LOCATION[2]
+      self.rbx_set_home_pub.publish(new_home_geo)
+      if ENABLE_FAKE_GPS:
+      	nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
+
+
+
+
+    ###########################     
+    # Sutup AI 3d targeting 
+    ###########################
+    # Wait for AI targeting detection topic and subscribe to it
+    AI_TARGETING_TOPIC = "app_ai_targeting/target_localizations"
+    nepi_msg.publishMsgInfo(self,"Waiting for topic: " + AI_TARGETING_TOPIC)
+    ai_targeting_topic_name = nepi_ros.wait_for_topic(AI_TARGETING_TOPIC)
+
     ## Initiation Complete
-    rospy.loginfo("Initialization Complete")
+    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    nepi_msg.publishMsgInfo(self,"Waiting for AI Object Detection")  
+
+    ###########################
+    ## Start Mission
+    ###########################
+    # Run pre-mission processes
+    self.pre_mission_actions()
+    # Start misson processes
+    nepi_msg.publishMsgInfo(self,"Starting move to object callback")
+    rospy.Subscriber(ai_targeting_topic_name, TargetLocalizations, self.move_to_object_callback, queue_size = 1)
+
+    #########################################################
+    ## Initiation Complete
+    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    #Set up node shutdown
+    nepi_ros.on_shutdown(self.cleanup_actions)
+    # Spin forever (until object is detected)
+    #nepi_ros.spin()
+    #########################################################
+ 
+ 
+  #######################
+  ### RBX Settings, Info, and Status Callbacks
+  def rbx_settings_callback(self, msg):
+    self.rbx_settings = nepi_ros.parse_settings_msg_data(msg.data)
 
 
+  def rbx_info_callback(self, msg):
+    self.rbx_info = msg
+
+
+  def rbx_status_callback(self, msg):
+    self.rbx_status = msg
 
   #######################
-  ### Node Methods
+  ### Node Methods    
 
-  ### Simple callback to get image height and width
-  def image_callback(self,img_msg):
+ ## Function for custom pre-mission actions
+  def pre_mission_actions(self):
+    ###########################
+    # Start Your Custom Actions
+    ###########################
+    success = True
+    # Set Mode to Guided
+    success = nepi_rbx.set_rbx_mode(self,"GUIDED",timeout_sec =CMD_MODE_TIMEOUT_SEC)
+    # Arm System
+    success = nepi_rbx.set_rbx_state(self,"ARM",timeout_sec = CMD_STATE_TIMEOUT_SEC)
+    # Send Takeoff Command
+    success=nepi_rbx.setup_rbx_action(self,"TAKEOFF",timeout_sec =CMD_ACTION_TIMEOUT_SEC)
+    time.sleep(1)
+    error_str = str(self.rbx_status.errors_current)
+    if success:
+      nepi_msg.publishMsgInfo(self,"Takeoff completed with errors: " + error_str )
+    else:
+      nepi_msg.publishMsgInfo(self,"Takeoff failed with errors: " + error_str )
+    nepi_ros.sleep(2,10)
+    ###########################
+    # Stop Your Custom Actions
+    ###########################
+    print("Pre-Mission Actions Complete")
+    return success
+
+
+  ## Function for custom mission actions
+  def mission_actions(self):
+    ###########################
+    # Start Your Custom Actions
+    ###########################
+    self.snapshot_trigger_pub.publish(Empty)
+    success = True
+    #########################################
+
+    ###########################
+    # Stop Your Custom Actions
+    ###########################
+    nepi_msg.publishMsgInfo(self,"Mission Actions Complete")
+    return success
+
+  ## Function for custom post-mission actions
+  def post_mission_actions(self):
+    ###########################
+    # Start Your Custom Actions
+    ###########################
+    success = True
+    #success = nepi_rbx.set_rbx_mode(self,"LAND", timeout_sec = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to Land mode
+    #success = nepi_rbx.set_rbx_mode(self,"LOITER", timeout_sec = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to Loiter mode
+    success = nepi_rbx.set_rbx_mode(self,"RTL", timeout_sec = CMD_MODE_TIMEOUT_SEC) # Uncomment to change to home mode
+    #success = nepi_rbx.set_rbx_mode(self,"RESUME", timeout_sec = CMD_MODE_TIMEOUT_SEC) # Uncomment to return to last mode
+    nepi_ros.sleep(1,10)
+    ###########################
+    # Stop Your Custom Actions
+    ###########################
+    print("Post-Mission Actions Complete")
+    return success
+
+  #######################
+  # AI Detection Functions
+  
+    ### Simple callback to get image height and width
+  def ai_image_callback(self,img_msg):
     # This is just to get the image size for ratio purposes
     if (self.img_height == 0 and self.img_width == 0):
-      rospy.loginfo("Initial input image received. Size = " + str(img_msg.width) + "x" + str(img_msg.height))
+      nepi_msg.publishMsgInfo(self,"Initial input image received. Size = " + str(img_msg.width) + "x" + str(img_msg.height))
       self.img_height = img_msg.height
       self.img_width = img_msg.width
-      self.img_area = self.img_height*self.img_width
 
-  ### Simple callback to get pt status info
-  def pt_status_callback(self,PanTiltStatus):
-    # This is just to get the current pt positions
-    self.status = PanTiltStatus
-
-    self.total_tilt_degs = self.status.pitch_max_softstop_deg - self.status.pitch_min_softstop_deg
-    tilt_ratio = 0.5 + self.status.pitch_now_deg / (self.total_tilt_degs)
-    if self.status.reverse_pitch_control:
-      self.current_tilt_ratio = 1 - tilt_ratio
-    self.total_pan_degs = self.status.yaw_max_softstop_deg - self.status.yaw_min_softstop_deg
-    pan_ratio = 0.5 + self.status.yaw_now_deg / (self.total_pan_degs)
-    if self.status.reverse_yaw_control:
-      self.current_pan_ratio = 1 - pan_ratio
-    
-  ### Setup a regular background scan process based on timer callback
-  def pt_scan_timer_callback(self,timer):
-    # Called periodically no matter what as a Timer object callback
-    if not self.object_detected: # if not tracking, return to scan mode
-      #print("No Targets Found, Entering Scan Mode")
-      if self.status.yaw_now_deg > PTX_SCAN_PAN_LIMIT_DEG:
-        print("Soft Pan Limit Reached, Reversing Scan Direction")
-        if self.status.reverse_yaw_control == False:
-          self.pan_scan_direction = -1
+  # Action upon detection and targeting for object of interest 
+  def move_to_object_callback(self,targets_data_msg):
+    #nepi_msg.publishMsgInfo(self,"Recieved target data message")
+    #nepi_msg.publishMsgInfo(target_data_msg)
+    # Check for the object of interest and take appropriate actions
+    for target_data_msg in targets_data_msg.target_localizations:
+      target_class = target_data_msg.Class
+      target_range_m = target_data_msg.range_m # [x,y,z]
+      target_yaw_d = target_data_msg.azimuth_deg  # dz
+      target_pitch_d = target_data_msg.elevation_deg # dy
+      if target_class == TARGET_TO_FOLLOW and  target_range_m != -999:
+        nepi_msg.publishMsgInfo(self,"Detected a " + TARGET_TO_FOLLOW + "with valid range")
+        setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
+        sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))  # X is Forward
+        sp_y_m = setpoint_range_m * math.sin(math.radians(target_yaw_d)) # Y is Right
+        sp_z_m = - setpoint_range_m * math.sin(math.radians(target_pitch_d)) # Z is Down
+        sp_yaw_d = target_yaw_d
+        if IGNORE_YAW_CONTROL:
+          sp_yaw_d = -999
+        setpoint_position_body_m = [sp_x_m,sp_y_m,sp_z_m,sp_yaw_d]
+        nepi_msg.publishMsgInfo(self,str(setpoint_position_body_m))
+        # Send poisition update
+        nepi_msg.publishMsgInfo(self,"Sending setpoint position body command")
+        nepi_msg.publishMsgInfo(self,str(setpoint_position_body_m))
+        success = nepi_rbx.goto_rbx_position(self,setpoint_position_body_m)
+        error_str = str(self.rbx_status.errors_current)
+        if success:
+          nepi_msg.publishMsgInfo(self,"Goto Position completed with errors: " + error_str )
         else:
-          self.pan_scan_direction = 1
-      elif self.status.yaw_now_deg < (-1 * PTX_SCAN_PAN_LIMIT_DEG):
-        print("Soft Pan Limit Reached, Reversing Scan Direction")
-        if self.status.reverse_yaw_control == False:
-          self.pan_scan_direction = 1
-        else:
-          self.pan_scan_direction = -1
-      pan_ratio = (self.pan_scan_direction + 1) /2
-
-      tilt_offset_ratio =  PTX_SCAN_TILT_RATIO
-      if self.status.reverse_pitch_control == False:
-        tilt_offset_ratio = - tilt_offset_ratio
-      tilt_ratio = 0.5 + tilt_offset_ratio
-      speed_ratio = PTX_SCAN_SPEED_RATIO
-      print("Current pan_scan_to_dir: " + "%.2f" % (pan_ratio))
-      print("Current tilt_scan_to_dir: " + "%.2f" % (tilt_ratio))
-      self.set_pt_speed_ratio_pub.publish(speed_ratio)
-      self.set_pt_pan_ratio_pub.publish(pan_ratio)
-      self.set_pt_tilt_ratio_pub.publish(tilt_ratio)
-
-
-
-  # Action upon detection of object of interest
-  def object_detected_callback(self,bounding_box_msg):
-    box_of_interest = None
-    #print("Entering Detection Callback")
-    # Iterate over all of the objects reported by the detector and return center of largest box in degrees relative to img center
-    largest_box_area_ratio=0 # Initialize largest box area
-    for box in bounding_box_msg.bounding_boxes:
-      # Check for the object of interest and take appropriate actions
-      if box.Class == OBJECT_LABEL_OF_INTEREST:
-        # Check if largest box
-        box_area=(box.xmax-box.xmin)*(box.ymax-box.ymin)
-        box_area_ratio = float(box_area) / self.img_area
-        if box_area_ratio > largest_box_area_ratio:
-          largest_box_area_ratio=box_area_ratio
-          largest_box=box
-    if largest_box_area_ratio > MIN_DETECT_BOX_AREA_RATIO:
-      box_of_interest = largest_box
-      self.object_detected = True
-      # Calculate the box center in image ratio terms
-      object_loc_y_pix = box_of_interest.ymin + ((box_of_interest.ymax - box_of_interest.ymin)  / 2) 
-      object_loc_x_pix = box_of_interest.xmin + ((box_of_interest.xmax - box_of_interest.xmin)  / 2)
-      object_loc_y_ratio = float(object_loc_y_pix) / self.img_height - PTX_OBJECT_TILT_OFFSET_RATIO
-      object_loc_x_ratio = float(object_loc_x_pix) / self.img_width
-      object_error_y_ratio = (object_loc_y_ratio - 0.5)  
-      object_error_x_ratio = (object_loc_x_ratio - 0.5) 
-      #print("Object Detection Center Error Ratios  x: " + "%.2f" % (object_error_x_ratio) + " y: " + "%.2f" % (object_error_y_ratio))
-      # Call the tracking algorithm
-      self.pt_track_box(object_error_x_ratio, object_error_y_ratio)
-    else:
-      # Object of interest not detected, so reset object_detected
-      self.object_detected=False  # will start scan mode on next timer event
-  
-  def found_object_callback(self,found_obj_msg):
-    # Must reset object_detected in the event of no objects to restart scan mode
-    if found_obj_msg.count == 0:
-      #print("No objects found")
-      self.object_detected=False
-
-  ### Track box process based on current box center relative ratio of image
-  def pt_track_box(self,object_error_x_ratio, object_error_y_ratio):
-    #print("Entering Track Callback, Object Detection Value: " + str(self.object_detected)) 
-    if self.object_detected:
-      #print("Target Found, Entering Track Mode")
-      # Simple bang/bang positional control with hysteresis band and error-proportional speed control
-      # First check if we are close enough to center in either dimension to stop motion: Hysteresis band
-      # Adjust the vertical box error to better center on target
-      print("Object Detection Error Ratios pan: " + "%.2f" % (object_error_x_ratio) + " tilt: " + "%.2f" % (object_error_y_ratio))
-      if (abs(object_error_y_ratio) <= PTX_OBJ_CENTERED_BUFFER_RATIO ) and \
-         (abs(object_error_x_ratio) <= PTX_OBJ_CENTERED_BUFFER_RATIO ):
-        #print("Object is centered in frame: Stopping any p/t motion") 
-        self.pt_stop_motion_pub.publish()
+          nepi_msg.publishMsgInfo(self,"Goto Position failed with errors: " + error_str )
+        nepi_ros.sleep(2,10)
+        #########################################
+        # Run Mission Actions
+        #nepi_msg.publishMsgInfo(self,"Starting Mission Actions")
+        #success = self.mission_actions()
+        ##########################################
+  ##        nepi_msg.publishMsgInfo(self,"Switching back to original mode")
+  ##        nepi_rbx.set_rbx_mode(self,"RESUME")
+        nepi_msg.publishMsgInfo(self,"Delaying next trigger for " + str(TRIGGER_RESET_DELAY_S) + " secs")
+        nepi_ros.sleep(TRIGGER_RESET_DELAY_S,100)
+        nepi_msg.publishMsgInfo(self,"Waiting for next " + TARGET_TO_FOLLOW + " detection")
       else:
-        #print("Object not centered in frame")
-        # Now set the speed proportional to average error
-        speed_control_value = PTX_MIN_TRACK_SPEED_RATIO + \
-                              (PTX_MAX_TRACK_SPEED_RATIO-PTX_MIN_TRACK_SPEED_RATIO) * max(abs(object_error_x_ratio),abs(object_error_y_ratio))
-        #print("Current track speed ratio: " + "%.2f" % (speed_control_value))
-        self.set_pt_speed_ratio_pub.publish(speed_control_value)
-        # Per-axis adjustment
-        self.move_pan_rel_ratio(object_error_x_ratio)
-        self.move_tilt_rel_ratio(object_error_y_ratio)
-        # set next scan in direction of last detection
-        if self.status.reverse_yaw_control == False:
-          self.pan_scan_direction = - np.sign(object_error_x_ratio)
-        else:
-          self.pan_scan_direction = np.sign(object_error_x_ratio)
-        #print("X Error: " + "%.2f" % (object_error_x_ratio))
-        #print("New Scan Dir: " + str(self.pan_scan_direction))
-
-
-
-  def move_pan_rel_ratio(self,pan_rel_ratio):
-    print("Pan Track Info")
-    print(self.current_pan_ratio)
-    print(pan_rel_ratio)
-    if self.status.reverse_yaw_control == False:
-      pan_ratio = self.current_pan_ratio - pan_rel_ratio
-    else:
-      pan_ratio = self.current_pan_ratio + pan_rel_ratio
-    print(pan_ratio)
-    if pan_ratio < 0.0:
-      pan_ratio = 0
-    elif pan_ratio > 1.0:
-      pan_ratio = 1
-    if not rospy.is_shutdown():
-      print("Current pan_to_ratio: " + "%.2f" % (pan_ratio))
-      self.set_pt_pan_ratio_pub.publish(pan_ratio)
-
-  def move_tilt_rel_ratio(self,tilt_rel_ratio):
-    #print("Tilt Track Info")
-    #print(self.current_tilt_ratio)
-    #print(tilt_rel_ratio)
-    if self.status.reverse_pitch_control == True:
-      tilt_ratio = self.current_tilt_ratio - tilt_rel_ratio
-    else:
-      tilt_ratio = self.current_tilt_ratio + tilt_rel_ratio
-    #print(tilt_ratio)
-    if tilt_ratio < 0:
-      tilt_ratio = 0
-    elif tilt_ratio > 1:
-      tilt_ratio = 1
-    if not rospy.is_shutdown():
-      print("Current tilt_to_ratio: " + "%.2f" % (tilt_ratio))
-      self.set_pt_tilt_ratio_pub.publish(tilt_ratio)
+        nepi_msg.publishMsgInfo(self,"Target range value invalid, skipping actions")
+        time.sleep(1)
 
 
   #######################
   # Node Cleanup Function
   
   def cleanup_actions(self):
-    global led_intensity_pub
-    rospy.loginfo("Shutting down: Executing script cleanup actions")
-
-
+    nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
 
 #########################################
 # Main
 #########################################
 if __name__ == '__main__':
-  current_filename = sys.argv[0].split('/')[-1]
-  current_filename = current_filename.split('.')[0]
-  rospy.loginfo(("Starting " + current_filename), disable_signals=True) # Disable signals so we can force a shutdown
-  rospy.init_node(name=current_filename)
-  #Launch the node
-  node_name = current_filename.rpartition("_")[0]
-  rospy.loginfo("Launching node named: " + node_name)
-  node_class = eval(node_name)
-  node = node_class()
-  #Set up node shutdown
-  rospy.on_shutdown(node.cleanup_actions)
-  # Spin forever (until object is detected)
-  rospy.spin()
+  droneFollowMission()
 
 
+  
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
