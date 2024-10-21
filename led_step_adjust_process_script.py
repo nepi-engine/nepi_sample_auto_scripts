@@ -20,8 +20,8 @@
 import rospy
 import time
 import sys
-from nepi_edge_sdk_base import nepi_ros 
-from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_ros
+from nepi_edge_sdk_base import nepi_msg 
 
 from std_msgs.msg import Empty, Float32
 
@@ -36,29 +36,25 @@ LED_STEP_SEC = 1.0
 #Set LED Control ROS Topic Name (or partial name)
 LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 
-#########################################
-# ROS NAMESPACE SETUP
-#########################################
 
 
 #########################################
 # Node Class
 #########################################
 
-class ledStepAdjust(object):
+class led_step_adjust(object):
 
   #######################
   ### Node Initialization
-  DEFAULT_NODE_NAME = "auto_led_step_adjust" # Can be overwitten by luanch command
+  DEFAULT_NODE_NAME = "led_step_adjust" # Can be overwitten by luanch command
   def __init__(self):
-    #### AUTO SCRIPT INIT SETUP ####
+    #### APP NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
     self.node_name = nepi_ros.get_node_name()
     self.base_namespace = nepi_ros.get_base_namespace()
     nepi_msg.createMsgPublishers(self)
     nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
     ##############################
-
     ## Initialize Class Variables
     self.led_level_max = LED_LEVEL_MAX
     self.led_level_step = LED_LEVEL_STEP
@@ -76,14 +72,13 @@ class ledStepAdjust(object):
     #Start level step loop
     nepi_msg.publishMsgInfo(self,"Starting LED level step loop")
     rospy.Timer(rospy.Duration(self.led_step_sec), self.led_step_callback)
-    #########################################################
+
+    ##############################
     ## Initiation Complete
-    nepi_msg.publishMsgInfo(self,"Initialization Complete")
-    #Set up node shutdown
-    nepi_ros.on_shutdown(self.cleanup_actions)
+    nepi_msg.publishMsgInfo(self," Initialization Complete")
     # Spin forever (until object is detected)
-    #nepi_ros.spin()
-    #########################################################
+    rospy.spin()
+    ##############################
 
   #######################
   ### Node Methods
@@ -111,5 +106,5 @@ class ledStepAdjust(object):
 # Main
 #########################################
 if __name__ == '__main__':
-  ledStepAdjust()
+  led_step_adjust()
 

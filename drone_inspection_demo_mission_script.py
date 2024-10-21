@@ -8,205 +8,296 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
-# Sample NEPI Process Script. 
-# 1. Waits for ai detection topic
-# 2. Adjust LED level based on target location in image
+# Sample NEPI Mission Script.
+# 1) Subscribes to NEPI nav_pose_current heading, orientation, position, location topics
+# 2) Runs pre-mission processes
+# 3) Runs mission goto command processes
+# 4) Runs mission action processes
+# 5) Runs post-mission processes
 
 # Requires the following additional scripts are running
-# a)ai_detector_config_script.py
+# a) ardupilot_rbx_driver_script.py
+# (Optional) Some Snapshot Action Automation Script like the following
+#   b)snapshot_event_save_to_disk_action_script.py
+#   c)snapshot_event_send_to_cloud_action_script.py
+# d) (Optional) ardupilot_rbx_fake_gps_process_script.py if a real GPS fix is not available
 # These scripts are available for download at:
 # [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
-import time
-import sys
 import rospy
-import statistics
-import numpy as np
+import sys
+import time
 from nepi_edge_sdk_base import nepi_ros 
 from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_rbx
 
-from std_msgs.msg import Empty, Float32
-from sensor_msgs.msg import Image
-from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
-
+from std_msgs.msg import Empty,Bool, String, UInt8, Int8, Float32, Float64
+from geographic_msgs.msg import GeoPoint
+from nepi_ros_interfaces.msg import RBXInfo, RBXStatus, AxisControls, RBXErrorBounds, RBXGotoErrors, RBXMotorControl, \
+     RBXGotoPose, RBXGotoPosition, RBXGotoLocation, SettingUpdate
+from nepi_ros_interfaces.srv import RBXCapabilitiesQuery, RBXCapabilitiesQueryResponse
 
 #########################################
 # USER SETTINGS - Edit as Necessary 
 #########################################
+#RBX Robot Name
+RBX_ROBOT_NAME = "ardupilot"
 
-OBJECT_LABEL_OF_INTEREST = "person"
-LED_LEVEL_MAX = 0.3
-WD_TIMEOUT_SEC = 4
-AVG_LENGTH = 2
+# Robot Settings Overides
+###################
+TAKEOFF_HEIGHT_M = 10.0
 
-#Set LED Control ROS Topic Name (or partial name)
-LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
+# GoTo Position Global Settings
+###################
+# goto_location is [LAT, LONG, ALT_WGS84, YAW_NED_DEGREES]
+# Altitude is specified as meters above the WGS-84 and converted to AMSL before sending
+# Yaw is specified in NED frame degrees 0-360 or +-180 
+GOTO_LOCATION = [47.6541208,-122.3186620, 10, -999] # [Lat, Long, Alt WGS84, Yaw NED Frame], Enter -999 to use current value
+GOTO_LOCATION_CORNERS =  [[47.65412620,-122.31881480, -999, -999],[47.65402050,-122.31875320, -999, -999],[47.65391570,-122.31883630, -999, -999]]
 
-#########################################
-# ROS NAMESPACE SETUP
-#########################################
+# Set Home Poistion
+ENABLE_FAKE_GPS = True
+SET_HOME = True
+HOME_LOCATION = [47.6540828,-122.3187578,0.0]
+
+# Goto Error Settings
+GOTO_MAX_ERROR_M = 2.0 # Goal reached when all translation move errors are less than this value
+GOTO_MAX_ERROR_DEG = 2.0 # Goal reached when all rotation move errors are less than this value
+GOTO_STABILIZED_SEC = 1.0 # Window of time that setpoint error values must be good before proceeding
+
+# CMD Timeout Values
+CMD_STATE_TIMEOUT_SEC = 5
+CMD_MODE_TIMEOUT_SEC = 5
+CMD_ACTION_TIMEOUT_SEC = 20
+CMD_GOTO_TIMEOUT_SEC = 20
 
 
 #########################################
 # Node Class
 #########################################
 
-class ledAiAdjust(object):
+class drone_inspection_demo_mission(object):
 
+
+  rbx_settings = []
+  rbx_info = RBXInfo()
+  rbx_status = RBXStatus()
   #######################
   ### Node Initialization
-  DEFAULT_NODE_NAME = "auto_led_ai_adjust" # Can be overwitten by luanch command
+  DEFAULT_NODE_NAME = "drone_inspection_demo_mission" # Can be overwitten by luanch command
   def __init__(self):
-    #### AUTO SCRIPT INIT SETUP ####
+    #### APP NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
     self.node_name = nepi_ros.get_node_name()
     self.base_namespace = nepi_ros.get_base_namespace()
     nepi_msg.createMsgPublishers(self)
     nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
     ##############################
-    ## Initialize Class Variables
-    self.led_intensity_pub = None
-    self.object_label_of_interest = OBJECT_LABEL_OF_INTEREST
-    self.led_level_max = LED_LEVEL_MAX
-    self.wd_timeout_sec = WD_TIMEOUT_SEC
-    self.wd_check_interval_sec = .1
-    self.wd_timer = 0
-    self.intensity_history = np.zeros(AVG_LENGTH)
-    self.img_width = 0 # Updated on receipt of first image
-    self.img_height = 0 # Updated on receipt of first image
-    self.object_detected = False
-    ## Define Class Namespaces
-    # AI Detector Subscriber Topics
-    AI_BOUNDING_BOXES_TOPIC = self.base_namespace + "classifier/bounding_boxes"
-    AI_DETECTION_IMAGE_TOPIC = self.base_namespace + "classifier/detection_image"
-    AI_FOUND_OBJECT_TOPIC = self.base_namespace + "classifier/found_object"
-    ## Class subscribers
+    nepi_msg.publishMsgInfo(self,"Waiting for namespace containing: " + RBX_ROBOT_NAME)
+    robot_namespace = nepi_ros.wait_for_node(RBX_ROBOT_NAME)
+    robot_namespace = robot_namespace + "/"
+    nepi_msg.publishMsgInfo(self,"Found namespace: " + robot_namespace)
+    rbx_namespace = (robot_namespace + "rbx/")
+    nepi_msg.publishMsgInfo(self,"Using rbx namesapce " + rbx_namespace)
+    nepi_rbx.rbx_initialize(self,rbx_namespace)
+    time.sleep(1)
 
-    # Wait for AI detector image topic to publish
-    nepi_msg.publishMsgInfo(self,"Connecting to NEPI Detector Image Topic")
-    nepi_msg.publishMsgInfo(AI_DETECTION_IMAGE_TOPIC )
-    nepi_msg.publishMsgInfo(self,"Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-    nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
-    img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, self.image_callback)
-    while self.img_width == 0 and self.img_height == 0 and not rospy.is_shutdown():
-      nepi_msg.publishMsgInfo(self,"Waiting for Classifier Detection Image")
-      nepi_ros.sleep(1,100)
-    img_sub.unregister() # Don't need it anymore
-    ## Create Class Publishers
-    led_control_topic_name = LED_CONTROL_TOPIC_NAME
-    nepi_msg.publishMsgInfo(self,"Waiting for topic name: " + led_control_topic_name)
-    led_control_topic=nepi_ros.wait_for_topic(led_control_topic_name)
-    nepi_msg.publishMsgInfo(self,"Found topic: " + led_control_topic)
-    self.led_intensity_pub = rospy.Publisher(led_control_topic, Float32, queue_size = 1)
-    ## Start Class Subscribers
-    # Set up object detector subscriber
-    nepi_msg.publishMsgInfo(self,"Starting object detection subscriber: Object of interest = " + self.object_label_of_interest + "...")
-    rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, self.object_detected_callback, queue_size = 1)
-    #Set up found object subscriber which monitors all AI outputs
-    nepi_msg.publishMsgInfo(self,"Starting found object subscriber")
-    rospy.Subscriber(AI_FOUND_OBJECT_TOPIC, ObjectCount, self.found_object_callback, queue_size = 1)
-    ## Start Node Processes
-    # Setup watchdog process
-    nepi_msg.publishMsgInfo(self,"Setting up watchdog timer")
-    rospy.Timer(rospy.Duration(self.wd_check_interval_sec), self.watchdog_timer_callback)
-    #########################################################
+    #### publishers used below are defined in nepi_rbx.initialize() helper function call above
+
+    # Apply Takeoff Height setting overide
+    th_setting = nepi_ros.get_setting_from_settings('takeoff_height_m',self.rbx_settings)
+    th_setting[2] = str(TAKEOFF_HEIGHT_M)
+    th_update_msg = nepi_ros.create_update_msg_from_setting(th_setting)
+    self.rbx_setting_update_pub.publish(th_update_msg) 
+    nepi_ros.sleep(2,10)
+    settings_str = str(self.rbx_settings)
+    nepi_msg.publishMsgInfo(self,"Udated settings:" + settings_str)
+
+    # Setup Fake GPS if Enabled   
+    if ENABLE_FAKE_GPS:
+      nepi_msg.publishMsgInfo(self,"Enabled Fake GPS")
+      self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
+      time.sleep(2)
+    if SET_HOME:
+      nepi_msg.publishMsgInfo(self,"Upating RBX Home Location")
+      new_home_geo = GeoPoint()
+      new_home_geo.latitude = HOME_LOCATION[0]
+      new_home_geo.longitude = HOME_LOCATION[1]
+      new_home_geo.altitude = HOME_LOCATION[2]
+      self.rbx_set_home_pub.publish(new_home_geo)
+      if ENABLE_FAKE_GPS:
+      	nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
+
+    # Setup mission action processes
+    SNAPSHOT_TRIGGER_TOPIC = self.self.base_namespace + "snapshot_trigger"
+    self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
+
+    ##############################
     ## Initiation Complete
-    nepi_msg.publishMsgInfo(self,"Initialization Complete")
-    #Set up node shutdown
-    nepi_ros.on_shutdown(self.cleanup_actions)
+    nepi_msg.publishMsgInfo(self," Initialization Complete")
     # Spin forever (until object is detected)
-    #nepi_ros.spin()
-    #########################################################
+    rospy.spin()
+    ##############################
 
 
+  #######################
+  ### RBX Settings, Info, and Status Callbacks
+  def rbx_settings_callback(self, msg):
+    self.rbx_settings = nepi_ros.parse_settings_msg_data(msg.data)
+
+
+  def rbx_info_callback(self, msg):
+    self.rbx_info = msg
+
+
+  def rbx_status_callback(self, msg):
+    self.rbx_status = msg
 
   #######################
   ### Node Methods
 
-  ### Simple callback to get image height and width
-  def image_callback(self,img_msg):
-    # This is just to get the image size for ratio purposes
-    if (self.img_height == 0 and self.img_width == 0):
-      nepi_msg.publishMsgInfo(self,"Initial input image received. Size = " + str(img_msg.width) + "x" + str(img_msg.height))
-      self.img_height = img_msg.height
-      self.img_width = img_msg.width
-
-  # Action upon detection of object of interest
-  def object_detected_callback(self,bounding_box_msg):
-    self.object_detected = False
-    # Iterate over all of the objects reported by the detector
-    for box in bounding_box_msg.bounding_boxes:
-      # Check for the object of interest and take appropriate actions
-      if box.Class == self.object_label_of_interest:
-        box_of_interest=box
-        print(box_of_interest.Class)
-        # Calculate the box center in image ratio terms
-        object_loc_y_pix = box_of_interest.ymin + ((box_of_interest.ymax - box_of_interest.ymin)  / 2) 
-        object_loc_x_pix = box_of_interest.xmin + ((box_of_interest.xmax - box_of_interest.xmin)  / 2)
-        object_loc_y_ratio = float(object_loc_y_pix) / self.img_height
-        object_loc_x_ratio = float(object_loc_x_pix) / self.img_width
-        print("Object Detected " + self.object_label_of_interest + " with box center (" + str(object_loc_x_ratio) + ", " + str(object_loc_y_ratio) + ")")
-        # check if we are AIose enough to center in either dimension to stop motion: Hysteresis band
-        box_abs_error_x_ratio = 2.0 * abs(object_loc_x_ratio - 0.5)
-        box_abs_error_y_ratio = 2.0 * abs(object_loc_y_ratio - 0.5)
-        print("Object Detection Error Ratios Horz: " "%.2f" % (box_abs_error_x_ratio) + " Vert: " + "%.2f" % (box_abs_error_y_ratio))
-        # Sending LED level update
-        center_ratios = [1-box_abs_error_x_ratio] # ignore vertical
-        mean_center_ratio = statistics.mean(center_ratios)
-        print("Target center ratio: " + "%.2f" % (mean_center_ratio))
-        intensity = self.led_level_max *  mean_center_ratio**4
-        self.intensity_history = np.roll(self.intensity_history,1)
-        self.intensity_history[0]=intensity
-        avg_intensity = np.mean(self.intensity_history)
-        print("Setting intensity level to: " + "%.2f" % (avg_intensity))
-        self.object_detected = True
-        if not rospy.is_shutdown():
-          self.led_intensity_pub.publish(data = avg_intensity)
-      else:
-        #led_intensity_pub.publish(data = 0.0)
-        #print("No " + object_label_OF_INTEREST + " type for target data")
-        time.sleep(0.01)
-      if self.object_detected == False and not rospy.is_shutdown():
-        self.led_intensity_pub.publish(data = 0)
-    
-  ### Check the number of objects detected on last detection process
-  def found_object_callback(self,found_obj_msg):
-    self.wd_timer = 0
-    if found_obj_msg.count == 0:
-      nepi_msg.publishMsgInfo(self,"No objects found")
-      self.object_detected=False
-      if not rospy.is_shutdown():
-        self.led_intensity_pub.publish(data = 0)
-
-
-  ### Setup a regular background scan process based on timer callback
-  def watchdog_timer_callback(self,timer):
-    # Called periodically no matter what as a Timer object callback
-    nepi_msg.publishMsgInfo(self,"Watchdog timer: " + str(self.wd_timer))
-    if self.wd_timer > self.wd_timeout_sec:
-      nepi_msg.publishMsgInfo(self,"Past timeout time, turning lights off")
-      if not rospy.is_shutdown():
-        self.led_intensity_pub.publish(data = 0)
+  ## Function for custom pre-mission actions
+  def pre_mission_actions(self):
+    ###########################
+    # Start Your Custom Actions
+    ###########################
+    success = True
+    # Set Mode to Guided
+    success = nepi_rbx.set_rbx_mode(self,"GUIDED",timeout_sec =CMD_MODE_TIMEOUT_SEC)
+    # Arm System
+    success = nepi_rbx.set_rbx_state(self,"ARM",timeout_sec = CMD_STATE_TIMEOUT_SEC)
+    # Send Takeoff Command
+    success=nepi_rbx.setup_rbx_action(self,"TAKEOFF",timeout_sec =CMD_ACTION_TIMEOUT_SEC)
+    time.sleep(2)
+    error_str = str(self.rbx_status.errors_current)
+    if success:
+      nepi_msg.publishMsgInfo(self,"Takeoff completed with errors: " + error_str )
     else:
-      self.wd_timer = self.wd_timer + self.wd_check_interval_sec
+      nepi_msg.publishMsgInfo(self,"Takeoff failed with errors: " + error_str )
+    nepi_ros.sleep(2,10)
+    ###########################
+    # Stop Your Custom Actions
+    ###########################
+    nepi_msg.publishMsgInfo(self,"Pre-Mission Actions Complete")
+    return success
 
+  ## Function for custom mission
+  def mission(self):
+    ###########################
+    # Start Your Custom Process
+    ###########################
+    success = True
+    ##########################################
+    # Send goto Location Command
+    nepi_msg.publishMsgInfo(self,"Starting goto Location Process")
+    success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION,timeout_sec =CMD_GOTO_TIMEOUT_SEC)
+    error_str = str(self.rbx_status.errors_current)
+    if success:
+      nepi_msg.publishMsgInfo(self,"Goto Location completed with errors: " + error_str )
+    else:
+      nepi_msg.publishMsgInfo(self,"Goto Location failed with errors: " + error_str )
+    nepi_ros.sleep(2,10)
+    #########################################
+    # Run Mission Actions
+    nepi_msg.publishMsgInfo(self,"Starting Mission Actions")
+    success = self.mission_actions()
+   #########################################
+    # Send goto Location Loop Command
+    '''
+    for ind in range(3):
+      # Send goto Location Command
+      nepi_msg.publishMsgInfo(self,"Starting goto Location Corners Process")
+      success = nepi_rbx.goto_rbx_location(self,GOTO_LOCATION_CORNERS[ind],timeout_sec =CMD_GOTO_TIMEOUT_SEC)
+      # Run Mission Actions
+      nepi_msg.publishMsgInfo(self,"Starting Mission Actions")
+      success = self.mission_actions()
+    '''
+    ###########################
+    # Stop Your Custom Process
+    ###########################
+    nepi_msg.publishMsgInfo(self,"Mission Processes Complete")
+    return success
+
+  ## Function for custom mission actions
+  def mission_actions(self):
+    ###########################
+    # Start Your Custom Actions
+    ###########################
+    ## Send Snapshot Trigger
+    success = True
+    success = nepi_rbx.set_rbx_process_name(self,"SNAPSHOT EVENT")
+    nepi_msg.publishMsgInfo(self,"Sending snapshot event trigger")
+    self.snapshot()
+    nepi_ros.sleep(2,10)
+    ###########################
+    # Stop Your Custom Actions
+    ###########################
+    nepi_msg.publishMsgInfo(self,"Mission Actions Complete")
+    return success
+
+  ## Function for custom post-mission actions
+  def post_mission_actions(self):
+    ###########################
+    # Start Your Custom Actions
+    ###########################
+    success = True
+    #success = nepi_rbx.set_rbx_mode(self,"LAND", timeout_sec =CMD_MODE_TIMEOUT_SEC) # Uncomment to change to Land mode
+    #success = nepi_rbx.set_rbx_mode(self,"LOITER", timeout_sec =CMD_MODE_TIMEOUT_SEC) # Uncomment to change to Loiter mode
+    success = nepi_rbx.set_rbx_mode(self,"RTL", timeout_sec =CMD_MODE_TIMEOUT_SEC) # Uncomment to change to home mode
+    #success = nepi_rbx.set_rbx_mode(self,"RESUME", timeout_sec =CMD_MODE_TIMEOUT_SEC) # Uncomment to return to last mode
+    nepi_ros.sleep(1,10)
+    ###########################
+    # Stop Your Custom Actions
+    ###########################
+    nepi_msg.publishMsgInfo(self,"Post-Mission Actions Complete")
+    return success
+
+
+  #######################
+  # Mission Action Functions
+
+  ### Function to send snapshot event trigger and wait for completion
+  def snapshot(self):
+    self.snapshot_trigger_pub.publish(Empty())
+    nepi_msg.publishMsgInfo(self,"Snapshot trigger sent")
 
 
   #######################
   # Node Cleanup Function
   
   def cleanup_actions(self):
-    global led_intensity_pub
     nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
-    self.led_intensity_pub.publish(data = 0)
-
-
 
 #########################################
 # Main
 #########################################
 if __name__ == '__main__':
-  ledAiAdjust()
+  node = drone_inspection_demo_mission()
+  #########################################
+  # Run Pre-Mission Custom Actions
+  nepi_msg.publishMsgInfo(self,"Starting Mission Actions")
+  success = node.pre_mission_actions()
+  if success:
+    #########################################
+    # Start Mission
+    #########################################
+    # Send goto Location Command
+    nepi_msg.publishMsgInfo(self,"Starting Mission Processes")
+    success = node.mission()
+    #########################################
+  # End Mission
+  #########################################
+  # Run Post-Mission Actions
+  nepi_msg.publishMsgInfo(self,"Starting Post-Goto Actions")
+  success = node.post_mission_actions()
+  nepi_ros.sleep(10,100)
+  #########################################
+  #Mission Complete, Shutting Down
+  rospy.signal_shutdown("Mission Complete, Shutting Down")
 
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+
+  
+
+
+

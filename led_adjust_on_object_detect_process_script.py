@@ -42,22 +42,19 @@ AVG_LENGTH = 2
 #Set LED Control ROS Topic Name (or partial name)
 LED_CONTROL_TOPIC_NAME = "lsx/set_intensity"
 
-#########################################
-# ROS NAMESPACE SETUP
-#########################################
 
 
 #########################################
 # Node Class
 #########################################
 
-class ledAiAdjust(object):
+class led_adjust_on_object_detect(object):
 
   #######################
   ### Node Initialization
-  DEFAULT_NODE_NAME = "auto_led_ai_adjust" # Can be overwitten by luanch command
+  DEFAULT_NODE_NAME = "led_adjust_on_object_detect" # Can be overwitten by luanch command
   def __init__(self):
-    #### AUTO SCRIPT INIT SETUP ####
+    #### APP NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
     self.node_name = nepi_ros.get_node_name()
     self.base_namespace = nepi_ros.get_base_namespace()
@@ -84,7 +81,7 @@ class ledAiAdjust(object):
 
     # Wait for AI detector image topic to publish
     nepi_msg.publishMsgInfo(self,"Connecting to NEPI Detector Image Topic")
-    nepi_msg.publishMsgInfo(AI_DETECTION_IMAGE_TOPIC )
+    nepi_msg.publishMsgInfo(self,AI_DETECTION_IMAGE_TOPIC )
     nepi_msg.publishMsgInfo(self,"Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
     nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
     img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, self.image_callback)
@@ -109,14 +106,13 @@ class ledAiAdjust(object):
     # Setup watchdog process
     nepi_msg.publishMsgInfo(self,"Setting up watchdog timer")
     rospy.Timer(rospy.Duration(self.wd_check_interval_sec), self.watchdog_timer_callback)
-    #########################################################
+
+    ##############################
     ## Initiation Complete
-    nepi_msg.publishMsgInfo(self,"Initialization Complete")
-    #Set up node shutdown
-    nepi_ros.on_shutdown(self.cleanup_actions)
+    nepi_msg.publishMsgInfo(self," Initialization Complete")
     # Spin forever (until object is detected)
-    #nepi_ros.spin()
-    #########################################################
+    rospy.spin()
+    ##############################
 
 
 
@@ -206,6 +202,6 @@ class ledAiAdjust(object):
 # Main
 #########################################
 if __name__ == '__main__':
-  ledAiAdjust()
+  led_adjust_on_object_detect()
 
 
