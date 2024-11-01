@@ -29,12 +29,13 @@ import sys
 import time
 from nepi_edge_sdk_base import nepi_ros 
 from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_settings
 from nepi_edge_sdk_base import nepi_rbx
 
 from std_msgs.msg import Empty,Bool, String, UInt8, Int8, Float32, Float64
 from geographic_msgs.msg import GeoPoint
 from nepi_ros_interfaces.msg import RBXInfo, RBXStatus, AxisControls, RBXErrorBounds, RBXGotoErrors, RBXMotorControl, \
-     RBXGotoPose, RBXGotoPosition, RBXGotoLocation, SettingUpdate
+     RBXGotoPose, RBXGotoPosition, RBXGotoLocation
 from nepi_ros_interfaces.srv import RBXCapabilitiesQuery, RBXCapabilitiesQueryResponse
 
 #########################################
@@ -71,15 +72,16 @@ CMD_MODE_TIMEOUT_SEC = 5
 CMD_ACTION_TIMEOUT_SEC = 20
 CMD_GOTO_TIMEOUT_SEC = 20
 
-
 #########################################
 # Node Class
 #########################################
 
 class drone_inspection_demo_mission(object):
 
+  settings_update =  dict(
+    takeoff_height_m = {"type":"Float","name":"takeoff_height_m","value":str(TAKEOFF_HEIGHT_M)}
+  )
 
-  rbx_settings = []
   rbx_info = RBXInfo()
   rbx_status = RBXStatus()
   #######################
@@ -101,20 +103,25 @@ class drone_inspection_demo_mission(object):
     nepi_msg.publishMsgInfo(self,"Using rbx namesapce " + rbx_namespace)
     nepi_rbx.rbx_initialize(self,rbx_namespace)
     time.sleep(1)
+    nepi_msg.publishMsgInfo(self,"Waiting for status message")
+    while self.rbx_status == None and not rospy.is_shutdown():
+       time.sleep(1)
+    fake_gps_enabled = self.rbx_status.fake_gps_enabled
+    
+    
 
     #### publishers used below are defined in nepi_rbx.initialize() helper function call above
 
     # Apply Takeoff Height setting overide
-    th_setting = nepi_ros.get_setting_from_settings('takeoff_height_m',self.rbx_settings)
-    th_setting[2] = str(TAKEOFF_HEIGHT_M)
-    th_update_msg = nepi_ros.create_update_msg_from_setting(th_setting)
-    self.rbx_setting_update_pub.publish(th_update_msg) 
-    nepi_ros.sleep(2,10)
-    settings_str = str(self.rbx_settings)
-    nepi_msg.publishMsgInfo(self,"Udated settings:" + settings_str)
+    for setting_name in self.settings_update.keys():
+      setting = self.settings_update[setting_name]
+      setting_msg = nepi_settings.create_msg_from_setting(setting)
+      nepi_msg.publishMsgInfo(self,"Updated setting msg:" + str(setting_msg))
+      self.rbx_setting_update_pub.publish(setting_msg)
+      #nepi_msg.publishMsgInfo(self,"Updated setting:" + str(setting))
 
     # Setup Fake GPS if Enabled   
-    if ENABLE_FAKE_GPS:
+    if ENABLE_FAKE_GPS and fake_gps_enabled == False:
       nepi_msg.publishMsgInfo(self,"Enabled Fake GPS")
       self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
       time.sleep(2)
@@ -125,33 +132,44 @@ class drone_inspection_demo_mission(object):
       new_home_geo.longitude = HOME_LOCATION[1]
       new_home_geo.altitude = HOME_LOCATION[2]
       self.rbx_set_home_pub.publish(new_home_geo)
+      nepi_ros.sleep(2) # Give system time to stabilize on new gps location
       if ENABLE_FAKE_GPS:
       	nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
+    fake_gps_enabled = self.rbx_status.fake_gps_enabled
 
     # Setup mission action processes
-    SNAPSHOT_TRIGGER_TOPIC = self.self.base_namespace + "snapshot_trigger"
+    SNAPSHOT_TRIGGER_TOPIC = self.base_namespace + "snapshot_trigger"
     self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
 
     ##############################
     ## Initiation Complete
     nepi_msg.publishMsgInfo(self," Initialization Complete")
     # Spin forever (until object is detected)
-    rospy.spin()
+    #rospy.spin()
     ##############################
 
+    #########################################
+    # Run Pre-Mission Custom Actions
+    nepi_msg.publishMsgInfo(self,"Starting Mission Actions")
+    success = self.pre_mission_actions()
+    if success:
+      #########################################
+      # Start Mission
+      #########################################
+      # Send goto Location Command
+      nepi_msg.publishMsgInfo(self,"Starting Mission Processes")
+      success = self.mission()
+      #########################################
+    # End Mission
+    #########################################
+    # Run Post-Mission Actions
+    nepi_msg.publishMsgInfo(self,"Starting Post-Goto Actions")
+    success = self.post_mission_actions()
+    nepi_ros.sleep(10,100)
+    #########################################
+    #Mission Complete, Shutting Down
+    rospy.signal_shutdown("Mission Complete, Shutting Down")
 
-  #######################
-  ### RBX Settings, Info, and Status Callbacks
-  def rbx_settings_callback(self, msg):
-    self.rbx_settings = nepi_ros.parse_settings_msg_data(msg.data)
-
-
-  def rbx_info_callback(self, msg):
-    self.rbx_info = msg
-
-
-  def rbx_status_callback(self, msg):
-    self.rbx_status = msg
 
   #######################
   ### Node Methods
@@ -254,6 +272,19 @@ class drone_inspection_demo_mission(object):
 
 
   #######################
+  ### RBX Settings, Info, and Status Callbacks
+  def rbx_settings_callback(self, msg):
+    self.rbx_settings = nepi_settings.parse_settings_msg_data(msg)
+
+
+  def rbx_info_callback(self, msg):
+    self.rbx_info = msg
+
+
+  def rbx_status_callback(self, msg):
+    self.rbx_status = msg
+
+  #######################
   # Mission Action Functions
 
   ### Function to send snapshot event trigger and wait for completion
@@ -272,28 +303,8 @@ class drone_inspection_demo_mission(object):
 # Main
 #########################################
 if __name__ == '__main__':
-  node = drone_inspection_demo_mission()
-  #########################################
-  # Run Pre-Mission Custom Actions
-  nepi_msg.publishMsgInfo(self,"Starting Mission Actions")
-  success = node.pre_mission_actions()
-  if success:
-    #########################################
-    # Start Mission
-    #########################################
-    # Send goto Location Command
-    nepi_msg.publishMsgInfo(self,"Starting Mission Processes")
-    success = node.mission()
-    #########################################
-  # End Mission
-  #########################################
-  # Run Post-Mission Actions
-  nepi_msg.publishMsgInfo(self,"Starting Post-Goto Actions")
-  success = node.post_mission_actions()
-  nepi_ros.sleep(10,100)
-  #########################################
-  #Mission Complete, Shutting Down
-  rospy.signal_shutdown("Mission Complete, Shutting Down")
+  drone_inspection_demo_mission()
+
 
 
 

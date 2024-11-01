@@ -29,6 +29,8 @@ from std_msgs.msg import UInt8, Empty, Float32
 from sensor_msgs.msg import Image
 from nepi_ros_interfaces.msg import PanTiltLimits, PanTiltPosition, PanTiltStatus, StringArray
 from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
+from nepi_app_ai_targeting import TargetLocalization, TargetLocalizations
+
 
 
 #########################################
@@ -62,11 +64,11 @@ PTX_OBJ_CENTERED_BUFFER_RATIO = 0.15 # Hysteresis band about center of image for
 # Node Class
 #########################################
 
-class pantilt_object_tracker(object):
+class AiPtTrackerApp(object):
 
   #######################
   ### Node Initialization
-  DEFAULT_NODE_NAME = "pantilt_object_tracker" # Can be overwitten by luanch command
+  DEFAULT_NODE_NAME = "app_ai_pt_tracker" # Can be overwitten by luanch command
   def __init__(self):
     #### APP NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
@@ -77,10 +79,7 @@ class pantilt_object_tracker(object):
     ##############################
     ## Initialize Class Variables
     self.object_label_of_interest = OBJECT_LABEL_OF_INTEREST
-    self.img_width = 0 # Updated on receipt of first image
-    self.img_height = 0 # Updated on receipt of first image
-    self.img_area = 0 # Updated on receipt of first image
-    self.object_detected = False
+    self.object_detected = None
 
     self.pan_scan_direction = 1 # Keep track of current scan direction (1: Positive Limit, -1: Negative Limit)
     self.img_width = 0 # Updated on receipt of first image
@@ -112,21 +111,19 @@ class pantilt_object_tracker(object):
     PTX_SET_SOFT_LIMITS_TOPIC = PTX_NAMESPACE + "set_soft_limits"
 
     # AI Detector Subscriber Topics
-    AI_BOUNDING_BOXES_TOPIC = self.base_namespace + "ai_detector_mgr/bounding_boxes"
-    AI_DETECTION_IMAGE_TOPIC = self.base_namespace + "ai_detector_mgr/detection_image"
-    AI_FOUND_OBJECT_TOPIC = self.base_namespace + "ai_detector_mgr/found_object"
-    ## Class subscribers
+    AI_TARGETING_TOPIC = self.base_namespace + "app_ai_targeting/targeting_localizations"
+    AI_TARGET_COUNT_TOPIC = self.base_namespace + "app_ai_targeting/target_count"  
 
-    # Wait for AI detector image topic to publish
-    nepi_msg.publishMsgInfo(self,"Connecting to NEPI Detector Image Topic")
-    nepi_msg.publishMsgInfo(self,AI_DETECTION_IMAGE_TOPIC )
-    nepi_msg.publishMsgInfo(self,"Waiting for topic: " + AI_DETECTION_IMAGE_TOPIC)
-    nepi_ros.wait_for_topic(AI_DETECTION_IMAGE_TOPIC)
-    img_sub = rospy.Subscriber(AI_DETECTION_IMAGE_TOPIC, Image, self.image_callback)
-    while self.img_width == 0 and self.img_height == 0 and not rospy.is_shutdown():
-      nepi_msg.publishMsgInfo(self,"Waiting for Detection Image")
+    # Wait for AI detector image topic to publish 
+    nepi_msg.publishMsgInfo(self,"Waiting for topic: " + AI_TARGET_COUNT_TOPIC)
+    nepi_ros.wait_for_topic(AI_TARGET_COUNT_TOPIC)
+    #Set up found object subscriber which monitors all AI outputs
+    nepi_msg.publishMsgInfo(self,"Starting found object subscriber")
+    rospy.Subscriber(AI_TARGET_COUNT_TOPIC, ObjectCount, self.targetCountCb, queue_size = 1)
+    nepi_msg.publishMsgInfo(self,"Waiting for AI Targeting to start")
+    while self.object_detected is None and not rospy.is_shutdown():
       nepi_ros.sleep(1,100)
-    img_sub.unregister() # Don't need it anymore
+
     ## Create Class Publishers
     self.send_pt_home_pub = rospy.Publisher(PTX_GOHOME_TOPIC, Empty, queue_size=10)
     self.set_pt_speed_ratio_pub = rospy.Publisher(PTX_SET_SPEED_RATIO_TOPIC, Float32, queue_size=10)
@@ -139,11 +136,9 @@ class pantilt_object_tracker(object):
     print("Starting Pan Tilt Stutus callback")
     rospy.Subscriber(PTX_GET_STATUS_TOPIC, PanTiltStatus, self.pt_status_callback)  
     # Set up object detector subscriber
-    nepi_msg.publishMsgInfo(self,"Starting object detection subscriber: Object of interest = " + self.object_label_of_interest + "...")
-    rospy.Subscriber(AI_BOUNDING_BOXES_TOPIC, BoundingBoxes, self.object_detected_callback, queue_size = 1)
-    #Set up found object subscriber which monitors all AI outputs
-    nepi_msg.publishMsgInfo(self,"Starting found object subscriber")
-    rospy.Subscriber(AI_FOUND_OBJECT_TOPIC, ObjectCount, self.found_object_callback, queue_size = 1)
+    nepi_msg.publishMsgInfo(self,"Starting object targeting subscriber: Object of interest = " + self.object_label_of_interest + "...")
+    rospy.Subscriber(AI_TARGETING_TOPIC , TargetLocalizations, self.targetingCb, queue_size = 1)
+
     ## Start Node Processes
     # Set up the timer that start scanning when no objects are detected
     print("Setting up pan/tilt scan check timer")
@@ -160,15 +155,6 @@ class pantilt_object_tracker(object):
 
   #######################
   ### Node Methods
-
-  ### Simple callback to get image height and width
-  def image_callback(self,img_msg):
-    # This is just to get the image size for ratio purposes
-    if (self.img_height == 0 and self.img_width == 0):
-      nepi_msg.publishMsgInfo(self,"Initial input image received. Size = " + str(img_msg.width) + "x" + str(img_msg.height))
-      self.img_height = img_msg.height
-      self.img_width = img_msg.width
-      self.img_area = self.img_height*self.img_width
 
   ### Simple callback to get pt status info
   def pt_status_callback(self,PanTiltStatus):
@@ -217,22 +203,14 @@ class pantilt_object_tracker(object):
 
 
   # Action upon detection of object of interest
-  def object_detected_callback(self,bounding_box_msg):
-    box_of_interest = None
-    #print("Entering Detection Callback")
-    # Iterate over all of the objects reported by the detector and return center of largest box in degrees relative to img center
-    largest_box_area_ratio=0 # Initialize largest box area
-    for box in bounding_box_msg.bounding_boxes:
-      # Check for the object of interest and take appropriate actions
-      if box.Class == OBJECT_LABEL_OF_INTEREST:
-        # Check if largest box
-        box_area=(box.xmax-box.xmin)*(box.ymax-box.ymin)
-        box_area_ratio = float(box_area) / self.img_area
-        if box_area_ratio > largest_box_area_ratio:
-          largest_box_area_ratio=box_area_ratio
-          largest_box=box
-    if largest_box_area_ratio > MIN_DETECT_BOX_AREA_RATIO:
-      box_of_interest = largest_box
+  def targetingCb(self,targeting_msg):
+      toi_msg = None
+      targets = targeting_msg.target_localizations
+      for target in targets:
+        if target.Class == self.object_label_of_interest:
+          if toi_msg == None:
+            toi_msg = target
+            target_size = (box.xmax-box.xmin)*(box.ymax-box.ymin)
       self.object_detected = True
       # Calculate the box center in image ratio terms
       object_loc_y_pix = box_of_interest.ymin + ((box_of_interest.ymax - box_of_interest.ymin)  / 2) 
@@ -248,11 +226,13 @@ class pantilt_object_tracker(object):
       # Object of interest not detected, so reset object_detected
       self.object_detected=False  # will start scan mode on next timer event
   
-  def found_object_callback(self,found_obj_msg):
+  def targetCountCb(self,found_obj_msg):
     # Must reset object_detected in the event of no objects to restart scan mode
     if found_obj_msg.count == 0:
       #print("No objects found")
       self.object_detected=False
+    else:
+      self.object_detected=True
 
   ### Track box process based on current box center relative ratio of image
   def pt_track_box(self,object_error_x_ratio, object_error_y_ratio):
@@ -335,6 +315,6 @@ class pantilt_object_tracker(object):
 # Main
 #########################################
 if __name__ == '__main__':
-  pantilt_object_tracker()
+  AiPtTrackerApp()
 
 

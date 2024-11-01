@@ -31,11 +31,12 @@ import math
 from nepi_edge_sdk_base import nepi_ros 
 from nepi_edge_sdk_base import nepi_msg
 from nepi_edge_sdk_base import nepi_rbx
+from nepi_edge_sdk_base import nepi_settings
 
 from std_msgs.msg import Empty,Bool, String, UInt8, Int8, Float32, Float64
 from geographic_msgs.msg import GeoPoint
 from nepi_ros_interfaces.msg import RBXInfo, RBXStatus, AxisControls, RBXErrorBounds, RBXGotoErrors, RBXMotorControl, \
-     RBXGotoPose, RBXGotoPosition, RBXGotoLocation, SettingUpdate
+     RBXGotoPose, RBXGotoPosition, RBXGotoLocation
 from nepi_ros_interfaces.srv import RBXCapabilitiesQuery, RBXCapabilitiesQueryResponse
 from sensor_msgs.msg import NavSatFix, Image
 from nepi_ros_interfaces.msg import TargetLocalization, TargetLocalizations
@@ -82,10 +83,13 @@ CMD_GOTO_TIMEOUT_SEC = 20
 
 class drone_follow_object_mission(object):
 
-  rbx_settings = []
   rbx_info = RBXInfo()
   rbx_status = RBXStatus()
 
+
+  settings_update =  dict(
+    takeoff_height_m = {"type":"Float","name":"takeoff_height_m","value":str(TAKEOFF_HEIGHT_M)}
+  )
   #######################
   ### Node Initialization
   DEFAULT_NODE_NAME = "drone_follow_object_mission" # Can be overwitten by luanch command
@@ -97,6 +101,7 @@ class drone_follow_object_mission(object):
     nepi_msg.createMsgPublishers(self)
     nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
     ##############################
+    ##############################
     nepi_msg.publishMsgInfo(self,"Waiting for namespace containing: " + RBX_ROBOT_NAME)
     robot_namespace = nepi_ros.wait_for_node(RBX_ROBOT_NAME)
     robot_namespace = robot_namespace + "/"
@@ -105,40 +110,44 @@ class drone_follow_object_mission(object):
     nepi_msg.publishMsgInfo(self,"Using rbx namesapce " + rbx_namespace)
     nepi_rbx.rbx_initialize(self,rbx_namespace)
     time.sleep(1)
+    nepi_msg.publishMsgInfo(self,"Waiting for status message")
+    while self.rbx_status == None and not rospy.is_shutdown():
+       time.sleep(1)
+    fake_gps_enabled = self.rbx_status.fake_gps_enabled
+
+    
+    
 
     #### publishers used below are defined in nepi_rbx.initialize() helper function call above
 
     # Apply Takeoff Height setting overide
-    th_setting = nepi_ros.get_setting_from_settings('takeoff_height_m',self.rbx_settings)
-    th_setting[2] = str(TAKEOFF_HEIGHT_M)
-    th_update_msg = nepi_ros.create_update_msg_from_setting(th_setting)
-    self.rbx_setting_update_pub.publish(th_update_msg) 
-    nepi_ros.sleep(2,10)
-    settings_str = str(self.rbx_settings)
-    nepi_msg.publishMsgInfo(self,"Updated settings:" + settings_str)
-
-
-    # Mission Action Topics (If Required)
-    self.base_namespace = nepi_ros.get_base_namespace()
-    SNAPSHOT_TRIGGER_TOPIC = self.base_namespace + "snapshot_trigger"
-    self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
+    for setting_name in self.settings_update.keys():
+      setting = self.settings_update[setting_name]
+      setting_msg = nepi_settings.create_msg_from_setting(setting)
+      nepi_msg.publishMsgInfo(self,"Updated setting msg:" + str(setting_msg))
+      self.rbx_setting_update_pub.publish(setting_msg)
+      #nepi_msg.publishMsgInfo(self,"Updated setting:" + str(setting))
 
     # Setup Fake GPS if Enabled   
-    if ENABLE_FAKE_GPS:
-      nepi_msg.publishMsgInfo(self,"DRONE_INSPECT: Enabled Fake GPS")
+    if ENABLE_FAKE_GPS and fake_gps_enabled == False:
+      nepi_msg.publishMsgInfo(self,"Enabled Fake GPS")
       self.rbx_enable_fake_gps_pub.publish(ENABLE_FAKE_GPS)
       time.sleep(2)
     if SET_HOME:
-      nepi_msg.publishMsgInfo(self,"DRONE_INSPECT: Upating RBX Home Location")
+      nepi_msg.publishMsgInfo(self,"Upating RBX Home Location")
       new_home_geo = GeoPoint()
       new_home_geo.latitude = HOME_LOCATION[0]
       new_home_geo.longitude = HOME_LOCATION[1]
       new_home_geo.altitude = HOME_LOCATION[2]
       self.rbx_set_home_pub.publish(new_home_geo)
+      nepi_ros.sleep(2) # Give system time to stabilize on new gps location
       if ENABLE_FAKE_GPS:
       	nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
+    fake_gps_enabled = self.rbx_status.fake_gps_enabled
 
-
+    # Setup mission action processes
+    SNAPSHOT_TRIGGER_TOPIC = self.base_namespace + "snapshot_trigger"
+    self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
 
 
     ###########################     
@@ -147,7 +156,13 @@ class drone_follow_object_mission(object):
     # Wait for AI targeting detection topic and subscribe to it
     AI_TARGETING_TOPIC = "app_ai_targeting/target_localizations"
     nepi_msg.publishMsgInfo(self,"Waiting for topic: " + AI_TARGETING_TOPIC)
-    ai_targeting_topic_name = nepi_ros.wait_for_topic(AI_TARGETING_TOPIC)
+    ai_targeting_topic = nepi_ros.wait_for_topic(AI_TARGETING_TOPIC)
+
+    AI_TARGETING_IMAGE_TOPIC = "app_ai_targeting/targeting_image"
+    nepi_msg.publishMsgInfo(self,"Waiting for topic: " + AI_TARGETING_IMAGE_TOPIC)
+    ai_targeting_image_topic = nepi_ros.wait_for_topic(AI_TARGETING_IMAGE_TOPIC)
+    nepi_msg.publishMsgInfo(self,"Setting image topic to: " + ai_targeting_image_topic)
+    self.rbx_set_image_topic_pub.publish(ai_targeting_image_topic)
 
     ## Initiation Complete
     nepi_msg.publishMsgInfo(self,"Initialization Complete")
@@ -160,7 +175,7 @@ class drone_follow_object_mission(object):
     self.pre_mission_actions()
     # Start misson processes
     nepi_msg.publishMsgInfo(self,"Starting move to object callback")
-    rospy.Subscriber(ai_targeting_topic_name, TargetLocalizations, self.move_to_object_callback, queue_size = 1)
+    rospy.Subscriber(ai_targeting_topic, TargetLocalizations, self.move_to_object_callback, queue_size = 1)
 
     ##############################
     ## Initiation Complete
@@ -172,7 +187,7 @@ class drone_follow_object_mission(object):
   #######################
   ### RBX Settings, Info, and Status Callbacks
   def rbx_settings_callback(self, msg):
-    self.rbx_settings = nepi_ros.parse_settings_msg_data(msg.data)
+    self.rbx_settings = nepi_settings.parse_settings_msg_data(msg)
 
 
   def rbx_info_callback(self, msg):
@@ -264,7 +279,7 @@ class drone_follow_object_mission(object):
       target_range_m = target_data_msg.range_m # [x,y,z]
       target_yaw_d = target_data_msg.azimuth_deg  # dz
       target_pitch_d = target_data_msg.elevation_deg # dy
-      if target_class == TARGET_TO_FOLLOW and  target_range_m != -999:
+      if target_class == TARGET_TO_FOLLOW and target_range_m != -999:
         nepi_msg.publishMsgInfo(self,"Detected a " + TARGET_TO_FOLLOW + "with valid range")
         setpoint_range_m = target_range_m - TARGET_OFFSET_GOAL_M
         sp_x_m = setpoint_range_m * math.cos(math.radians(target_yaw_d))  # X is Forward
