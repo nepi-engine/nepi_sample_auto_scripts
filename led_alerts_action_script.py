@@ -42,9 +42,9 @@ LED_STATUS_TOPIC_NAME = "lsx/status"
 
 # Start and Alert Actions List [on_off_state,intensity_val,blink_state,blink_time_sec,color_string] Use -999 to ignore (not set)
 # States or actions for unsupported capabilities will be ignored
-START_STATE = [True,-999,False,0.0,"GREEN"]
-ALERT_TRUE_ACTIONS = [True,-999,True,0.5,"RED"]
-ALERT_FALSE_ACTIONS = [True,-999,False,-999,"GREEN"]
+START_STATE = [True,0.2,False,0.0,"GREEN"]
+ALERT_TRUE_ACTIONS = [True,0.2,True,0.5,"RED"]
+ALERT_FALSE_ACTIONS = [True,0.4,False,-999,"GREEN"]
 
 #########################################
 # Node Class
