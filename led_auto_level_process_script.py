@@ -9,9 +9,11 @@
 #
 
 # Sample NEPI Process Script.
-# 1. Connects to camera image
-# 2. Estimates image brightness with OpenCV 
-# 3. Adjust LED brightness based on image brightness
+# 1. Waits for LED system
+# 2. Waits for Camera image
+# 3. Connects to camera image
+# 4. Estimates image brightness with OpenCV 
+# 5. Adjust LED brightness based on image brightness
 
 
 import time

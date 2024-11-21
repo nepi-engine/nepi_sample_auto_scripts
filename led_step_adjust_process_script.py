@@ -12,10 +12,6 @@
 # 1. Waits for LED system
 # 2. Steps through LED intensities
 
-# Requires the following additional scripts are running
-# a)ai_detector_config_script.py
-# These scripts are available for download at:
-# [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
 
 import rospy
 import time

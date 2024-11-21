@@ -9,13 +9,11 @@
 #
 
 # Sample NEPI Process Script. 
-# 1. Waits for ai detection topic
-# 2. Adjust LED level based on target location in image
+# 1. Waits for LED system
+# 2. Waits for NEPI AI Alerts application
+# 3. Adjust LED level based on target location in image
 
-# Requires the following additional scripts are running
-# a)ai_detector_config_script.py
-# These scripts are available for download at:
-# [link text](https://github.com/numurus-nepi/nepi_sample_auto_scripts)
+
 
 import time
 import sys
