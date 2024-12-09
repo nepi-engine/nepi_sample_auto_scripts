@@ -119,7 +119,7 @@ class drone_inspection_demo_mission(object):
       nepi_msg.publishMsgInfo(self,"Updated setting msg:" + str(setting_msg))
       self.rbx_setting_update_pub.publish(setting_msg)
       #nepi_msg.publishMsgInfo(self,"Updated setting:" + str(setting))
-
+    '''
     # Setup Fake GPS if Enabled   
     if ENABLE_FAKE_GPS and fake_gps_enabled == False:
       nepi_msg.publishMsgInfo(self,"Enabled Fake GPS")
@@ -136,7 +136,7 @@ class drone_inspection_demo_mission(object):
       if ENABLE_FAKE_GPS:
       	nepi_ros.sleep(15,100) # Give system time to stabilize on new gps location
     fake_gps_enabled = self.rbx_status.fake_gps_enabled
-
+    '''
     # Setup mission action processes
     SNAPSHOT_TRIGGER_TOPIC = self.base_namespace + "snapshot_trigger"
     self.snapshot_trigger_pub = rospy.Publisher(SNAPSHOT_TRIGGER_TOPIC, Empty, queue_size = 1)
@@ -221,7 +221,7 @@ class drone_inspection_demo_mission(object):
     success = self.mission_actions()
    #########################################
     # Send goto Location Loop Command
-    '''
+    
     for ind in range(3):
       # Send goto Location Command
       nepi_msg.publishMsgInfo(self,"Starting goto Location Corners Process")
@@ -229,7 +229,7 @@ class drone_inspection_demo_mission(object):
       # Run Mission Actions
       nepi_msg.publishMsgInfo(self,"Starting Mission Actions")
       success = self.mission_actions()
-    '''
+   
     ###########################
     # Stop Your Custom Process
     ###########################
