@@ -32,11 +32,12 @@ from darknet_ros_msgs.msg import BoundingBoxes, ObjectCount
 # USER SETTINGS - Edit as Necessary 
 #########################################
 
-OBJECT_LABEL_OF_INTEREST = "person"
+OBJECT_LABEL_OF_INTEREST = "bottle"
+LOST_COUNT_THRESHOLD = 5
 LED_LEVEL_MAX = 0.3
 LED_BLINK_RATE = 0.5
 LED_BLINK_THRESHOLD = 0.5
-LED_UPDATE_TIME = 4
+WATCHDOG_TIME = 4
 AVG_LENGTH = 2
 
 
@@ -53,6 +54,7 @@ class led_adjust_on_object_detect(object):
   has_blink = False
   is_blinking = False
   set_intensity = 0
+  lost_count = 0
 
   
   #######################
@@ -70,7 +72,7 @@ class led_adjust_on_object_detect(object):
     self.led_intensity_pub = None
     self.object_label_of_interest = OBJECT_LABEL_OF_INTEREST
     self.led_level_max = LED_LEVEL_MAX
-    self.wd_timeout_sec = LED_UPDATE_TIME
+    self.wd_timeout_sec = WATCHDOG_TIME
     self.wd_check_interval_sec = 1
     self.wd_timer = 0
     self.intensity_history = np.zeros(AVG_LENGTH)
@@ -134,8 +136,8 @@ class led_adjust_on_object_detect(object):
       nepi_msg.publishMsgInfo(self,"Starting found object subscriber")
       rospy.Subscriber(AI_FOUND_OBJECT_TOPIC, ObjectCount, self.found_object_callback, queue_size = 1)
       ## Start Node Processes
-      # Setup watchdog process
-      nepi_msg.publishMsgInfo(self,"Setting up watchdog timer")
+      # Setup LED process
+      nepi_msg.publishMsgInfo(self,"Setting up LED timer")
       rospy.Timer(rospy.Duration(self.wd_check_interval_sec), self.led_timer_callback)
 
       ##############################
@@ -154,11 +156,12 @@ class led_adjust_on_object_detect(object):
   def object_detected_callback(self,bounding_boxes_msg):
     self.img_height = bounding_boxes_msg.image_height
     self.img_width = bounding_boxes_msg.image_width
-    self.object_detected = False
+    object_detected = False
     # Iterate over all of the objects reported by the detector
     for box in bounding_boxes_msg.bounding_boxes:
       # Check for the object of interest and take appropriate actions
       if box.Class == self.object_label_of_interest:
+        self.lost_count = 0
         box_of_interest=box
         #nepi_msg.publishMsgInfo(box_of_interest.Class)
         # Calculate the box center in image ratio terms
@@ -174,7 +177,7 @@ class led_adjust_on_object_detect(object):
         # Sending LED level update
         center_ratios = [1-box_abs_error_x_ratio] # ignore vertical
         mean_center_ratio = statistics.mean(center_ratios)
-        #nepi_msg.publishMsgInfo("Target center ratio: " + "%.2f" % (mean_center_ratio))
+        #nepi_msg.publishMsgInfo(self,"Target center ratio: " + "%.2f" % (mean_center_ratio))
         intensity = self.led_level_max *  mean_center_ratio**4
         self.intensity_history = np.roll(self.intensity_history,1)
         self.intensity_history[0]=intensity
@@ -183,46 +186,49 @@ class led_adjust_on_object_detect(object):
           self.set_blink_interval = LED_BLINK_RATE
         else:
           self.set_blink_interval = 0
+        object_detected = True
+      else:
+        self.lost_count += 1
+    self.object_detected = object_detected
 
-        self.object_detected = True
-    
+
   ### Check the number of objects detected on last detection process
   def found_object_callback(self,found_obj_msg):
     self.wd_timer = 0
     if found_obj_msg.count == 0:
+      self.lost_count += 1
+    if self.lost_count > LOST_COUNT_THRESHOLD:
       #nepi_msg.publishMsgInfo(self,"No objects found")
       self.object_detected=False
-      if not rospy.is_shutdown():
-          if self.has_intensity:
-            self.led_intensity_pub.publish(data = 0)
-          if self.has_blink:
-            self.led_blink_on_off_pub.publish(False)
 
 
   ### Setup a regular background scan process based on timer callback
   def led_timer_callback(self,timer):
     # Called periodically no matter what as a Timer object callback
-    #nepi_msg.publishMsgInfo(self,"Watchdog timer: " + str(self.wd_timer))
+    nepi_msg.publishMsgWarn(self,"LED timer: " + str(self.wd_timer))
     if self.wd_timer > self.wd_timeout_sec:
       nepi_msg.publishMsgInfo(self,"Past timeout time, turning lights off")
       if self.has_intensity:
         self.led_intensity_pub.publish(data = 0)
-      if self.has_blink:
+      if self.has_blink and self.is_blinking == True:
         self.led_blink_on_off_pub.publish(False)
         self.is_blinking = False
       self.led_on_off_pub.publish(False)
     else:
-      self.wd_timer = self.wd_timer + self.wd_check_interval_sec
+      self.wd_timer += self.wd_check_interval_sec
+      #self.led_on_off_pub.publish(True)
       if self.object_detected:
         if not rospy.is_shutdown():
+          #self.led_on_off_pub.publish(True)
           if self.has_intensity:
             nepi_msg.publishMsgInfo(self,"Setting intensity level to: " + "%.2f" % (self.set_intensity))
-            self.led_intensity_pub.publish(data = set_intensity)
+            self.led_intensity_pub.publish(data = self.set_intensity)
+          nepi_msg.publishMsgInfo(self,"Have blink interval of: " + "%.2f" % (self.set_blink_interval))
           if self.has_blink and self.set_blink_interval > 0:
             if self.is_blinking == False:
               nepi_msg.publishMsgInfo(self,"Setting blink interval to: " + "%.2f" % (self.set_blink_interval))
-              self.led_blink_interval_pub.publish(data = self.set_blink_interval)
               self.led_blink_on_off_pub.publish(True)
+              self.led_blink_interval_pub.publish(data = self.set_blink_interval)
               self.is_blinking = True
           else:
             self.led_blink_on_off_pub.publish(False)
@@ -230,9 +236,10 @@ class led_adjust_on_object_detect(object):
       elif not rospy.is_shutdown():
           if self.has_intensity:
             self.led_intensity_pub.publish(data = 0)
-          if self.has_blink:
+          if self.has_blink and self.is_blinking == True:
             self.led_blink_on_off_pub.publish(False)
             self.is_blinking = False
+
 
 
 
