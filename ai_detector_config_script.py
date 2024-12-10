@@ -32,7 +32,7 @@ from nepi_ros_interfaces.msg import ClassifierSelection, StringArray
 IMAGE_INPUT_TOPIC_NAME = "color_2d_image"
 
 #Set AI Detector Parameters
-DETECTION_MODEL = "common_object_detection"
+DETECTION_MODEL = "darknet_common_object_detection_fast"
 DETECTION_THRESHOLD = 0.5
 
 
