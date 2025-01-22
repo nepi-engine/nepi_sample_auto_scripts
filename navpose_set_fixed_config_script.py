@@ -21,9 +21,9 @@ import math
 import tf
 import time
 import sys
-from nepi_edge_sdk_base import nepi_ros 
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_nav
+from nepi_sdk import nepi_ros 
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_nav
 
 from std_msgs.msg import Float64, Empty
 from sensor_msgs.msg import NavSatFix

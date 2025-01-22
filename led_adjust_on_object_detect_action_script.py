@@ -20,8 +20,8 @@ import sys
 import rospy
 import statistics
 import numpy as np
-from nepi_edge_sdk_base import nepi_ros 
-from nepi_edge_sdk_base import nepi_msg
+from nepi_sdk import nepi_ros 
+from nepi_sdk import nepi_msg
 
 from std_msgs.msg import Bool, Empty, Float32
 from sensor_msgs.msg import Image

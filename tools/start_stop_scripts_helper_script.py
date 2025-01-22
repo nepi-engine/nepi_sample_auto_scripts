@@ -7,7 +7,7 @@
 # This license applies to any user of NEPI Engine software
 #
 # Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
+# see https://github.com/numurus-nepi/nepi_sdk
 #
 # This software is dual-licensed under the terms of either a NEPI software developer license
 # or a NEPI software commercial license.

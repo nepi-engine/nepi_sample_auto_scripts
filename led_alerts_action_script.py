@@ -20,8 +20,8 @@ import os
 import rospy
 import time
 import sys
-from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_msg 
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_msg 
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Int32, Bool, String, Float32, Float64
 from nepi_ros_interfaces.msg import LSXStatus

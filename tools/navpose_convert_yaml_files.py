@@ -16,8 +16,8 @@
 import os
 import yaml
 import rospy
-from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_nav
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_nav
 from std_msgs.msg import Float64MultiArray
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 from nepi_ros_interfaces.msg import NavPose, NavPoseResponse

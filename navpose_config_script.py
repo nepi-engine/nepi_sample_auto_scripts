@@ -15,8 +15,8 @@
 import rospy
 import time
 import sys
-from nepi_edge_sdk_base import nepi_ros 
-from nepi_edge_sdk_base import nepi_msg
+from nepi_sdk import nepi_ros 
+from nepi_sdk import nepi_msg
 
 from std_msgs.msg import String, Bool
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest

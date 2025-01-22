@@ -28,10 +28,10 @@ import rospy
 import sys
 import time
 import math
-from nepi_edge_sdk_base import nepi_ros 
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_rbx
-from nepi_edge_sdk_base import nepi_settings
+from nepi_sdk import nepi_ros 
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_rbx
+from nepi_sdk import nepi_settings
 
 from std_msgs.msg import Empty,Bool, String, UInt8, Int8, Float32, Float64
 from geographic_msgs.msg import GeoPoint

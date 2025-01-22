@@ -19,9 +19,9 @@ import sys
 import rospy
 import numpy as np
 import cv2
-from nepi_edge_sdk_base import nepi_ros 
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_img
+from nepi_sdk import nepi_ros 
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_img
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge

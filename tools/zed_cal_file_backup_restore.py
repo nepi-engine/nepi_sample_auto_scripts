@@ -9,7 +9,7 @@
 #
 
 import os
-from nepi_edge_sdk_base import nepi_ros
+from nepi_sdk import nepi_ros
 
      
 if __name__ == '__main__':

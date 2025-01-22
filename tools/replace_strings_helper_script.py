@@ -7,7 +7,7 @@
 # This license applies to any user of NEPI Engine software
 #
 # Copyright (C) 2023 Numurus, LLC <https://www.numurus.com>
-# see https://github.com/numurus-nepi/nepi_edge_sdk_base
+# see https://github.com/numurus-nepi/nepi_sdk
 #
 # This software is dual-licensed under the terms of either a NEPI software developer license
 # or a NEPI software commercial license.
@@ -43,8 +43,8 @@ import fileinput
 SCRIPT_FOLDER = "/mnt/nepi_storage/automation_scripts/"
 SCRIPT_LIST = [] # Leave empty to update all files in folder. Add files to limit which files are updated
 
-FIND_REPLACE_LIST = [["resources import nepi","nepi_edge_sdk_base import nepi_ros "],
-                     ["resources import nepi_navpose","nepi_edge_sdk_base import nepi_nav "],
+FIND_REPLACE_LIST = [["resources import nepi","nepi_sdk import nepi_ros "],
+                     ["resources import nepi_navpose","nepi_sdk import nepi_nav "],
                      ["nepi.","nepi_ros."]]
 
 
